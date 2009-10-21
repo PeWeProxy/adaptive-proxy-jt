@@ -1,0 +1,38 @@
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration debug="false" xmlns:log4j="http://jakarta.apache.org/log4j/">
+    <appender name="zeroconf" class="org.apache.log4j.net.ZeroConfSocketHubAppender">
+        <param name="Name" value="AdaptiveProxy Logging"/>
+		<param name="LocationInfo" value="true" />
+    </appender>
+    <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
+        <param name="Name" value="Standard output appender"/>
+        <layout class="org.apache.log4j.PatternLayout">
+			<!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
+			<param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%C{1}] [%t]: [%m]%n"/>
+		</layout>
+    </appender>
+    <!--
+    <appender name="socket" class="org.apache.log4j.net.SocketHubAppender">
+        <param name="Name" value="SocketHubAppender@4560"/>
+   		<param name="Port" value="4560"/>
+   		<param name="Threshold" value="ALL"/>
+    </appender>
+    -->
+    <logger name="org.apache">
+    	<level value="warn" />
+    </logger>
+    <logger name="rabbit">
+    	<level value="info" />
+    </logger>
+    <!-- <logger name="rabbit.util.CharsetDetector">
+    	<level value="all" />
+    </logger> -->
+    <logger name="sk.fiit.rabbit.adaptiveproxy">
+    	<level value="info" />
+    </logger>
+    <!--ROOT Logger-->
+    <root>
+        <level value="all" />
+        <appender-ref ref="stdout" />
+    </root>
+</log4j:configuration>

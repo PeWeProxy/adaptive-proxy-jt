@@ -1,0 +1,36 @@
+
+One thread, the selector thread, handles all network access.
+This thread may not do blocking operations since that will make
+other connections lag. Once the selector thread reaches a
+point where it must do a blocking call it queues up a runnable
+to the thread pool.
+
+The thread pool does blocking calls (dns lookups, cache reading, ...).
+It spawns threads as needed and reuses threads that have been
+released from blocking calls.
+When a blocking call is done and it is time to send data on the network
+the blocking operations queues up a runnable on the selector
+thread queue and calls selector.wakeup.
+
+So a request goes something like this:
+1)  selector accepts a connection
+2)  selector reads the http request and creates a Connection
+3)  Connection does a cache lookup (blocking on thread pool)
+4)  Cache did not hold the resource, Connection does a DNS
+    lookup to the real server (blocking)
+5)  Connection establishes a tcp socket to the upstream server
+6)  Connection sends http request
+7)  Connection reads http response
+8)  Connection sends http response to client
+9)  Connection establishes a cache entry (blocking)
+10) Connection waits for more data from server
+11) Connection reads data and sends it to client, may also
+    cache (blocking but done on selector thread for now,
+    I will fix that some day).
+12) loop back to 10 if resource has more data
+13) return tcp sockets to pool
+14) loop back to 2 or close the client socket.
+
+A Connection goes between the selector thread and
+the thread pool. A connection is _never_ used by two threads
+at the same time.
