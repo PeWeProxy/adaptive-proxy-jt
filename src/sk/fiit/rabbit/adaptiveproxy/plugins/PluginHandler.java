@@ -20,12 +20,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import org.apache.log4j.Appender;
-import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.WriterAppender;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -192,7 +187,6 @@ public class PluginHandler {
 	
 	private synchronized void loadPluginsConfigs() {
 		configEntries.clear();
-		excludeFileNames.add("services.xml");
 		File[] configFiles = pluginRepositoryDir.listFiles(new PluginsXMLFileFilter(excludeFileNames));
 		Set<String> pluginNames = new HashSet<String>();
 		Map<URI, ClassLoader> cLoaders = new HashMap<URI, ClassLoader>();
