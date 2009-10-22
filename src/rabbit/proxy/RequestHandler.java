@@ -26,7 +26,7 @@ class RequestHandler {
     
     public RequestHandler (Connection con) {
 	webHandle = new CacheBufferHandle (con.getBufferHandler ());
-	cond = new ConditionalChecker (con.getLogger ());
+	cond = new ConditionalChecker ();
     }
 
     public synchronized BufferHandle getWebHandle () {

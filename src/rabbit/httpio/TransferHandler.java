@@ -2,13 +2,11 @@ package rabbit.httpio;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import rabbit.io.Address;
-import rabbit.io.SelectorRegistrator;
-import rabbit.io.SocketHandler;
-import rabbit.util.Logger;
+import rabbit.nio.DefaultTaskIdentifier;
+import rabbit.nio.NioHandler;
+import rabbit.nio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that transfers data from a Transferable to a socket channel. 
@@ -17,35 +15,34 @@ import rabbit.util.TrafficLogger;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class TransferHandler implements Runnable {
-    private final TaskRunner tr;
+    private final NioHandler nioHandler;
     private final Transferable t;
-    private SelectionKey sk;
-    private final Selector selector;
     private final SocketChannel channel;
     private final TrafficLogger tlFrom;
     private final TrafficLogger tlTo;
     private final TransferListener listener;
-    private final Logger logger;
     private long pos = 0; 
     private long count;
-    
-    public TransferHandler (TaskRunner tr, Transferable t, 
-			    Selector selector, SocketChannel channel, 
+
+    public TransferHandler (NioHandler nioHandler, Transferable t, 
+			    SocketChannel channel, 
 			    TrafficLogger tlFrom, TrafficLogger tlTo, 
-			    TransferListener listener, Logger logger) {
-	this.tr = tr;
+			    TransferListener listener) {
+	this.nioHandler = nioHandler;
 	this.t = t;
-	this.selector = selector;
 	this.channel = channel;
 	this.tlFrom = tlFrom;
 	this.tlTo = tlTo;
 	this.listener = listener;
-	this.logger = logger;
 	count = t.length ();
     }
 
     public void transfer () {
-	tr.runThreadTask (this);
+	String groupId = getClass ().getSimpleName ();
+	String desc = "Transferable: " + t + ", chanel: " + channel + 
+	    ", listener: " + listener;
+	nioHandler.runThreadTask (this, 
+				  new DefaultTaskIdentifier (groupId, desc));
     }
     
     public void run () {
@@ -62,47 +59,25 @@ public class TransferHandler implements Runnable {
 		    return;
 		}		
 	    }
-	    returnOk ();
+	    listener.transferOk ();
 	} catch (IOException e) {
-	    returnWithFailure (e);
+	    listener.failed (e);
 	}	    
     }
 
     private void setupWaitForWrite () {
-	tr.runMainTask (new WriteWaitRegistrator ());
+	nioHandler.waitForWrite (channel, new WriteWaiter ());
     }
 
-    private class WriteWaitRegistrator implements Runnable {
-	public void run () {
-	    try {
-		SocketHandler sh = new WriteWaiter ();
-		sk = 
-		    SelectorRegistrator.register (logger, channel, 
-						  selector, 
-						  SelectionKey.OP_WRITE,
-						  sh, Long.MAX_VALUE);
-	    } catch (IOException e) {
-		listener.failed (e);
-	    }
+    private class WriteWaiter implements WriteHandler {
+	private Long timeout = nioHandler.getDefaultTimeout ();
+
+	public void closed () {
+	    listener.failed (new IOException ("channel closed"));
 	}
-    }
-    
-    private class WriteWaiter implements SocketHandler {
-	public void run () {
-	    if (sk.isValid ()) {
-		TransferHandler.this.run ();
-	    } else {
-		sk.cancel ();
-		String err = "write wait got invalid channel";
-		returnWithFailure (new IOException (err));
-	    }
-	}
-	
+
 	public void timeout () {
-	    if (!sk.isValid ()) {
-		sk.cancel ();
-	    }
-	    returnWithFailure (new IOException ("write timed out"));
+	    listener.failed (new IOException ("write timed out"));
 	}
 
 	public boolean useSeparateThread () {
@@ -114,23 +89,13 @@ public class TransferHandler implements Runnable {
 	    Address a = new Address (s.getInetAddress (), s.getPort ());
 	    return "TransferHandler$WriteWaiter: address: " + a;
 	}
-    }
-    
-    private void returnWithFailure (final Exception cause) {
-	tr.runMainTask (new Runnable () {
-		public void run () {
-		    listener.failed (cause);
-		}
-	    });	    
-    }
 
-    private void returnOk () {
-	tr.runMainTask (new TransferOK ());
-    }
+	public Long getTimeout () {
+	    return timeout;
+	}
 
-    private class TransferOK implements Runnable {
-	public void run () {
-	    listener.transferOk ();
+	public void write () {
+	    TransferHandler.this.run ();
 	}
     }
 }

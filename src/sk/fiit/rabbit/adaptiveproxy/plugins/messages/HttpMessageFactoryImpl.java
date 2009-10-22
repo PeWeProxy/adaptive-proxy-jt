@@ -1,6 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
 
 import java.util.Date;
+import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
@@ -9,8 +10,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.headers.RequestHeaders;
 import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
-	private static final org.apache.log4j.Logger log
-	= org.apache.log4j.Logger.getLogger(HttpMessageFactoryImpl.class);
+	private static final Logger log = Logger.getLogger(HttpMessageFactoryImpl.class.getName());
 	
 	private final Connection con;
 	private final ModifiableHttpRequestImpl request;

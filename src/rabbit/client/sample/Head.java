@@ -6,7 +6,6 @@ import rabbit.client.ClientListenerAdapter;
 import rabbit.client.CountingClientBaseStopper;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.WebConnectionResourceSource;
-import rabbit.util.Logger;
 
 /** A class that performs a set HEAD request to the given urls.
  *  This is mostly an example of how to use the rabbit client classes.
@@ -52,14 +51,10 @@ public class Head {
      */
     public void head (String url) throws IOException {
 	ccbs.sendRequest (clientBase.getRequest ("HEAD", url),
-			  new HeadListener (clientBase.getLogger ()));
+			  new HeadListener ());
     }
 
     private class HeadListener extends ClientListenerAdapter {   
-	public HeadListener (Logger logger) {
-	    super (logger);
-	}
-
 	@Override public void redirectedTo (String url) throws IOException {
 	    head (url);
 	}

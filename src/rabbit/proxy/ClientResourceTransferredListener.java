@@ -8,7 +8,6 @@ import rabbit.httpio.AsyncListener;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public interface ClientResourceTransferredListener extends AsyncListener {
-	
 	/** Sending failed 
      * @param cause the real reason the operation failed.
      */
@@ -16,7 +15,7 @@ public interface ClientResourceTransferredListener extends AsyncListener {
 
     /** The sending operation timed out 
      */
-    void sendingTimeout(); 
+    void sendingTimeout();
 
     /** The client resource have been successfully transferred.
      */

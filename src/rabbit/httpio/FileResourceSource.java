@@ -7,9 +7,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
+import java.util.logging.Logger;
 import rabbit.io.BufferHandle;
 import rabbit.io.BufferHandler;
 import rabbit.io.CacheBufferHandle;
+import rabbit.io.Closer;
+import rabbit.nio.DefaultTaskIdentifier;
+import rabbit.nio.NioHandler;
+import rabbit.nio.TaskIdentifier;
 
 /** A resource that comes from a file.
  * 
@@ -20,16 +25,19 @@ public class FileResourceSource implements ResourceSource {
     
     // used for block handling.
     private BlockListener listener;
-    private TaskRunner tr;
+    private NioHandler nioHandler;
     protected BufferHandle bufHandle;
+
+    private final Logger logger = 
+	Logger.getLogger (getClass ().getName ());
     
-    public FileResourceSource (String filename, TaskRunner tr, 
+    public FileResourceSource (String filename, NioHandler nioHandler, 
 			       BufferHandler bufHandler) 
 	throws IOException {
-	this (new File (filename), tr, bufHandler);
+	this (new File (filename), nioHandler, bufHandler);
     }
 
-    public FileResourceSource (File f, TaskRunner tr, 
+    public FileResourceSource (File f, NioHandler nioHandler, 
 			       BufferHandler bufHandler) 
 	throws IOException {
 	if (!f.exists ())
@@ -40,7 +48,7 @@ public class FileResourceSource implements ResourceSource {
 					     " is not a regular file");
 	FileInputStream fis = new FileInputStream (f);
 	fc = fis.getChannel ();
-	this.tr = tr;
+	this.nioHandler = nioHandler;
 	this.bufHandle = new CacheBufferHandle (bufHandler);
     }    
 
@@ -81,7 +89,10 @@ public class FileResourceSource implements ResourceSource {
 	this.listener = listener;
 	// Get buffer on selector thread.
 	bufHandle.getBuffer ();
-	tr.runThreadTask (new ReadBlock ());
+	TaskIdentifier ti = 
+	    new DefaultTaskIdentifier (getClass ().getSimpleName (), 
+				       "addBlockListener: channel: " + fc);
+	nioHandler.runThreadTask (new ReadBlock (), ti);
     }
 
     private class ReadBlock implements Runnable {
@@ -102,41 +113,24 @@ public class FileResourceSource implements ResourceSource {
     }
 
     private void returnWithFailure (final Exception e) {
-	tr.runMainTask (new Runnable () {
-		public void run () {
-		    bufHandle.possiblyFlush ();
-		    listener.failed (e);
-		}
-	    });
+	bufHandle.possiblyFlush ();
+	listener.failed (e);
     }
 
     private void returnFinished () {
-	tr.runMainTask (new Runnable () {
-		public void run () {
-		    bufHandle.possiblyFlush ();
-		    listener.finishedRead ();
-		}
-	    });
+	bufHandle.possiblyFlush ();
+	listener.finishedRead ();
     }
 
     private void returnBlockRead () {
-	tr.runMainTask (new Runnable () {
-		public void run () {
-		    listener.bufferRead (bufHandle);
-		}
-	    });
+	listener.bufferRead (bufHandle);
     }
 
     public void release () {
-	try {
-	    if (fc != null)
-		fc.close ();
-	    listener = null;
-	    tr = null;
-	    bufHandle.possiblyFlush ();
-	    bufHandle = null;
-	} catch (IOException e) {
-	    // TODO: handle...
-	}
+	Closer.close (fc, logger);
+	listener = null;
+	nioHandler = null;
+	bufHandle.possiblyFlush ();
+	bufHandle = null;
     }
 }

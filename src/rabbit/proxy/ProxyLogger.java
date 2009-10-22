@@ -1,9 +1,6 @@
 package rabbit.proxy;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
@@ -11,33 +8,22 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
-import rabbit.util.Level;
-import rabbit.util.Logger;
+import java.util.logging.FileHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 import rabbit.util.SProperties;
 
 /** A class to handle proxy logging. 
  * 
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class ProxyLogger implements Logger, ConnectionLogger {
+public class ProxyLogger implements ConnectionLogger {
 
-    /** The current config */
-    private SProperties config;
-    
-    /** Output for errors */
-    private LogWriter errorLog = new LogWriter (System.err, true);
-
-    /** monitor for error log. */
-    private Object errorMonitor = new Object ();
-    
     /** Output for accesses */
-    private LogWriter accessLog = new LogWriter (System.out, true);
-
-    /** monitor for access log. */
-    private Object accessMonitor = new Object ();
-
-    /** The current error log level. */
-    private Level logLevel = Level.MSG;
+    private Logger accessLog;
 
     /** The format we write dates on. */
     private SimpleDateFormat sdf = 
@@ -68,164 +54,55 @@ public class ProxyLogger implements Logger, ConnectionLogger {
 	return offset;
     }
 
-    public void setup (SProperties config) {
-	if (config == null) // just default if we got no config.
-	    config = new SProperties ();
-	this.config = config;
-	String loglvl = config.getProperty ("loglevel", "WARN");
-	logLevel = getErrorLevel (loglvl);
+    private Logger getLogger (SProperties config, String prefix,
+			      String logDomain, Formatter format) 
+	throws IOException {
+	String log = config.get (prefix + "_log");
+	String sl = config.get (prefix + "_size_limit");
+	sl = sl == null ? "1" : sl.trim ();
+	int limit = Integer.parseInt (sl) * 1024 * 1024;
+	int numFiles = Integer.parseInt (config.get (prefix + "_num_files"), 10);
+	sl = config.get (prefix + "_log_level");
+	sl = sl != null ? sl : "INFO";
+	Level level = Level.parse (sl);
+
+	FileHandler fh = new FileHandler (log, limit, numFiles, true);
+	fh.setFormatter (new SimpleFormatter ());
+	Logger logger = Logger.getLogger(logDomain);
+	logger.setLevel (level);
+	logger.addHandler (fh);
+	logger.setUseParentHandlers (false);
 	
-	errorLog = setupLog (config, errorLog, errorMonitor, "errorlog", 
-			     "logs/error_log", System.err);
-	accessLog = setupLog (config, accessLog, accessMonitor, "accesslog", 
-			      "logs/access_log", System.out);
+	if (format != null)
+	    fh.setFormatter (format);
+	
+	return logger;
     }
-    
-    /** Configure the error log.
-     */
-    private LogWriter setupLog (SProperties config, LogWriter currentLogger, 
-				Object monitor, String entry, 
-				String defaultLog, PrintStream defaultStream) {
-	String log = config.getProperty (entry, defaultLog);
-	synchronized (monitor) {
-	    try {	    
-		closeLog (currentLogger);
-		if (!log.equals ("")) {
-		    File f = new File (log);
-		    File p = new File (f.getParent ());
-		    if (!p.exists ())
-			if (!p.mkdirs ()) {
-			    String err = "faile to create directories: " + 
-				p.getAbsolutePath ();
-			    throw new IOException (err);
-			}
-		    return new LogWriter (new FileWriter (log, true), true);
-		}
-		return new LogWriter (defaultStream, true);
-	    } catch (IOException e) {
-		logFatal ("Could not create log on '" + log + 
-			  "' exiting: " + e);
-	    }
-	    return new LogWriter (defaultStream, true);
+
+    public void setup (SProperties config) throws IOException {
+	String sysLogging = 
+	    System.getProperty ("java.util.logging.config.file");
+	if (sysLogging != null) {
+	    System.out.println ("Logging configure by system property");
+	} else {
+	    Logger eh = getLogger (config, "error", "rabbit", null);
+	    eh.info ("Log level set to: " + eh.getLevel ());
+	}
+	Logger ah = getLogger (config, "access", "rabbit_access", 
+			       new AccessFormatter ());
+	accessLog = ah;
+    }
+
+    private static class AccessFormatter extends Formatter {
+	@Override public String format (LogRecord record) {
+	    return record.getMessage () + "\n";
 	}
     }
     
-    public void rotateLogs () {
-	logMsg ("Log rotation requested.");
-	Date d = new Date ();
-	SimpleDateFormat lf = new SimpleDateFormat ("yyyy-MM-dd");
-	String date = lf.format (d);	
-	errorLog = rotateLog (config, errorLog, errorMonitor, "errorlog", 
-			      "logs/error_log", System.err, date);
-	accessLog = rotateLog (config, accessLog, accessMonitor, "accesslog", 
-			       "logs/access_log", System.out, date);	
-    }
-
-    private LogWriter rotateLog (SProperties config, LogWriter w, 
-				 Object monitor, String entry, 
-				 String defaultLog, 
-				 PrintStream defaultStream, String date) {
-	synchronized (monitor) {
-	    if (w != null && !w.isSystemWriter ()) {
-		closeLog (w);
-		String log = config.getProperty (entry, defaultLog);
-		File f = new File (log);
-		File fn = new File (log + "-" + date);	    
-		if (f.renameTo (fn))
-		    return setupLog (config, w, monitor, entry, 
-				     defaultLog, defaultStream);
-		logError ("failed to rotate error log!");
-	    }
-	    return w;
-	}
-    }
-
-    /** Get the actual error level from the given String.
-     * @param errorlevel the String to translate.
-     * @return the errorlevel suitable for the given String.
-     */
-    private Level getErrorLevel (String errorlevel) {
-	Level l = Enum.valueOf (Level.class, errorlevel.toUpperCase ());
-	return l;
-    }
-
-    /** Flush and close the logfile given.
-     * @param w the logfile to close.
-     */
-    private void closeLog (LogWriter w) {
-	if (w != null && !w.isSystemWriter ()) {
-	    w.flush ();
-	    w.close ();
-	}
-    }
-    
-    /** Close down this logger. Will set the access and error logs to console.
-     */
-    public void close () {
-	synchronized (accessMonitor) {
-	    accessLog.flush ();
-	    accessLog.close ();
-	    accessLog = new LogWriter (System.out, true);
-	}
-	synchronized (errorMonitor) {
-	    errorLog.flush ();
-	    errorLog.close ();
-	    errorLog = new LogWriter (System.err, true);
-	}
-    }
-
-    public void logDebug (String error) {
-	logError (Level.DEBUG, error);		
-    }
-
-    public void logAll (String error) {
-	logError (Level.ALL, error);		
-    }
-
-    public void logInfo (String error) {
-	logError (Level.INFO, error);		
-    }
-
-    public void logWarn (String error) {
-	logError (Level.WARN, error);		
-    }
-
-    public void logMsg (String error) {
-	logError (Level.MSG, error);		
-    }
-
-    public void logError (String error) {
-	logError (Level.ERROR, error);	
-    }
-
-    public void logFatal (String error) {
-	logError (Level.FATAL, error);
-    }
-
-    public boolean showsLevel (Level level) {
-	return logLevel.compareTo (level) <= 0;
-    }
-
-    public void logError (Level level, String error) {
-	if (!showsLevel (level))
-	    return;
-	Date d = new Date ();
-	d.setTime (d.getTime () - offset);
-	StringBuilder sb = new StringBuilder ("[");
-	synchronized (sdfMonitor) {
-	    sb.append (sdf.format (d));
-	}
-	sb.append ("][");
-	sb.append (level);
-	sb.append ("][");
-	sb.append (error);
-	sb.append ("]");
-	synchronized (errorMonitor) {
-	    errorLog.println (sb.toString ());
-	}	
-    }
-
     public void logConnection (Connection con) {
+	if (accessLog == null)
+	    return;
+
 	StringBuilder sb = new StringBuilder ();
 	Socket s = con.getChannel ().socket (); 
 	if (s != null) {
@@ -253,8 +130,7 @@ public class ProxyLogger implements Logger, ConnectionLogger {
 	sb.append (con.getId ().toString ());
 	sb.append (" ");
 	sb.append ((con.getExtraInfo () != null ? con.getExtraInfo () : ""));
-	synchronized (accessMonitor) {
-	    accessLog.println (sb.toString ());
-	}
+
+	accessLog.log (Level.INFO, sb.toString ());
     }
 }

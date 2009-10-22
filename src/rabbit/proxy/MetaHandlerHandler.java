@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.StringTokenizer;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.meta.MetaHandler;
 import rabbit.util.Coder;
@@ -74,7 +75,7 @@ class MetaHandlerHandler {
 	    error = "Strange name of metapage?:" + file + ", " + e;
 	} 
 	if (error != null) {
-	    con.getLogger ().logWarn (error);
+	    Logger.getLogger (getClass ().getName ()).warning (error);
 	    con.doError (400, error);
 	    return;
 	}

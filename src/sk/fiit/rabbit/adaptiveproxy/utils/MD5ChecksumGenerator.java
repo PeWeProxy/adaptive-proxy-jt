@@ -9,7 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import org.apache.log4j.Logger;
 
 public final class MD5ChecksumGenerator {
-	private static final Logger log = Logger.getLogger(MD5ChecksumGenerator.class);
+	private static final Logger log = Logger.getLogger(MD5ChecksumGenerator.class.getName());
 	private static final MessageDigest md5Generator;
 	private static final byte[] HEX_CHAR_TABLE;    
 	 

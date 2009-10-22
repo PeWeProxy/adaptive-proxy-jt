@@ -42,7 +42,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 			try {
 				providers = plugin.provideRequestServices(request);
 			} catch (Exception e) {
-				log.debug("Exception thrown while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'");
+				log.error("Exception thrown while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'");
 			}
 			if (providers != null)
 				addServiceProviders(plugin,providers);

@@ -9,6 +9,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.util.Date;
 import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.http.ContentRangeParser;
@@ -21,14 +23,12 @@ import rabbit.httpio.ChunkEnder;
 import rabbit.httpio.HttpHeaderSender;
 import rabbit.httpio.HttpHeaderSentListener;
 import rabbit.httpio.ResourceSource;
-import rabbit.httpio.TaskRunner;
 import rabbit.httpio.TransferHandler;
 import rabbit.httpio.TransferListener;
 import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.PartialCacher;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This class is an implementation of the Handler interface.
@@ -38,7 +38,7 @@ import rabbit.util.SProperties;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class BaseHandler 
-    implements Handler, HandlerFactory, HttpHeaderSentListener,  
+    implements Handler, HandlerFactory, HttpHeaderSentListener, BlockListener, 
                BlockSentListener {
     /** The Connection handling the request.*/
     protected Connection con;
@@ -71,6 +71,8 @@ public class BaseHandler
     protected boolean emptyChunkSent = false;
     
     private ResponseReadListener responseReadListener = null;
+
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     /** For creating the factory.
      */
@@ -115,7 +117,7 @@ public class BaseHandler
     }
 
     protected Logger getLogger () {
-	return con.getLogger ();
+	return logger;
     }
 
     /** Handle the request.
@@ -145,9 +147,10 @@ public class BaseHandler
 
     protected void sendHeader () {
 	try {
-	    new HttpHeaderSender (con.getChannel (), con.getSelector (), 
-				  getLogger (), tlh.getClient (), 
-				  response, false, this);
+	    HttpHeaderSender hhs = 
+		new HttpHeaderSender (con.getChannel (), con.getNioHandler (), 
+				      tlh.getClient (), response, false, this);
+	    hhs.sendHeader ();
 	} catch (IOException e) {
 	    failed (e);
 	}
@@ -174,8 +177,8 @@ public class BaseHandler
 	    BlockSentListener bsl = new Finisher ();
 	    ChunkEnder ce = new ChunkEnder ();
 	    try {
-		ce.sendChunkEnding (con.getChannel (), con.getSelector (), 
-				    getLogger (), tlh.getClient (), bsl);
+		ce.sendChunkEnding (con.getChannel (), con.getNioHandler (),
+				    tlh.getClient (), bsl);
 	    } catch (IOException e) {
 		failed (e);
 	    }
@@ -303,14 +306,14 @@ public class BaseHandler
 	    if (exp != null) {
 		long now = System.currentTimeMillis ();
 		if (now > exp.getTime ()) {
-		    getLogger ().logWarn ("expire date in the past: '" + 
-					  expires + "'");
+		    getLogger ().config ("expire date in the past: '" + 
+					 expires + "'");
 		    entry = null;
 		    return;
 		}
 		entry.setExpires (exp.getTime ());
 	    } else {
-		getLogger ().logMsg ("unable to parse expire date: '" + 
+		getLogger ().config ("unable to parse expire date: '" + 
 				     expires + "' for URI: '" + 
 				     request.getRequestURI () + "'");
 		entry = null;
@@ -332,7 +335,7 @@ public class BaseHandler
 		cr = "bytes 0-" + (size - 1) + "/" + size;
 	    }
 	}
-	ContentRangeParser crp = new ContentRangeParser (cr, getLogger ());
+	ContentRangeParser crp = new ContentRangeParser (cr);
 	if (crp.isValid ()) {
 	    long start = crp.getStart ();
 	    long end = crp.getEnd ();
@@ -363,14 +366,14 @@ public class BaseHandler
 	if (oldEntry != null) {
 	    String oldName = cache.getEntryName (oldEntry.getId (), true, null);
 	    PartialCacher pc = 
-		new PartialCacher (getLogger (), oldName, response);
+		new PartialCacher (oldName, response);
 	    cacheChannel = pc.getChannel ();
 	    updateRange (oldEntry, pc, cache);
 	    return;
 	}
 	entry.setDataHook (response);
 	PartialCacher pc = 
-	    new PartialCacher (getLogger (), entryName, response);
+	    new PartialCacher (entryName, response);
 	cacheChannel = pc.getChannel ();
     }
 
@@ -382,7 +385,7 @@ public class BaseHandler
 	    entry = cache.newEntry (request);
 	    setCacheExpiry ();
 	    if (entry == null) {
-		getLogger ().logAll ("Expiry =< 0 set on entry, will not cache");				     
+		getLogger ().config ("Expiry =< 0 set on entry, will not cache");				     
 		return;
 	    }
 	    String entryName = cache.getEntryName (entry.getId (), false, null);
@@ -392,9 +395,9 @@ public class BaseHandler
 		try {
 		    setupPartial (oldEntry, entry, entryName, cache);
 		} catch (IOException e) {
-		    getLogger ().logWarn ("Got IOException, " + 
-					  "not updating cache: " + 
-					  e + "'");
+		    getLogger ().log (Level.WARNING, 
+				      "Got IOException, not updating cache",
+				      e);
 		    entry = null;
 		    cacheChannel = null;		    
 		}
@@ -410,8 +413,9 @@ public class BaseHandler
 		    */
 		    cacheChannel = cacheStream.getChannel ();
 		} catch (IOException e) {
-		    getLogger ().logWarn ("Got IOException, not caching: " + 
-					  e + "'");
+		    getLogger ().log (Level.WARNING,
+				      "Got IOException, not caching",
+				      e);
 		    entry = null;
 		    cacheChannel = null;
 		}
@@ -433,26 +437,21 @@ public class BaseHandler
 	return true;
     }
 
-    protected TaskRunner getTaskRunner () {
-	return con.getProxy ().getTaskRunner ();
-    }
-
     protected void send () {
 	if (mayTransfer () 
 	    && content.length () > 0 
 	    && content.supportsTransfer ()) {
 	    TransferListener tl = new ContentTransferListener ();
 	    TransferHandler th = 
-		new TransferHandler (getTaskRunner (), content,
-				     con.getSelector (), con.getChannel (), 
-				     tlh.getCache (), tlh.getClient (), tl, 
-				     con.getLogger ());
+		new TransferHandler (con.getNioHandler (), content,
+				     con.getChannel (), 
+				     tlh.getCache (), tlh.getClient (), tl);
 	    th.transfer ();
 	} else {
 	    requestMoreData();
 	}
     }
-    
+
     private class ResponseReadListener implements BlockListener {
 		@Override
 		public void bufferRead(BufferHandle bufHandle) {
@@ -478,7 +477,7 @@ public class BaseHandler
 			doTimeout();
 		}
     }
-
+    
     private class ContentTransferListener implements TransferListener {
 	public void transferOk () {
 	    finishData ();
@@ -509,27 +508,23 @@ public class BaseHandler
 	    if (cacheChannel != null)
 		writeCache (buffer);
 	    totalRead += buffer.remaining ();
-	    new BlockSender (con.getChannel (), con.getSelector (), 
-			     getLogger (), tlh.getClient (), 
-			     bufHandle, con.getChunking (), this);
+	    BlockSender bs = 
+		new BlockSender (con.getChannel (), con.getNioHandler (), 
+				 tlh.getClient (), bufHandle, 
+				 con.getChunking (), this);
+	    bs.write ();
 	} catch (IOException e) {
 	    failed (e);
 	}
     }
     
-    protected void requestMoreData() {
+     protected void requestMoreData() {
     	if (content != null)
     		content.addBlockListener (responseReadListener);
     }
 
-    protected class MainBlockListener implements Runnable {
-	public void run () {
-	    requestMoreData();
-	}
-    }
-
     public void blockSent () {
-	con.getProxy ().runMainTask (new MainBlockListener ());
+		requestMoreData();
     }
     
     public void finishedRead () {
@@ -568,7 +563,9 @@ public class BaseHandler
 		f.delete ();
 		entry = null;
 	    } catch (IOException e) {
-		getLogger ().logMsg ("failed to remove cache entry: " + e);				     
+		getLogger ().log (Level.WARNING,
+				  "failed to remove cache entry: ", 
+				  e);
 	    } finally {
 		cacheChannel = null;
 	    } 
@@ -580,43 +577,46 @@ public class BaseHandler
     	doFailed(cause);
     }
     
-    private void doFailed(Exception cause) {
-    	if (con != null) {
-    	    String st = null;
-    	    if (cause instanceof IOException) {
-    		IOException ioe = (IOException)cause;
-    		if ("Broken pipe".equals (ioe.getMessage ()))
-    		    st = ioe.toString () + ", probably cancelled pipeline";
-    		else 
-    		    st = getStackTrace (cause);
-    	    } else {
-    		st = getStackTrace (cause);
-    	    }
-    	    getLogger ().logWarn ("BaseHandler: error handling request: " +
-    				  request.getRequestURI () + ": " + 
-    				  st);
-    	    con.setStatusCode ("500");
-    	    String ei = con.getExtraInfo ();
-    	    ei = ei == null ? cause.toString () : (ei + ", " + cause);
-    	    con.setExtraInfo (ei);
-    	}
-    	removeCache ();
-    	finish (false);
+    public void doFailed (Exception cause) {
+	if (con != null) {
+	    String st = null;
+	    if (cause instanceof IOException) {
+		IOException ioe = (IOException)cause;
+		String msg = ioe.getMessage ();
+		if ("Broken pipe".equals (msg))
+		    st = ioe.toString () + ", probably cancelled pipeline";
+		else if ("Connection reset by peer".equals (msg))
+		    st = ioe.toString () + ", client aborted connection";
+		else 
+		    st = getStackTrace (cause);
+	    } else {
+		st = getStackTrace (cause);
+	    }
+	    getLogger ().warning ("BaseHandler: error handling request: " +
+				  request.getRequestURI () + ": " + 
+				  st);
+	    con.setStatusCode ("500");
+	    String ei = con.getExtraInfo ();
+	    ei = ei == null ? cause.toString () : (ei + ", " + cause);
+	    con.setExtraInfo (ei);
+	}
+	removeCache ();
+	finish (false);
     }
-
-    public void timeout () {
+    
+     public void timeout () {
     	con.getProxy().getAdaptiveEngine().getEventsHandler().logResponseDeliveryTimeout(con);
     	doTimeout();
     }
-    
-    private void doTimeout() {
-    	if (con != null)
-    	    getLogger ().logWarn ("BaseHandler: timeout");
-    	removeCache ();
-    	finish (false);
+
+    public void doTimeout () {
+	if (con != null)
+	    getLogger ().warning ("BaseHandler: timeout");
+	removeCache ();
+	finish (false);
     }
 
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	// nothing to do.
     }
 }

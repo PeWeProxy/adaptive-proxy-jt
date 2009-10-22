@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a class that removes "Accept-Encoding: gzip"
@@ -63,7 +62,7 @@ public class NoGZipEncoding implements HttpFilter {
     /** Setup this class with the given properties.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String rs = properties.getProperty ("remove", "");
 	remove = "true".equalsIgnoreCase (rs);
     }

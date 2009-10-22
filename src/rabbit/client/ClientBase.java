@@ -2,15 +2,13 @@ package rabbit.client;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.channels.Selector;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.HttpResponseListener;
 import rabbit.httpio.HttpResponseReader;
-import rabbit.httpio.SelectorRunner;
 import rabbit.httpio.SimpleResolver;
-import rabbit.httpio.TaskRunner;
 import rabbit.httpio.WebConnectionResourceSource;
 import rabbit.io.BufferHandle;
 import rabbit.io.BufferHandler;
@@ -19,9 +17,9 @@ import rabbit.io.ConnectionHandler;
 import rabbit.io.Resolver;
 import rabbit.io.WebConnection;
 import rabbit.io.WebConnectionListener;
+import rabbit.nio.MultiSelectorNioHandler;
+import rabbit.nio.NioHandler;
 import rabbit.util.Counter;
-import rabbit.util.Logger;
-import rabbit.util.SimpleLogger;
 import rabbit.util.SimpleTrafficLogger;
 import rabbit.util.TrafficLogger;
 
@@ -30,10 +28,10 @@ import rabbit.util.TrafficLogger;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class ClientBase {
-    private final Logger logger = new SimpleLogger ();
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     private final ConnectionHandler connectionHandler;
     private final Counter counter = new Counter ();
-    private final SelectorRunner selectorRunner;
+    private final NioHandler nioHandler;
     private final TrafficLogger trafficLogger = new SimpleTrafficLogger ();
     private final BufferHandler bufHandler;
 
@@ -41,12 +39,11 @@ public class ClientBase {
      */
     public ClientBase () throws IOException {
 	ExecutorService es = Executors.newCachedThreadPool ();
-	selectorRunner = new SelectorRunner (es, logger);
-	selectorRunner.start ();
-	Resolver resolver = new SimpleResolver (logger, selectorRunner);
-	connectionHandler = 
-	    new ConnectionHandler (logger, counter, resolver, 
-				   selectorRunner.getSelector ());
+	nioHandler = new MultiSelectorNioHandler (es, 4);
+	nioHandler.start ();
+	Resolver resolver = new SimpleResolver (nioHandler);
+	connectionHandler =
+	    new ConnectionHandler (counter, resolver, nioHandler);
 
 	bufHandler = new CachingBufferHandler ();
     }
@@ -69,12 +66,8 @@ public class ClientBase {
 	return connectionHandler;
     }
 
-    public TaskRunner getTaskRunner () {
-	return selectorRunner;
-    }
-
-    private Selector getSelector () {
-	return selectorRunner.getSelector ();
+    public NioHandler getNioHandler () {
+	return nioHandler;
     }
 
     public Logger getLogger () {
@@ -84,7 +77,7 @@ public class ClientBase {
     /** Shutdown this client handler.
      */ 
     public void shutdown () {
-	selectorRunner.shutdown ();
+	nioHandler.shutdown ();
     }
 
     /** Send a request and let the client be notified on response. 
@@ -138,10 +131,11 @@ public class ClientBase {
 			      WebConnection wc) {
 	HttpResponseListener hrl = new HRL (request, client, wc);
 	try {
-	    new HttpResponseReader (wc.getChannel (), 
-				    selectorRunner.getSelector (), 
-				    logger, trafficLogger, bufHandler, 
-				    request, true, true, hrl);
+	    HttpResponseReader rr = 
+		new HttpResponseReader (wc.getChannel (), nioHandler,
+					trafficLogger, bufHandler, 
+					request, true, true, hrl);
+	    rr.sendRequestAndWaitForResponse ();
 	} catch (IOException e) {
 	    handleFailure (request, client, e);
 	}
@@ -193,12 +187,10 @@ public class ClientBase {
     private WebConnectionResourceSource 
     getWebConnectionResouceSource (WebConnection wc, BufferHandle bufferHandle,
 				   boolean isChunked, long dataSize) {
-	Selector selector = getSelector ();
 	WebConnectionResourceSource wrs = 
-	    new WebConnectionResourceSource (connectionHandler, selector, 
-					     wc, bufferHandle, logger,
-					     trafficLogger, isChunked, 
-					     dataSize, true);
+	    new WebConnectionResourceSource (connectionHandler, nioHandler, 
+					     wc, bufferHandle, trafficLogger, 
+					     isChunked, dataSize, true);
 	return wrs;
     }
 }

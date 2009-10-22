@@ -2,11 +2,10 @@ package rabbit.meta;
 
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
-import rabbit.io.HandlerRegistration;
 import rabbit.proxy.HtmlPage;
+import rabbit.nio.SelectorVisitor;
 
 /** A status page for the proxy.
  *
@@ -24,29 +23,44 @@ public class SelectorStatus extends BaseMetaHandler {
 	return PageCompletion.PAGE_DONE;
     }    
 
-    private void addStatus (StringBuilder sb) {
+    private void addStatus (final StringBuilder sb) {
 	sb.append ("Status of selector at: ");
 	sb.append (new Date ());
 	sb.append ("<p>\n");
-	Selector sel = con.getSelector ();
-	appendKeys (sb, sel.selectedKeys (), "Selected key");
-	appendKeys (sb, sel.keys (), "Registered key");
+	
+	con.getNioHandler ().visitSelectors (new SelectorVisitor () {
+		int count = 0;
+		public void selector (Selector selector) {
+		    boolean odd = (count & 1) == 1;
+		    String trColor = odd ? "#EE8888" : "#DD6666";
+		    String tdColor = odd ? "#EEFFFF" : "#DDDDFF";
+		    appendKeys (sb, selector.selectedKeys (), "Selected key", 
+				trColor, tdColor);
+		    appendKeys (sb, selector.keys (), "Registered key", 
+				trColor, tdColor);
+		    count++;
+		}
+		public void end () {
+		}
+	    });
     }
 
-    private void appendKeys (StringBuilder sb, 
-			     Set<SelectionKey> sks, String header) {
-	SimpleDateFormat sdf = new SimpleDateFormat ("yyyy-MM-dd HH:mm:ss");
+
+    private void appendKeys (StringBuilder sb, Set<SelectionKey> sks, 
+			     String header, String thColor, String trColor) {
 	sb.append (HtmlPage.getTableHeader (100, 1));
-	sb.append (HtmlPage.getTableTopicRow ());
+	sb.append ("<tr bgcolor=\"").append (thColor).append ("\">");
 	sb.append ("<th width=\"20%\">").append (header).append ("</th>");
-	sb.append ("<th width=\"50%\">Attachment</th>");
-	sb.append ("<th>Interest</th>");
-	sb.append ("<th>Ready</th>");
-	sb.append ("<th>Registered</th>");
-	sb.append ("</tr>\n");
+	sb.append ("<th>channel</th>" + 
+		   "<th width=\"50%\">Attachment</th>" + 
+		   "<th>Interest</th>" + 
+		   "<th>Ready</th>" +
+		   "</tr>\n");
 	for (SelectionKey sk : sks) {
-	    sb.append ("<tr><td>");
+	    sb.append ("<tr bgcolor=\"").append (trColor).append ("\"><td>");
 	    sb.append (sk.toString ());
+	    sb.append ("</td><td>");
+	    sb.append (sk.channel ());
 	    sb.append ("</td><td>");
 	    sb.append (sk.attachment ());
 	    sb.append ("</td><td>");
@@ -54,14 +68,6 @@ public class SelectorStatus extends BaseMetaHandler {
 	    appendOpString (sb, valid ? sk.interestOps () : 0);
 	    sb.append ("</td><td>");
 	    appendOpString (sb, valid ? sk.readyOps () : 0);
-	    sb.append ("</td><td>");
-	    Object a = sk.attachment ();
-	    if (a instanceof HandlerRegistration) {
-		HandlerRegistration hr = (HandlerRegistration)a;
-		long when = hr.getRegistrationTime ();
-		if (when < Long.MAX_VALUE)
-		    sb.append (sdf.format (when));
-	    }
 	    sb.append ("</td></tr>\n");
 	}
 	sb.append ("</table>\n<br>\n");

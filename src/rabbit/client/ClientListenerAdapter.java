@@ -2,24 +2,18 @@ package rabbit.client;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.WebConnectionResourceSource;
-import rabbit.util.Logger;
+
 
 /** A basic ClientListener.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class ClientListenerAdapter implements ClientListener {
-    private final Logger logger;
-
-    public ClientListenerAdapter (Logger logger) {
-	this.logger = logger;
-    }
-
-    public Logger getLogger () {
-	return logger;
-    }
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     /** Create the redirected url and calls redirectedTo() and requestDone().
      */
@@ -56,16 +50,17 @@ public class ClientListenerAdapter implements ClientListener {
     /** Logs an error to the logger and calls requestDone().
      */ 
     @Override public void handleTimeout (HttpHeader request) {
-	logger.logError ("Request to " + request.getRequestURI () + 
-			 " timed out");
+	logger.warning ("Request to " + request.getRequestURI () + 
+			" timed out");
 	requestDone (request);
     }
 
     /** Logs an error to the logger and calls requestDone().
      */ 
     @Override public void handleFailure (HttpHeader request, Exception e) {
-	logger.logError ("Request to " + request.getRequestURI () + 
-			 " failed: " + e);
+	logger.log (Level.WARNING, 
+		    "Request to " + request.getRequestURI () + " failed: ", 
+		    e);
 	requestDone (request);
     }
     

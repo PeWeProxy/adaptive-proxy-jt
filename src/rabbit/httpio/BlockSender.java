@@ -4,30 +4,29 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
+import java.util.logging.Level;
 import rabbit.io.BufferHandle;
-import rabbit.util.Logger;
+import rabbit.nio.NioHandler;
+import rabbit.nio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that writes data blocks.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class BlockSender extends BaseSocketHandler {
+public class BlockSender extends BaseSocketHandler implements WriteHandler {
     private ByteBuffer chunkBuffer;
     private ByteBuffer end;
     private ByteBuffer[] buffers;
     private final TrafficLogger tl;
     private final BlockSentListener sender;
-    private int ops = 0;
     
-    public BlockSender (SocketChannel channel, Selector selector, 
-			Logger logger, TrafficLogger tl, 
+    public BlockSender (SocketChannel channel, NioHandler nioHandler, 
+			TrafficLogger tl, 
 			BufferHandle bufHandle, boolean chunking, 
 			BlockSentListener sender) 
 	throws IOException {
-	super (channel, bufHandle, selector, logger);
+	super (channel, bufHandle, nioHandler);
 	this.tl = tl;
 	ByteBuffer buffer = bufHandle.getBuffer ();
 	if (chunking) {
@@ -36,7 +35,9 @@ public class BlockSender extends BaseSocketHandler {
 	    try {
 		chunkBuffer = ByteBuffer.wrap (s.getBytes ("ASCII"));
 	    } catch (UnsupportedEncodingException e) {
-		logger.logError ("BlockSender: ASCII not found!");
+		getLogger ().log (Level.WARNING, 
+				  "BlockSender: ASCII not found!", 
+				  e);
 	    }
 	    end = ByteBuffer.wrap (new byte[] {'\r', '\n'});
 	    buffers = new ByteBuffer[]{chunkBuffer, buffer, end};
@@ -45,11 +46,11 @@ public class BlockSender extends BaseSocketHandler {
 	    end = buffer;
 	}
 	this.sender = sender;
-	writeBuffer ();
     }
 
-    public String getDescription () {
-	StringBuilder sb = new StringBuilder ("BlockSender: buffers: " + buffers.length);
+    @Override public String getDescription () {
+	StringBuilder sb = 
+	    new StringBuilder ("BlockSender: buffers: " + buffers.length);
 	for (int i = 0; i < buffers.length; i++) {
 	    if (i > 0)
 		sb.append (", ");
@@ -58,20 +59,20 @@ public class BlockSender extends BaseSocketHandler {
 	return sb.toString ();
     }
 
-    @Override protected int getSocketOperations () {
-	return ops;
-    }
-
-    public void timeout () {
+    @Override public void timeout () {
 	releaseBuffer ();
 	sender.timeout ();
     }
 
-    public void run () {
+    @Override public void closed () {
+	releaseBuffer ();
+	sender.failed (new IOException ("channel was closed"));
+    }
+
+    public void write () {
 	try {
 	    writeBuffer ();
 	} catch (IOException e) {
-	    unregister ();
 	    releaseBuffer ();
 	    sender.failed (e);
 	}
@@ -80,17 +81,15 @@ public class BlockSender extends BaseSocketHandler {
     private void writeBuffer () throws IOException {
 	long written;
 	do {
-	    written = channel.write (buffers);
+	    written = getChannel ().write (buffers);
 	    tl.write (written);
 	} while (written > 0 && end.remaining () > 0);
 
 	if (end.remaining () == 0) {
-	    unregister ();
 	    releaseBuffer ();
 	    sender.blockSent ();
 	} else {
-	    ops = SelectionKey.OP_WRITE;
-	    register ();
+	    waitForWrite (this);
 	}
     }
 }    

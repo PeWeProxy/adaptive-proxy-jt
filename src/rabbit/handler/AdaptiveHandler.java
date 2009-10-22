@@ -62,7 +62,7 @@ public class AdaptiveHandler extends FilterHandler {
 		return h;
 	}
 	
-	private void setHTMLprasing() {
+	private void setHTMLparsing() {
 		String ct = response.getHeader("Content-Type");
 		if (ct != null && ct.startsWith("text/html")) {
 			doHTMLparsing = true;
@@ -74,7 +74,7 @@ public class AdaptiveHandler extends FilterHandler {
 	@Override
 	public void handle() {
 		if (notCaching) {
-			setHTMLprasing();
+			setHTMLparsing();
 			super.handle();
 		} else 
 			// start receiving content data
@@ -115,6 +115,11 @@ public class AdaptiveHandler extends FilterHandler {
 	}
 	
 	public void sendResponse(HttpHeader responseHeaders, byte[] content) {
+		if (sendingPhase) {
+			log.warn("sendResponse() method was called second time, closing down connection");
+			finish(false);
+			return;
+		}
 		response = responseHeaders;
 		if (content != null) {
 			if (log.isTraceEnabled())
@@ -141,17 +146,17 @@ public class AdaptiveHandler extends FilterHandler {
 				log.trace("Sending response with no data");
 			ContentHeadersRemover.removeContentHeaders(response);
 			isCompressing = false;
-			gzu = null;
 			if (this.content != null) {
 				this.content.release();
 				this.content = null;
 			}
 			emptyChunkSent = true;
 		}
+		gzu = null;
 		memStore = null;
 		sendingPhase = true;
 		ignoreDataRequest = false;
-		setHTMLprasing();
+		setHTMLparsing();
 		sendHeader();
 	}
 	

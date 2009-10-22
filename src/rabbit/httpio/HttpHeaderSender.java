@@ -4,11 +4,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.Selector;
 import rabbit.http.HttpHeader;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
-import rabbit.util.Logger;
+import rabbit.nio.NioHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that writes http headers
@@ -18,18 +17,23 @@ import rabbit.util.TrafficLogger;
 public class HttpHeaderSender implements BlockSentListener {
     private final boolean fullURI;
     private final HttpHeaderSentListener sender;
-    
+    private final BlockSender bs;
+
     /** 
      * @param fullURI if false then try to change header.uri into just the file.
      */
-    public HttpHeaderSender (SocketChannel channel, Selector selector, 
-			     Logger logger, TrafficLogger tl, HttpHeader header,
+    public HttpHeaderSender (SocketChannel channel, NioHandler nioHandler, 
+			     TrafficLogger tl, HttpHeader header,
 			     boolean fullURI, HttpHeaderSentListener sender) 
 	throws IOException {
 	this.fullURI = fullURI;
 	this.sender = sender;
 	BufferHandle bh = new SimpleBufferHandle (getBuffer (header));
-	new BlockSender (channel, selector, logger, tl, bh, false, this);
+	bs = new BlockSender (channel, nioHandler, tl, bh, false, this);
+    }
+
+    public void sendHeader () throws IOException {
+	bs.write ();
     }
 
     private ByteBuffer getBuffer (HttpHeader header) throws IOException {

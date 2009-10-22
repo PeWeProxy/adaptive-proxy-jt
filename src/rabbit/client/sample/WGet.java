@@ -9,7 +9,6 @@ import rabbit.client.CountingClientBaseStopper;
 import rabbit.client.FileSaver;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.WebConnectionResourceSource;
-import rabbit.util.Logger;
 
 /** A class to download a set of resources.
  *  Given a set of urls this class will download all of them concurrently
@@ -51,14 +50,10 @@ public class WGet {
      */ 
     public void get (String url) throws IOException {
 	ccbs.sendRequest (clientBase.getRequest ("GET", url),
-			  new WGetListener (clientBase.getLogger ()));
+			  new WGetListener ());
     }
 
     private class WGetListener extends ClientListenerAdapter {   
-	public WGetListener (Logger logger) {
-	    super (logger);
-	}
-	
 	@Override public void redirectedTo (String url) throws IOException {
 	    get (url);
 	}

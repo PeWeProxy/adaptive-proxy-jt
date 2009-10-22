@@ -1,8 +1,10 @@
 package rabbit.proxy;
 
 import java.io.IOException;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.httpio.AcceptorListener;
 import rabbit.io.BufferHandler;
 
@@ -11,34 +13,36 @@ import rabbit.io.BufferHandler;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class ProxyConnectionAcceptor implements AcceptorListener {
-    private int id;
-    private long counter;
-    private HttpProxy proxy;
+    private final int id;
+    private final HttpProxy proxy;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+    private final AtomicLong counter = new AtomicLong ();
 
     public ProxyConnectionAcceptor (int id, HttpProxy proxy) {
+	logger.fine ("ProxyConnectionAcceptor created: " + id);
 	this.id = id;
 	this.proxy = proxy;
     }
 
-    public void connectionAccepted (SocketChannel sc, Selector selector) 
+    public void connectionAccepted (SocketChannel sc) 
 	throws IOException {
 	proxy.getCounter ().inc ("Socket accepts");
+	if (logger.isLoggable (Level.FINE))
+	    logger.fine ("Accepted connection from: " + sc);
 	if (!proxy.getSocketAccessController ().checkAccess (sc)) {
-	    proxy.getLogger ().logWarn ("Rejecting access from " + 
-					sc.socket ().getInetAddress ());
+	    logger.warning ("Rejecting access from " + 
+			    sc.socket ().getInetAddress ());
 	    proxy.getCounter ().inc ("Rejected IP:s");
 	    sc.close ();
 	} else {
-	    BufferHandler bh = proxy.getBufferHandler (selector);
+	    BufferHandler bh = proxy.getBufferHandler ();
 	    Connection c = 
-		new Connection (getId (), sc, selector, proxy, bh);
+		new Connection (getId (), sc, proxy, bh);
 	    c.readRequest ();
 	}
     }
 
     private ConnectionId getId () {
-	synchronized (this) {
-	    return new ConnectionId (id, counter++);
-	}
+	return new ConnectionId (id, counter.incrementAndGet ());
     }
 }

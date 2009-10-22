@@ -14,8 +14,10 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import rabbit.io.Closer;
 import rabbit.util.IPAccess;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a class that filters access based on ip adress.
@@ -27,6 +29,8 @@ public class AccessFilter implements IPAccessFilter {
     private List<IPAccess> allowed = new ArrayList<IPAccess> ();
     private List<IPAccess> denied = new ArrayList<IPAccess> ();
     private static final String DEFAULTCONFIG = "conf/access";
+
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     /** Filter based on a socket.
      * @param s the SocketChannel to check.
@@ -48,40 +52,36 @@ public class AccessFilter implements IPAccessFilter {
     /** Setup this class.
      * @param properties the Properties to get the settings from.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String file = properties.getProperty ("accessfile", DEFAULTCONFIG);
-	loadAccess (logger, file);
+	loadAccess (file);
     }
      
     /** Read the data (accesslists) from a file.
      * @param filename the name of the file to read from.
      */
-    private void loadAccess (Logger logger, String filename) {
+    private void loadAccess (String filename) {
 	filename = filename.replace ('/', File.separatorChar);
 	accessfile = filename;
 	
 	FileReader fr = null;
 	try {
 	    fr = new FileReader (accessfile);
-	    loadAccess (logger, fr);	    
+	    loadAccess (fr);	    
 	} catch (IOException e) {
-	    logger.logFatal ("Accessfile '" + accessfile + 
-			     "' not found: no one allowed: " + e);
+	    logger.log (Level.WARNING, 
+			"Accessfile '" + accessfile + 
+			"' not found: no one allowed",
+			e);
 	} finally {
-	    if (fr != null) {
-		try {
-		    fr.close ();
-		} catch (IOException e) {
-		    logger.logFatal ("failed to close accessfile: " + e);
-		}
-	    }
+	    Closer.close (fr, logger);
 	}
     }
     
     /** Loads in the accessess allowed from the given Reader
      * @param r the Reader were data is available
      */
-    public void loadAccess (Logger logger, Reader r) throws IOException {
+    public void loadAccess (Reader r) throws IOException {
 	List<IPAccess> allowed = new ArrayList<IPAccess> ();
 	List<IPAccess> denied = new ArrayList<IPAccess> ();
 	LineNumberReader br = new LineNumberReader (r);
@@ -101,7 +101,7 @@ public class AccessFilter implements IPAccessFilter {
 	    }
 	    StringTokenizer st = new StringTokenizer (line);
 	    if (st.countTokens () != 2) {
-		logger.logWarn ("Bad line in accessconf:" + br.getLineNumber());
+		logger.warning ("Bad line in accessconf:" + br.getLineNumber());
 		continue;
 	    }
 	    String low = st.nextToken ();
@@ -128,7 +128,7 @@ public class AccessFilter implements IPAccessFilter {
 	try {
 	    ip = InetAddress.getByName (text);
 	} catch (UnknownHostException e) {
-	    logger.logWarn ("Bad host: " + text + " at line:" + 
+	    logger.warning ("Bad host: " + text + " at line:" + 
 			    br.getLineNumber());
 	}
 	return ip;
@@ -137,7 +137,7 @@ public class AccessFilter implements IPAccessFilter {
     /** Saves the accesslist from the given Reader.
      * @param r the Reader with the users.
      */
-    public void saveAccess (Logger logger, Reader r) throws IOException {
+    public void saveAccess (Reader r) throws IOException {
 	if (accessfile == null) 
 	    return;
 	BufferedReader br = new BufferedReader (r);
@@ -149,9 +149,8 @@ public class AccessFilter implements IPAccessFilter {
 		fw.println (line);
 	    fw.flush ();
 	} finally {
-	    if (fw != null)
-		fw.close ();
-	    br.close ();
+	    Closer.close (fw, logger);
+	    Closer.close (br, logger);
 	}
     }
 

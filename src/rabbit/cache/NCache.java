@@ -15,9 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** The NCache is like a Map in lookup/insert/delete
@@ -26,8 +27,7 @@ import rabbit.util.SProperties;
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class NCache<K, V> implements Cache<K, V>, Runnable 
-{
+public class NCache<K, V> implements Cache<K, V>, Runnable {
     private static String DIR = "/tmp/rabbit/cache";  // standard dir.
     private static String DEFAULT_SIZE  = "10";       // 10 MB.
     private static String DEFAULT_CACHE_TIME = "24";  // 1 day.
@@ -52,7 +52,7 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
     private File tempdir = null;
     private final Object dirLock = new Object ();
 
-    private final Logger logger;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock ();
     private final Lock r = rwl.readLock ();
@@ -66,14 +66,12 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
     /** Create a cache that uses default values.
      *  Note that you must call startCleaner to have the cache fully up.
      */
-    public NCache (Logger logger, SProperties props, 
-		   FileHandler<K> fhk, FileHandler<V> fhv) {
-	this.logger = logger;
+    public NCache (SProperties props, FileHandler<K> fhk, FileHandler<V> fhv) {
 	this.fhk = fhk;
 	this.fhv = fhv;
 	htab = new HashMap<FiledKey<K>, CacheEntry<K, V>> ();
 	vec = new ArrayList<CacheEntry<K, V>> ();
-	setup (logger, props);
+	setup (props);
     } 
 
     public void startCleaner () {
@@ -109,29 +107,32 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
 	    // does new dir exist?
 	    dir = newDir;
 	    File dirtest = new File (dir);
+	    boolean readCache = true;
 	    if (!dirtest.exists ()) {
 		dirtest.mkdirs ();
 		if (!dirtest.exists ()) {
-		    logger.logError ("could not create cachedir");
+		    logger.warning ("could not create cachedir: " + dirtest);
 		}
+		readCache = false;
 	    } else if (dirtest.isFile ()) {
-		logger.logError ("Cachedir is a file");
+		logger.warning ("Cachedir: " + dirtest + " is a file");
 	    }
 	
 	    synchronized (dirLock) {
-		tempdir = new File (dir + File.separator + TEMPDIR);
+		tempdir = new File (dirtest, TEMPDIR);
 		if (!tempdir.exists ()) {
 		    tempdir.mkdir ();
 		    if (!tempdir.exists ()) {
-			logger.logError ("couldl not create cache tempdir");
+			logger.warning ("could not create cache tempdir: " +
+					tempdir);
 		    }
-		} 
-		else if (tempdir.isFile ()) {
-		    logger.logError ("Cache temp dir is a file");
+		} else if (tempdir.isFile ()) {
+		    logger.warning ("Cache temp dir is a file: " + tempdir);
 		}
 	    }
-	    // move to new dir.
-	    readCacheIndex ();
+	    if (readCache)
+		// move to new dir.
+		readCacheIndex ();
 	} finally {
 	    w.unlock ();
 	}
@@ -317,7 +318,7 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
 	synchronized (dirLock) {
 	    if (f.exists ()) {
 		if (f.isFile ()) {
-		    logger.logWarn ("Wanted cachedir is a file!");
+		    logger.warning ("Wanted cachedir is a file: " + f);
 		}
 		// good situation...
 	    } else {
@@ -482,12 +483,12 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
 	    vec = (List<CacheEntry<K, V>>)is.readObject ();
 	    is.close ();
 	} catch (IOException e) {
-	    logger.logWarn ("Couldnt read " + 
-			    dir + File.separator + CACHEINDEX + 
-			    ", This is bad( but not serius).\n" + 
-			    "Treating as empty. " + e);
+	    logger.log (Level.WARNING, 
+			"Couldnt read " + dir + File.separator + CACHEINDEX + 
+			", This is bad( but not serius).\nTreating as empty. ",
+			e);
 	} catch (ClassNotFoundException e) {
-	    logger.logError("Couldn't find classes: " + e);
+	    logger.log (Level.SEVERE, "Couldn't find classes", e);
 	}
     }
     
@@ -523,8 +524,10 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
 	    }
 	    os.close ();
 	} catch (IOException e) {
-	    logger.logWarn ("Couldnt write " + dir + File.separator + 
-			    CACHEINDEX + ", This is serious!\n" + e);
+	    logger.log (Level.WARNING,
+			"Couldnt write " + dir + File.separator + CACHEINDEX + 
+			", This is serious!\n", 
+			e);
 	}	
     }
 
@@ -595,7 +598,7 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
     /** Configure the cache system from the given config.
      * @param config the properties describing the cache settings.
      */
-    public void setup (Logger logger, SProperties config) {
+    public void setup (SProperties config) {
 	if (config == null)
 	    config = new SProperties (); 
 	String cachedir = 
@@ -606,21 +609,21 @@ public class NCache<K, V> implements Cache<K, V>, Runnable
 	try {
 	    setMaxSize (Long.parseLong (cmsize) * 1024 * 1024);     // in MB
 	} catch (NumberFormatException e) { 
-	    logger.logWarn ("Bad number for cache maxsize: '" + cmsize + "'");
+	    logger.warning ("Bad number for cache maxsize: '" + cmsize + "'");
 	}
 
 	String ctime = config.getProperty ("cachetime", DEFAULT_CACHE_TIME);
 	try {
 	    setCacheTime (Long.parseLong (ctime) * 1000 * 60 * 60); // in hours.o
 	} catch (NumberFormatException e) { 
-	    logger.logWarn ("Bad number for cache cachetime: '" + ctime + "'");
+	    logger.warning ("Bad number for cache cachetime: '" + ctime + "'");
 	}
 
 	String ct = config.getProperty ("cleanloop", DEFAULT_CLEAN_LOOP);
 	try {
 	    setCleanLoopTime (Integer.parseInt (ct) * 1000); // in seconds.
 	} catch (NumberFormatException e) { 
-	    logger.logWarn ("Bad number for cache cleanloop: '" + ct + "'");
+	    logger.warning ("Bad number for cache cleanloop: '" + ct + "'");
 	}
     }
 }

@@ -4,12 +4,13 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import rabbit.io.BufferHandle;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.Header;
 import rabbit.http.HttpHeader;
-import rabbit.util.Logger;
+import rabbit.io.BufferHandle;
+import rabbit.nio.NioHandler;
+import rabbit.nio.ReadHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that reads http headers
@@ -17,7 +18,7 @@ import rabbit.util.TrafficLogger;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class HttpHeaderReader extends BaseSocketHandler 
-    implements LineListener {
+    implements LineListener, ReadHandler {
     
     private HttpHeader header;
     private Header head = null;    
@@ -51,46 +52,55 @@ public class HttpHeaderReader extends BaseSocketHandler
      *                handle that.
      */ 
     public HttpHeaderReader (SocketChannel channel, BufferHandle bh, 
-			     Selector selector, Logger logger, 
-			     TrafficLogger tl, boolean request, 
-			     boolean strictHttp, HttpHeaderListener reader) 
-	throws IOException {
-	super (channel, bh, selector, logger);
+			     NioHandler nioHandler, TrafficLogger tl, 
+			     boolean request, boolean strictHttp, 
+			     HttpHeaderListener reader) {
+	super (channel, bh, nioHandler);
 	this.tl = tl;
 	this.request = request;
 	this.strictHttp = strictHttp;
 	this.reader = reader;
-	if (!bh.isEmpty ()) {
+    }
+
+    public void readRequest () throws IOException {
+	if (!getBufferHandle ().isEmpty ()) {
 	    ByteBuffer buffer = getBuffer ();
 	    startParseAt = buffer.position ();
 	    parseBuffer (buffer);
 	} else {
 	    releaseBuffer ();
+	    waitForRead (this);
 	}
     }
 
-    public String getDescription () {
-	return "HttpHeaderReader: channel: " + channel + 
+    @Override public String getDescription () {
+	return "HttpHeaderReader: channel: " + getChannel () + 
 	    ", current header lines: " + 
 	    (header == null ? 0 : header.size ());
     }
 
-    public void timeout () {
+    @Override public void closed () {
+	releaseBuffer ();
+	reader.closed ();
+    }
+
+    @Override public void timeout () {
 	// If buffer exists it only holds a partial http header.
 	// We relase the buffer and discard that partial header.
 	releaseBuffer ();
 	reader.timeout ();
     }
     
-    public void run () {
+    public void read () {
 	Logger logger = getLogger ();
+	logger.finest ("HttpHeaderReader reading data");
 	try {
 	    // read http request
 	    // make sure we have room for reading.
 	    ByteBuffer buffer = getBuffer ();
 	    int pos = buffer.position ();
 	    buffer.limit (buffer.capacity ());
-	    int read = channel.read (buffer);
+	    int read = getChannel ().read (buffer);
 	    if (read == -1) {
 		buffer.position (buffer.limit ());
 		closeDown ();
@@ -108,7 +118,6 @@ public class HttpHeaderReader extends BaseSocketHandler
 	    buffer.limit (read + pos);
 	    parseBuffer (buffer);
 	} catch (IOException e) {
-	    logger.logWarn ("Failed to handle connection: " + e);
 	    closeDown ();
 	    reader.failed (e);
 	}
@@ -118,8 +127,10 @@ public class HttpHeaderReader extends BaseSocketHandler
 	int startPos = buffer.position ();
 	buffer.mark ();
 	boolean done = handleBuffer (buffer);
+	Logger logger = getLogger ();
+	if (logger.isLoggable (Level.FINEST))
+	    logger.finest ("HttpHeaderReader.parseBuffer: done " + done);
 	if (!done) {
-	    register (); // TODO: move this down to after the if/else
 	    int fullPosition = buffer.position ();
 	    buffer.reset ();
 	    int pos = buffer.position ();
@@ -138,16 +149,13 @@ public class HttpHeaderReader extends BaseSocketHandler
 		buffer.compact ();
 		startParseAt = 0;
 	    }
+	    waitForRead (this);
 	} else {
 	    setState ();
-	    unregister ();
 	    releaseBuffer ();
-	    reader.httpHeaderRead (header, bh, keepalive, ischunked, dataSize);
+	    reader.httpHeaderRead (header, getBufferHandle (), 
+				   keepalive, ischunked, dataSize);
 	}
-    }
-
-    @Override protected int getSocketOperations () {
-	return bh.isEmpty () ? SelectionKey.OP_READ : 0;
     }
 
     private void setState () {
@@ -231,16 +239,14 @@ public class HttpHeaderReader extends BaseSocketHandler
     private boolean verifyResponse (ByteBuffer buffer) throws IOException {
 	// some broken web servers (apache/2.0.4x) send multiple last-chunks
 	if (buffer.remaining () > 4 && matchBuffer (EXTRA_LAST_CHUNK)) {
-	    Logger log = getLogger ();
-	    log.logWarn ("Found a last-chunk, trying to ignore it.");
+	    getLogger ().warning ("Found a last-chunk, trying to ignore it.");
 	    buffer.position (buffer.position () + EXTRA_LAST_CHUNK.capacity ());
 	    return verifyResponse (buffer);
 	}
 
 	if (buffer.remaining () > 4 && !matchBuffer (HTTP_IDENTIFIER)) {
-	    Logger log = getLogger ();
-	    log.logWarn ("http response header with odd start:" + 
-			 getBufferStartString (buffer, 5));
+	    getLogger ().warning ("http response header with odd start:" + 
+				  getBufferStartString (buffer, 5));
 	    // Create a http/0.9 response...
 	    header = new HttpHeader ();
 	    return true;
@@ -314,8 +320,9 @@ public class HttpHeaderReader extends BaseSocketHandler
 		head.append (msg);
 		append = checkQuotes (head.getValue ());
 	    } else {
+		SocketChannel channel = getChannel ();
 		throw (new IOException ("Malformed header from: " + 
-					channel.socket ().getInetAddress () + 
+					channel.socket ().getInetAddress () +
 					", msg: " + msg));
 	    }
 	    return;

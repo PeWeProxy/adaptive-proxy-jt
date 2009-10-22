@@ -1,8 +1,9 @@
 package rabbit.util;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** This class counts different messages
  */
@@ -15,7 +16,7 @@ public class Counter
     /** This class holds one messages counts
      */
     static class Count {
-	private int counter = 0;
+	private AtomicInteger counter = new AtomicInteger (0);
 	
 	/** Create a new Count
 	 */
@@ -25,14 +26,14 @@ public class Counter
 	/** Increase its value by one
 	 */
 	void inc () {
-	    counter++;
+	    counter.incrementAndGet ();
 	}
 	
 	/** Get the count for this message
 	 * @return the number of times this message has been counted.
 	 */
 	public int count () {
-	    return counter;
+	    return counter.intValue ();
 	}
     }
 

@@ -24,7 +24,6 @@ import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
-
 import sk.fiit.rabbit.adaptiveproxy.utils.MD5ChecksumGenerator;
 import sk.fiit.rabbit.adaptiveproxy.utils.XMLFileParser;
 
@@ -187,6 +186,7 @@ public class PluginHandler {
 	
 	private synchronized void loadPluginsConfigs() {
 		configEntries.clear();
+		excludeFileNames.add("services.xml");
 		File[] configFiles = pluginRepositoryDir.listFiles(new PluginsXMLFileFilter(excludeFileNames));
 		Set<String> pluginNames = new HashSet<String>();
 		Map<URI, ClassLoader> cLoaders = new HashMap<URI, ClassLoader>();

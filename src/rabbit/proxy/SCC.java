@@ -3,11 +3,11 @@ package rabbit.proxy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import rabbit.io.Range;
+import java.util.logging.Logger;
 import rabbit.handler.BaseHandler;
-import rabbit.http.HttpHeader;
 import rabbit.http.ContentRangeParser;
-import rabbit.util.Logger;
+import rabbit.http.HttpHeader;
+import rabbit.io.Range;
 
 /** A class that tries to setup a resource from the cache
  *
@@ -23,10 +23,6 @@ public class SCC {
 	this.con = con;
 	this.header = header;
 	this.rh = rh;
-    }
-
-    private Logger getLogger () {
-	return con.getLogger ();
     }
 
     /** 
@@ -83,7 +79,7 @@ public class SCC {
 	    HttpProxy proxy = con.getProxy ();
 	    rh.setContent (new CacheResourceSource (proxy.getCache (), 
 						    rh.getEntry (), 
-						    proxy.getTaskRunner (),
+						    con.getNioHandler (),
 						    con.getBufferHandler ()));
 	    rh.setSize (rh.getEntry ().getSize ());
 	    rh.getWebHeader ().setStatusCode ("200");
@@ -99,7 +95,7 @@ public class SCC {
 	    // Simply send, its already filtered.
 	    rh.setHandlerFactory (new BaseHandler ());
 	WarningsHandler wh = new WarningsHandler ();
-	wh.removeWarnings (getLogger (), rh.getWebHeader (), false);
+	wh.removeWarnings (rh.getWebHeader (), false);
 	return null;
     }
 
@@ -108,7 +104,7 @@ public class SCC {
 	throws IOException {
 	HttpProxy proxy = con.getProxy ();
 	rh.setContent (new RandomCacheResourceSource (proxy.getCache (), rh, 
-						      proxy.getTaskRunner (),
+						      con.getNioHandler (),
 						      con.getBufferHandler (),
 						      ranges, totalSize));
 	con.setChunking (false);
@@ -140,7 +136,8 @@ public class SCC {
 		long l = Long.parseLong (age);
 		secs += l;
 	    } catch (NumberFormatException e) {
-		getLogger ().logWarn ("bad Age : '" + age + "'");
+		Logger logger = Logger.getLogger (getClass ().getName ());
+		logger.warning ("bad Age : '" + age + "'");
 	    }
 	}
 	rh.getWebHeader ().setHeader ("Age", "" + secs);
@@ -260,8 +257,7 @@ public class SCC {
 	    long end = r.getEnd ();
 	    String t = "bytes " + start + "-" + end + "/" + totalSize;
 	    if (!t.equals (cr)) {
-		ContentRangeParser crp = 
-		    new ContentRangeParser (cr, getLogger ());
+		ContentRangeParser crp = new ContentRangeParser (cr);
 		if (crp.isValid () && 
 		    (crp.getStart () > start || crp.getEnd () < end))
 		    return false;

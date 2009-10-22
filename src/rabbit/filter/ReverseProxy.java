@@ -5,7 +5,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a filter that set up rabbit for reverse proxying. 
@@ -60,10 +59,9 @@ public class ReverseProxy implements HttpFilter {
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger to output errors/warnings on.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	matcher = properties.getProperty ("transformMatch", "");
 	replacer = properties.getProperty ("transformTo", "");
 	String denyString = properties.getProperty ("deny");

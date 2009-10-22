@@ -3,7 +3,6 @@ package rabbit.filter;
 import java.nio.channels.SocketChannel;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** A filter for http headers. 
@@ -35,8 +34,7 @@ public interface HttpFilter {
 				   Connection con);
 
     /** Setup this filter.
-     * @param logger the Logger to output errors/warnings on.
      * @param properties the SProperties to get the settings from.
      */
-    void setup (Logger logger, SProperties properties);
+    void setup (SProperties properties);
 }

@@ -3,7 +3,6 @@ package rabbit.filter;
 import java.nio.channels.SocketChannel;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a class that prints the Http headers on the standard out stream.
@@ -45,10 +44,9 @@ public class HttpSnoop implements HttpFilter {
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger to output errors/warnings on.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String rlo = properties.getProperty ("requestLineOnly", "false");
 	requestLineOnly = rlo.equals ("true");
     }

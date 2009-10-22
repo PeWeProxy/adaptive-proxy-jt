@@ -8,7 +8,7 @@
         <param name="Name" value="Standard output appender"/>
         <layout class="org.apache.log4j.PatternLayout">
 			<!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
-			<param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%C{1}] [%t]: [%m]%n"/>
+			<param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
 		</layout>
     </appender>
     <!--
@@ -22,13 +22,28 @@
     	<level value="warn" />
     </logger>
     <logger name="rabbit">
-    	<level value="info" />
+    	<level value="debug" />
     </logger>
     <!-- <logger name="rabbit.util.CharsetDetector">
     	<level value="all" />
     </logger> -->
     <logger name="sk.fiit.rabbit.adaptiveproxy">
-    	<level value="info" />
+    	<level value="warn" />
+    </logger>
+     <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
+    	<level value="trace" />
+    </logger>
+    <logger name="rabbit.handler.AdaptiveHandler">
+    	<level value="debug" />
+    </logger>
+    <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
+    	<level value="debug" />
+    </logger>
+    <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
+    	<level value="warn" />
+    </logger>
+    <logger name="sk.fiit.redeemer.test">
+    	<level value="warn" />
     </logger>
     <!--ROOT Logger-->
     <root>

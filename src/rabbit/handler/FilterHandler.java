@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
 import rabbit.filter.HtmlFilter;
 import rabbit.filter.HtmlFilterFactory;
 import rabbit.html.HtmlBlock;
@@ -19,7 +20,6 @@ import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.CharsetDetector;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.zip.GZipUnpackListener;
 import rabbit.zip.GZipUnpacker;
@@ -29,7 +29,7 @@ import rabbit.zip.GZipUnpacker;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class FilterHandler extends GZipHandler {
-	protected List<HtmlFilterFactory> filterClasses = 
+    protected List<HtmlFilterFactory> filterClasses = 
     new ArrayList<HtmlFilterFactory> ();
     protected boolean repack = false;
     private String defaultCharSet = null;
@@ -43,7 +43,7 @@ public class FilterHandler extends GZipHandler {
 
     protected GZipUnpacker gzu = null;
     private GZListener gzListener = null;
-    
+
     // For creating the factory.
     public FilterHandler () {	
     }
@@ -83,7 +83,7 @@ public class FilterHandler extends GZipHandler {
 		gzListener = new GZListener ();
 		gzu = new GZipUnpacker (gzListener, true);
 	    } else {
-		getLogger ().logWarn ("Encloding: " + ce);
+		getLogger ().warning ("Encloding: " + ce);
 	    }
 	}
 
@@ -91,7 +91,7 @@ public class FilterHandler extends GZipHandler {
 	if (mayFilter) {
 	    response.removeHeader ("Content-Length");
 
-	    String cs = null;
+	   String cs = null;
 	    if (overrideCharSet != null) {
 	    	cs = overrideCharSet;
 	    } else {
@@ -109,12 +109,13 @@ public class FilterHandler extends GZipHandler {
  	    //	    then look for HTML Meta charset, maybe re-decode
 	    // <META content="text/html; charset=gb2312" http-equiv=Content-Type>
 	    // <meta http-equiv="content-type" content="text/html;charset=Shift_JIS" />
+	    
 	    Charset charSet = null;
 	    if (cs != null) {
 	    	try {
 	    		charSet = Charset.forName (cs);
 	    	    } catch (UnsupportedCharsetException e) {
-	    		getLogger ().logInfo ("Bad CharSet: " + cs);
+	    		getLogger ().warning("Bad CharSet: " + cs);
 	    	    }
 		}
 	    if (charSet == null)
@@ -128,7 +129,7 @@ public class FilterHandler extends GZipHandler {
     protected boolean willCompress () {
 	return gzu != null || super.willCompress ();
     }
-    
+
     private class GZListener implements GZipUnpackListener {
 	private byte[] buffer;
 	public void unpacked (byte[] buf, int off, int len) {
@@ -192,11 +193,27 @@ public class FilterHandler extends GZipHandler {
 	// remaining section
 	forwardArrayToHandler (arr, 0, arr.length);
     }
+    // added by Redeemer ************
+    private boolean dataRequested = false;
+    
+    @Override
+    protected void requestMoreData() {
+    	dataRequested = true;
+    	super.requestMoreData();
+    }
+    
+    @Override
+    public void bufferRead(BufferHandle bufHandle) {
+    	dataRequested = false;
+    	super.bufferRead(bufHandle);
+    }
+    
+    // ******************************
 
     private void forwardArrayToHandler (byte[] arr, int off, int len) {
 	if (gzu != null) {
 	    gzu.setInput (arr, off, len);
-	    if ((sendBlocks == null || !sendBlocks.hasNext ()) && 
+	    if (!dataRequested && (sendBlocks == null || !sendBlocks.hasNext ()) && 
 		(gzu != null && gzu.needsInput ()))
 		waitForData ();
 	} else {
@@ -236,7 +253,7 @@ public class FilterHandler extends GZipHandler {
 	    }
 	    sendBlocks = ls.iterator ();
 	} catch (HtmlParseException e) {
-	    getLogger ().logInfo ("Bad HTML: " + e.toString ());
+	    getLogger ().info ("Bad HTML: " + e.toString ());
 	    // out.write (arr);
 	    currentBlock = null;
 	    ByteBuffer buf = ByteBuffer.wrap (arr, off, len);
@@ -281,7 +298,7 @@ public class FilterHandler extends GZipHandler {
 	    super.finishData ();
 	}
     }
-    
+
     /** Initialize the filter we are using.
      * @return a List of HtmlFilters.
      */
@@ -299,8 +316,8 @@ public class FilterHandler extends GZipHandler {
     /** Setup this class.
      * @param prop the properties of this class.
      */
-    @Override public void setup (Logger logger, SProperties prop) {
-	super.setup (logger, prop);
+    @Override public void setup (SProperties prop) {
+	super.setup (prop);
 	defaultCharSet = prop.getProperty ("defaultCharSet", "ISO-8859-1");
 	overrideCharSet = prop.getProperty ("overrideCharSet");
 	String rp = prop.getProperty ("repack", "false");
@@ -316,13 +333,18 @@ public class FilterHandler extends GZipHandler {
 		    asSubclass (HtmlFilterFactory.class);
 		filterClasses.add (cls.newInstance ());
 	    } catch (ClassNotFoundException e) {
-		logger.logWarn ("Could not find filter: '" + classname + "'");
+		getLogger ().warning ("Could not find filter: '" + 
+				      classname + "'");
 	    } catch (InstantiationException e) {
-		logger.logWarn ("Could not instanciate class: '" + 
-				classname + "' " + e);
+		getLogger ().log (Level.WARNING, 
+				  "Could not instanciate class: '" + 
+				  classname + "'",
+				  e);
 	    } catch (IllegalAccessException e) {
-		logger.logWarn ("Could not get constructor for: '" + 
-				classname + "' " + e);
+		getLogger ().log (Level.WARNING, 
+				  "Could not get constructor for: '" +
+				  classname + "'",
+				  e);
 	    }
 	}
     }

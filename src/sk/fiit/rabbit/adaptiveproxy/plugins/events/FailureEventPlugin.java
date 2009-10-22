@@ -7,9 +7,13 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpResponse;
 
 public interface FailureEventPlugin extends RequestPlugin, ResponsePlugin {
-	void requestReadFailed(InetSocketAddress clientSocket, HttpRequest request);
+	void requestReadFailed(HttpRequest request);
+	
+	void requestReadFailed(InetSocketAddress clientSocket);
 	
 	void requestDeliveryFailed(HttpRequest request);
+	
+	void responseReadFailed(HttpRequest request);
 	
 	void responseReadFailed(HttpRequest request, HttpResponse response);
 	

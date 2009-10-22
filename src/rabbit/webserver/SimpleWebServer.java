@@ -3,18 +3,16 @@ package rabbit.webserver;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import rabbit.nio.NioHandler;
+import rabbit.nio.MultiSelectorNioHandler;
 import rabbit.httpio.Acceptor;
 import rabbit.httpio.AcceptorListener;
-import rabbit.httpio.SelectorRunner;
 import rabbit.io.BufferHandler;
 import rabbit.io.CachingBufferHandler;
-import rabbit.util.Logger;
-import rabbit.util.SimpleLogger;
 import rabbit.util.SimpleTrafficLogger;
 import rabbit.util.TrafficLogger;
 
@@ -25,8 +23,7 @@ import rabbit.util.TrafficLogger;
 public class SimpleWebServer {
     private File dir;
     private int port;
-    private final Logger logger = new SimpleLogger ();
-    private final SelectorRunner selectorRunner;
+    private final NioHandler nioHandler;
     private final TrafficLogger trafficLogger = new SimpleTrafficLogger ();
     private final BufferHandler bufferHandler = new CachingBufferHandler ();
 
@@ -62,18 +59,14 @@ public class SimpleWebServer {
 	    throw new IOException (dir + " is not an existing directory");
 	dir = dir.getCanonicalFile ();
 	ExecutorService es = Executors.newCachedThreadPool ();
-	selectorRunner = new SelectorRunner (es, logger);
+	nioHandler = new MultiSelectorNioHandler (es, 4);
     }
 
     /** Start serving requests. 
      */
     public void start ()  {
-	selectorRunner.start ();
-	selectorRunner.runMainTask (new Runnable () {
-		public void run () {
-		    setupServerSocket ();
-		}
-	    });	
+	nioHandler.start ();
+	setupServerSocket ();
     }
 
     private void setupServerSocket () {
@@ -83,7 +76,7 @@ public class SimpleWebServer {
 	    ssc.socket ().bind (new InetSocketAddress (port));
 	    AcceptorListener acceptListener = new AcceptListener ();
 	    Acceptor acceptor = 
-		new Acceptor (ssc, selectorRunner, logger, acceptListener);
+		new Acceptor (ssc, nioHandler, acceptListener);
 	    acceptor.register ();
 	} catch (IOException e) {
 	    throw new RuntimeException ("Failed to setup server socket", e);
@@ -91,7 +84,7 @@ public class SimpleWebServer {
     }
 
     private class AcceptListener implements AcceptorListener {
-	public void connectionAccepted (SocketChannel sc, Selector selector) 
+	public void connectionAccepted (SocketChannel sc) 
 	    throws IOException {
 	    new Connection (SimpleWebServer.this, sc).readRequest ();
 	}
@@ -108,13 +101,8 @@ public class SimpleWebServer {
     }
 
     /** Get the SelectorRunner used by this web server. */
-    public SelectorRunner getSelectorRunner () {
-	return selectorRunner;
-    }
-
-    /** Get the logger used by this web server. */
-    public Logger getLogger () {
-	return logger;
+    public NioHandler getNioHandler () {
+	return nioHandler;
     }
 
     /** Get the TrafficLogger used by this web server. */

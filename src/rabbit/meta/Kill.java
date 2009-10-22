@@ -19,7 +19,6 @@ public class Kill extends BaseMetaHandler {
 	    timeToKill = true;
 	    return PageCompletion.PAGE_NOT_DONE;
 	} else {
-		con.getProxy().getAdaptiveEngine().setProxyIsDying();
 	    con.getProxy ().stop ();
 	    return PageCompletion.PAGE_DONE;
 	}

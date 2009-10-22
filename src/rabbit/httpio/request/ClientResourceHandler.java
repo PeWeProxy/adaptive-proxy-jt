@@ -62,8 +62,8 @@ public class ClientResourceHandler implements BlockListener {
     @Override
     public void bufferRead(BufferHandle bufHandle) {
     	try {
-    	    new BlockSender (wc.getChannel (), con.getSelector (), 
-    			     con.getLogger (), con.getTrafficLoggerHandler().getNetwork (),
+    	    new BlockSender (wc.getChannel (), con.getNioHandler(), 
+    			     con.getTrafficLoggerHandler().getNetwork (),
     			     bufHandle, chunking, sendingListener);
     	} catch (IOException e) {
     	    failed (e);
@@ -78,8 +78,8 @@ public class ClientResourceHandler implements BlockListener {
     		try {
 				ChunkEnder ce = new ChunkEnder ();
 				sentEndChunk = true;	
-				ce.sendChunkEnding (wc.getChannel(), con.getSelector(),
-						con.getLogger(), con.getTrafficLoggerHandler().getNetwork(),
+				ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
+						con.getTrafficLoggerHandler().getNetwork(),
 						sendingListener);
 			} catch (IOException e) {
 				failed(e);

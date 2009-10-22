@@ -318,7 +318,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 				try {
 					charbuf = decoder.decode(ByteBuffer.wrap(data));
 				} catch (CharacterCodingException e) {
-					log.debug("Data of this message is not valid text data [requested: "+
+					log.trace("Data of this message is not valid text data [requested: "+
 							getRequestHeader().getRequestLine()+" | message entity type: "+contentType+"]");
 				}
 				if (charbuf != null) {
@@ -327,7 +327,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 						ContentServicesProvider contentSvcProvider = new ContentServicesProvider(new String(charbuf.array()));
 						addServiceProvider(contentSvcProvider, contentSvcProvider, StringContentService.class);
 					} catch (OutOfMemoryError e) {
-						log.warn("Java heap space saturated, unable to provide StringContentService",e);
+						log.warn("Java heap space saturated, unable to provide StringContentService \n"+e.toString());
 					}
 				}
 			}
@@ -349,7 +349,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			ProxyService service = serviceProvider.getService();
 			Class<? extends ProxyService> implementedService = serviceProvider.getServiceClass();
 			if (!implementedService.isInstance(service)) {
-				log.warn("Provided service "+service+" is not of claimed type "+implementedService+" ("+
+				log.error("Provided service "+service+" is not of claimed type "+implementedService+" ("+
 						"service provided by "+serviceProvider+" obtained from plugin "+plugin+")");
 				continue;
 			}

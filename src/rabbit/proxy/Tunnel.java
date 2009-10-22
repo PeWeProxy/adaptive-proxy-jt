@@ -1,188 +1,183 @@
 package rabbit.proxy;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import rabbit.io.Address;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.io.BufferHandle;
-import rabbit.io.SelectorRegistrator;
-import rabbit.io.SocketHandler;
-import rabbit.util.Logger;
+import rabbit.io.Closer;
+import rabbit.nio.NioHandler;
+import rabbit.nio.ReadHandler;
+import rabbit.nio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that just tunnels data.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-class Tunnel implements SocketHandler {
-    private Selector selector;
-    private Logger logger;
-    private SocketChannel from;
-    private BufferHandle fromHandle;
-    private TrafficLogger fromLogger;
-    private SelectionKey fromSk = null;
-    private SocketChannel to;
-    private BufferHandle toHandle;
-    private TrafficLogger toLogger;
-    private SelectionKey toSk = null;
-    private TunnelDoneListener listener;
-    
-    public Tunnel (Selector selector, Logger logger, 
-		   SocketChannel from, BufferHandle fromHandle,
+class Tunnel {
+    private final NioHandler nioHandler;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+    private final OneWayTunnel fromToTo;
+    private final OneWayTunnel toToFrom;
+    private final TunnelDoneListener listener;
+
+    public Tunnel (NioHandler nioHandler, SocketChannel from, 
+		   BufferHandle fromHandle,
 		   TrafficLogger fromLogger, 
 		   SocketChannel to, BufferHandle toHandle, 
 		   TrafficLogger toLogger,
 		   TunnelDoneListener listener) 
 	throws IOException {
-	this.selector = selector;
-	this.logger = logger;
-	this.from = from;
-	this.fromHandle = fromHandle;
-	this.fromLogger = fromLogger;
-	this.to = to;
-	this.toHandle = toHandle;
-	this.toLogger = toLogger;
+	if (logger.isLoggable (Level.FINEST))
+	    logger.finest ("Tunnel created from: " + from + " to: " + to);
+	this.nioHandler = nioHandler;
+	fromToTo = new OneWayTunnel (from, to, fromHandle, fromLogger);
+	toToFrom = new OneWayTunnel (to, from, toHandle, toLogger);
 	this.listener = listener;
-	sendBuffers ();
     }
 
-    public String getDescription () {
-	StringBuilder sb = new StringBuilder ("Tunnel: from: ");
-	Socket s = from.socket ();
-	Address a = new Address (s.getInetAddress (), s.getPort ());
-	sb.append (a.toString ()).append (", to: ");
-	s = to.socket ();
-	a = new Address (s.getInetAddress (), s.getPort ());
-	sb.append (a.toString ());
-	return sb.toString ();
-    }
-    
-    private boolean isValidForRead (SelectionKey sk) {
-	return sk == null ||   // not previously registered
-	    (sk.isValid () &&  // previously registered 
-	     (sk.interestOps () & SelectionKey.OP_READ) == 0);
+    public void start () {
+	if (logger.isLoggable (Level.FINEST))
+	    logger.finest ("Tunnel started");
+	fromToTo.start ();
+	toToFrom.start ();
     }
 
-    private void registerReadFrom () throws IOException {
-	if (listener == null)
-	    return;
-        toHandle.possiblyFlush ();
-        if (isValidForRead (fromSk)) {
-            fromSk = SelectorRegistrator.register (logger, from, selector,
-						   SelectionKey.OP_READ,
-						   this, Long.MAX_VALUE);
-        }
-    }
+    private class OneWayTunnel implements ReadHandler, WriteHandler {
+	private final SocketChannel from;
+	private final SocketChannel to;
+	private final BufferHandle bh;
+	private final TrafficLogger tl;
+	
+	public OneWayTunnel (SocketChannel from, SocketChannel to, 
+			     BufferHandle bh, TrafficLogger tl) {
+	    this.from = from;
+	    this.to = to;
+	    this.bh = bh;
+	    this.tl = tl;
+	}
 
-    private void registerReadTo () throws IOException {
-	if (listener == null)
-	    return;
-        fromHandle.possiblyFlush ();
-        if (isValidForRead (toSk)) {
-            toSk = SelectorRegistrator.register (logger, to, selector,
-						 SelectionKey.OP_READ,
-						 this, Long.MAX_VALUE);
-        }
-    }
+	public void start () {
+	    if (logger.isLoggable (Level.FINEST))
+		logger.finest ("OneWayTunnel started: bh.isEmpty: " + 
+			       bh.isEmpty ());
+	    if (bh.isEmpty ())
+		waitForRead ();
+	    else 
+		writeData ();
+	}
 
-    private void sendBuffers () throws IOException {	
-	boolean needMore1 = false;
-	needMore1 = sendBuffer (fromHandle, to, toLogger);
-	if (needMore1) {
-	    toSk = SelectorRegistrator.register (logger, to, selector, 
-						 SelectionKey.OP_WRITE, 
-						 this, Long.MAX_VALUE);
+	private void waitForRead () {
+	    nioHandler.waitForRead (from, this);
+	}
+
+	private void waitForWrite () {
+	    bh.possiblyFlush ();
+	    nioHandler.waitForWrite (to, this);
+	}
+
+	public void unregister () {
+	    nioHandler.cancel (from, this);
+	    nioHandler.cancel (to, this);
+
+	    // clear buffer and return it.
+	    ByteBuffer buf = bh.getBuffer ();
+	    buf.position (buf.limit ());
+	    bh.possiblyFlush ();
+	}
+
+	private void writeData () {
+	    try {
+		if (!to.isOpen ()) {
+		    logger.warning ("Tunnel to is closed, not writing data");
+		    closeDown ();
+		    return;
+		}
+		ByteBuffer buf = bh.getBuffer ();
+		if (buf.hasRemaining ()) {
+		    int written = 0;
+		    do {
+			written = to.write (buf);
+			if (logger.isLoggable (Level.FINEST))
+			    logger.finest ("OneWayTunnel wrote: " + written);
+			tl.write (written);
+		    } while (written > 0 && buf.hasRemaining ());
+		}
+		
+		if (buf.hasRemaining ())
+		    waitForWrite ();
+		else
+		    waitForRead ();
+	    } catch (IOException e) {
+		logger.warning ("Got exception writing to tunnel: " + e);
+		closeDown ();
+	    }
+	}
+
+	public void closed () {
+	    logger.info ("Tunnel closed");
+	    closeDown ();
 	}
 	
-	boolean needMore2 = false;
-	needMore2 = sendBuffer (toHandle, from, fromLogger);
-	if (needMore2) {
-	    fromSk = SelectorRegistrator.register (logger, from, selector, 
-						   SelectionKey.OP_WRITE, 
-						   this, Long.MAX_VALUE);
+	public void timeout () {
+	    logger.warning ("Tunnel got timeout");
+	    closeDown ();
 	}
-	
-        if (!needMore1) {
-            registerReadTo ();
-        }
-	
-        if (!needMore2) {
-            registerReadFrom ();
-        }
-    }
 
-    /** Send the buffer to the channel. 
-     * @return true if more data needs to be written.
-     */
-    private boolean sendBuffer (BufferHandle bh, SocketChannel channel, 
-				TrafficLogger tl) 
-	throws IOException {
-	if (bh.isEmpty ())
+	public boolean useSeparateThread () {
 	    return false;
-	ByteBuffer buffer = bh.getBuffer ();
-	if (buffer.hasRemaining ()) {
-	    int written;
-	    do {
-		written = channel.write (buffer);
-		tl.write (written);
-	    } while (written > 0 && buffer.remaining () > 0);
 	}
-	bh.possiblyFlush ();
-	return !bh.isEmpty ();
-    }
-    
-    private void readBuffers () throws IOException {
-	readBuffer (from, fromHandle, fromLogger);
-	readBuffer (to, toHandle, toLogger);
-    }
+
+	public String getDescription () {
+	    return "Tunnel part from: " + from + " to: " + to;
+	}
+
+	public Long getTimeout () {
+	    return null;
+	}
 	
-    private void readBuffer (SocketChannel channel, BufferHandle bh, 
-			    TrafficLogger tl) 
-	throws IOException {
-	ByteBuffer buffer = bh.getBuffer ();
-	int read = channel.read (buffer);
-	if (read == -1) {
-	    buffer.position (buffer.limit ());
-	    closeDown ();
-	} 
-	buffer.flip ();
-	tl.read (read);
-    }
+	public void read () {
+	    try {
+		if (!from.isOpen ()) {
+		    logger.warning ("Tunnel to is closed, not reading data");
+		    return;
+		}
+		ByteBuffer buffer = bh.getBuffer ();
+		buffer.clear ();
+		int read = from.read (buffer);
+		if (logger.isLoggable (Level.FINEST))
+		    logger.finest ("OneWayTunnel read: " + read);
+		if (read == -1) {
+		    buffer.position (buffer.limit ());
+		    closeDown ();
+		} else { 
+		    buffer.flip ();
+		    tl.read (read);
+		    writeData ();
+		}
+	    } catch (IOException e) {
+		logger.warning ("Got exception reading from tunnel: " + e);
+	    }
+	}
 
-    private Logger getLogger () {
-	return logger;
-    }
-	
-    public boolean useSeparateThread () {
-	return false;
-    }
-
-    public void timeout () {
-	getLogger ().logWarn ("Tunnel: timeout during handling");
-	throw new IllegalStateException ("Tunnels should not get timeout");
-    }
-
-    public void run () {
-	try {
-	    if (fromHandle.isEmpty () && toHandle.isEmpty ()) 
-		readBuffers ();
-	    sendBuffers ();
-	} catch (IOException e) {
-	    getLogger ().logWarn ("Tunnel: failed to handle: " + e);
-	    closeDown ();
+	public void write () {
+	    writeData ();
 	}
     }
 
     private void closeDown () {
-	fromHandle.possiblyFlush ();
-	toHandle.possiblyFlush ();
+	fromToTo.unregister ();
+	toToFrom.unregister ();
 	// we do not want to close the channels, 
 	// it is up to the listener to do that.
-	if (listener != null)
+	if (listener != null) {
 	    listener.tunnelClosed ();
-	listener = null;
+	} else {
+	    // hmm? no listeners, then close down
+	    Closer.close (fromToTo.from, logger);
+	    Closer.close (toToFrom.from, logger);
+	}
     }
 }

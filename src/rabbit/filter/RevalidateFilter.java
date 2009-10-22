@@ -1,11 +1,11 @@
 package rabbit.filter;
 
 import java.nio.channels.SocketChannel;
-import java.util.regex.Pattern;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a class that makes all requests (matching a few criterias) use revalidation
@@ -38,13 +38,14 @@ public class RevalidateFilter implements HttpFilter {
 	return null;
     }
 
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String always = properties.getProperty ("alwaysrevalidate", "false");
 	alwaysRevalidate = Boolean.valueOf (always);
 	if (!alwaysRevalidate) {
 	    String mustRevalidate = properties.getProperty ("revalidate");
 	    if (mustRevalidate == null) {
-		logger.logWarn ("alwaysRevalidate is off and no revalidate " + 
+		Logger logger = Logger.getLogger (getClass ().getName ());
+		logger.warning ("alwaysRevalidate is off and no revalidate " + 
 				"patterns found, filter is useless.");
 		return;
 	    }

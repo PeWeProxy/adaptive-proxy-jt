@@ -10,10 +10,11 @@ import rabbit.httpio.BlockListener;
 import rabbit.httpio.FileResourceSource;
 import rabbit.httpio.ResourceSource;
 import rabbit.io.BufferHandle;
+import rabbit.nio.DefaultTaskIdentifier;
+import rabbit.nio.TaskIdentifier;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This handler first downloads the image runs convert on it and 
@@ -168,11 +169,14 @@ public class ImageHandler extends BaseHandler {
 
     private class ImageReader implements BlockListener {
 	public void bufferRead (final BufferHandle bufHandle) {
-	    getTaskRunner ().runThreadTask (new Runnable () {
+	    TaskIdentifier ti = 
+		new DefaultTaskIdentifier (getClass ().getSimpleName (), 
+					   request.getRequestURI ());
+	    con.getNioHandler ().runThreadTask (new Runnable () {
 		    public void run () {
 			writeImageData (bufHandle);
 		    }
-		});
+		}, ti);
 	}
 	
 	private void writeImageData (BufferHandle bufHandle) {
@@ -182,11 +186,7 @@ public class ImageHandler extends BaseHandler {
 		totalRead += buf.remaining ();
 		buf.position (buf.limit ());
 		bufHandle.possiblyFlush ();
-		con.getProxy ().runMainTask (new Runnable () {
-			public void run () {
-			    content.addBlockListener (ImageReader.this);
-			}
-		    });
+		content.addBlockListener (this);
 	    } catch (IOException e) {
 		failed (e);
 	    }
@@ -223,36 +223,24 @@ public class ImageHandler extends BaseHandler {
      * @throws IOException if conversion fails.
      */
     protected void convertImage () {
-	getTaskRunner ().runThreadTask (new Runnable () {
+	TaskIdentifier ti = 
+	    new DefaultTaskIdentifier (getClass ().getSimpleName () +
+				       ".convertImage", 
+				       request.getRequestURI ());
+				      
+	con.getNioHandler ().runThreadTask (new Runnable () {
 		public void run () {
 		    try {
 			internalConvertImage ();
 			converted = true;
-			returnOk ();
+			ImageHandler.super.handle ();
 		    } catch (IOException e) {
-			returnWithFailure (e);
+			failed (e);
 		    }
 		}
-	    });
+	    }, ti);
     }
     
-    private void returnWithFailure (final Exception cause) {
-	con.getProxy ().runMainTask (new Runnable () {
-		public void run () {		    
-		    failed (cause);
-		}
-	    });	    
-    }
-    
-    private void returnOk () {
-	con.getProxy ().runMainTask (new Runnable () {
-		public void run () {
-		    // resume normal operations...
-		    ImageHandler.super.handle ();
-		}
-	    });
-    }
-
     protected void internalConvertImage () throws IOException {
 	long origSize = size;
 	String convert = config.getProperty ("convert", STD_CONVERT);
@@ -268,20 +256,20 @@ public class ImageHandler extends BaseHandler {
 		    convargs.substring (idx + "$filename".length());
 	    }
 	    String command = convert + " " + convargs;	    
-	    getLogger ().logAll ("ImageHandler running: '" + command + "'");
+	    getLogger ().fine ("ImageHandler running: '" + command + "'");
 	    Process ps = Runtime.getRuntime ().exec (command);
 	    try {
 		ps.waitFor ();
 		closeStreams (ps);
 		int exitValue = ps.exitValue (); 
 		if (exitValue != 0) {
-		    getLogger ().logWarn ("Bad conversion: " + entryName + 
+		    getLogger ().warning ("Bad conversion: " + entryName + 
 					  ", got exit value: " + exitValue);
 		    throw new IOException ("failed to convert image, " + 
 					   "exit value: " + exitValue);
 		} 
 	    } catch (InterruptedException e) {
-		getLogger ().logWarn ("Interupted during wait for: " + 
+		getLogger ().warning ("Interupted during wait for: " + 
 				      entryName);
 	    }
 	    
@@ -301,7 +289,7 @@ public class ImageHandler extends BaseHandler {
 		if (convertedFile.renameTo (new File (entryName)))
 		    convertedFile = null;
 		else 
-		    getLogger ().logWarn ("rename failed: " + 
+		    getLogger ().warning ("rename failed: " + 
 					  convertedFile.getName () + 
 					  " => " + 
 					  entryName);
@@ -317,7 +305,7 @@ public class ImageHandler extends BaseHandler {
 	con.setExtraInfo ("imageratio:" + origSize + "/" + lowQualitySize + 
 			  "=" + ((float)lowQualitySize / origSize));	
 	content.release ();
-	content = new FileResourceSource (entryName, getTaskRunner (),
+	content = new FileResourceSource (entryName, con.getNioHandler (),
 					  con.getBufferHandler ());
 	convertedFile = null;
     }
@@ -337,7 +325,8 @@ public class ImageHandler extends BaseHandler {
 	return ctype;
     }
     
-    @Override public void setup (Logger logger, SProperties prop) {
+    @Override public void setup (SProperties prop) {
+	super.setup (prop);
 	if (prop != null) {	    
 	    config = prop;
 	    doConvert = true;
@@ -345,8 +334,8 @@ public class ImageHandler extends BaseHandler {
 	    String conv = prop.getProperty ("convert", STD_CONVERT);
 	    File f = new File (conv);
 	    if (!f.exists () || !f.isFile()) {
-		logger.logWarn ("convert -" + conv + 
-				"- not found, is your path correct?");
+		getLogger ().warning ("convert -" + conv + 
+				      "- not found, is your path correct?");
 		doConvert = false;
 	    }
 	    

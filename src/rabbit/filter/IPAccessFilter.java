@@ -5,7 +5,6 @@ import java.io.Reader;
 import java.nio.channels.SocketChannel;
 import java.util.List;
 import rabbit.util.IPAccess;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This interface holds the method needed to do socket based access filtering.
@@ -21,10 +20,9 @@ public interface IPAccessFilter {
     boolean doIPFiltering (SocketChannel s);
 
     /** Setup this filter.
-     * @param logger the Logger to use in case of errors/warnings.
      * @param properties the SProperties to get the settings from.
      */
-    void setup (Logger logger, SProperties properties);
+    void setup (SProperties properties);
 
     /** Get the list of allowed ips
      */
@@ -37,10 +35,10 @@ public interface IPAccessFilter {
     /** Loads in the accessess allowed from the given Reader
      * @param r the Reader were data is available
      */
-    public void loadAccess (Logger logger, Reader r) throws IOException;
+    public void loadAccess (Reader r) throws IOException;
 
     /** Saves the accesslist from the given Reader.
      * @param r the Reader with the users.
      */
-    public void saveAccess (Logger logger, Reader r) throws IOException;
+    public void saveAccess (Reader r) throws IOException;
 }

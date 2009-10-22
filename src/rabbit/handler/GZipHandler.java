@@ -13,7 +13,6 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.zip.GZipPackListener;
 import rabbit.zip.GZipPacker;
@@ -29,7 +28,7 @@ public class GZipHandler extends BaseHandler {
     private boolean compressedDataFinished = false;
     private GZipPacker packer = null;
     private GZipPackListener pl = null;
-
+    
     private static final NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
 
     /** For creating the factory.
@@ -123,14 +122,14 @@ public class GZipHandler extends BaseHandler {
 	    		following = following.substring(0, end);
 	    		try {
 	    			return nf.parse(following).doubleValue() > 0;
-				} catch (ParseException ignorede) {}
+				} catch (ParseException ignored) {}
 			}
     	}
     	return null;
     }
     
     protected boolean willCompress () {
-	String ce = request.getHeader ("Content-Encoding");
+	String ce = response.getHeader ("Content-Encoding");
 	if (ce == null)
 	    return true;
 	ce = ce.toLowerCase ();
@@ -250,7 +249,7 @@ public class GZipHandler extends BaseHandler {
     }
     
     protected void waitForData () {
-	con.getProxy ().runMainTask (new MainBlockListener ());
+	requestMoreData();
     }
     
     /** Write the current block of data to the gzipper.
@@ -321,7 +320,8 @@ public class GZipHandler extends BaseHandler {
     }
 
     @Override 
-    public void setup (Logger logger, SProperties prop) {
+    public void setup (SProperties prop) {
+	super.setup (prop);
 	if (prop != null) {
 	    String comp = prop.getProperty ("compress", "true");
 	    if (comp.equalsIgnoreCase ("false"))
