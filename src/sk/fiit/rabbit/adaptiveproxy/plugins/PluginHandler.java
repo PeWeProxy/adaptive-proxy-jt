@@ -126,7 +126,7 @@ public class PluginHandler {
 		try {
 			return plugin.setup(props);
 		} catch (Exception e) {
-			log.warn("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'");
+			log.warn("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"', : " + e);
 		}
 		return false;
 	}
