@@ -193,6 +193,7 @@ public class FilterHandler extends GZipHandler {
 	// remaining section
 	forwardArrayToHandler (arr, 0, arr.length);
     }
+    
     // added by Redeemer ************
     private boolean dataRequested = false;
     
@@ -207,7 +208,6 @@ public class FilterHandler extends GZipHandler {
     	dataRequested = false;
     	super.bufferRead(bufHandle);
     }
-    
     // ******************************
 
     private void forwardArrayToHandler (byte[] arr, int off, int len) {

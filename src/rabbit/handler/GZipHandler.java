@@ -81,7 +81,7 @@ public class GZipHandler extends BaseHandler {
     	 * Accept-Encoding: compress;q=0.5, gzip;q=1.0
     	 * Accept-Encoding: gzip;q=1.0, identity; q=0.5, *;q=0
     	 */
-    	boolean rejectOther = false;
+    	boolean undirectAccept = false;
     	Iterator<String> iter = con.getClientRHeader().getHeaders("Accept-Encoding").iterator();
     	if (!iter.hasNext()) {
     		/* RFC 2616:
@@ -102,10 +102,10 @@ public class GZipHandler extends BaseHandler {
     			return gzipAccept.booleanValue();
     		Boolean otherAccept = isEncAccepted(prefs, "*");
     		if (otherAccept != null) {
-    			rejectOther = !otherAccept;
+    			undirectAccept = !otherAccept;
     		}
     	}
-    	return !rejectOther;
+    	return undirectAccept;
     }
     
     private Boolean isEncAccepted(String prefs, String enc) {
