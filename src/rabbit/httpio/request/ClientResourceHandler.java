@@ -62,9 +62,10 @@ public class ClientResourceHandler implements BlockListener {
     @Override
     public void bufferRead(BufferHandle bufHandle) {
     	try {
-    	    new BlockSender (wc.getChannel (), con.getNioHandler(), 
+    		BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
     			     con.getTrafficLoggerHandler().getNetwork (),
     			     bufHandle, chunking, sendingListener);
+    		bs.write();
     	} catch (IOException e) {
     	    failed (e);
     	}

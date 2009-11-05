@@ -147,7 +147,6 @@ public class PluginHandler {
 			}
 			if (!libsOK) {
 				// something went wrong with creating URLClassLoader for this library entry
-				cfgEntry.libsrariesURLSet.clear();
 				iterator.remove();
 				continue;
 			}
@@ -162,6 +161,7 @@ public class PluginHandler {
 				// unable to locate plugin's binary file (jar/dir)
 				log.warn("Can not read classpath file/directory "+pluginFile.getPath()+",  Plugin '"+cfgEntry.name
 					+"' will not be loaded");
+				iterator.remove();
 				continue;
 			}
 			URI classLocURI = pluginFile.toURI();

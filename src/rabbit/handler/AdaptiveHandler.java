@@ -171,12 +171,13 @@ public class AdaptiveHandler extends FilterHandler {
 	@Override
 	protected void waitForData() {
 		if (notCaching || !sendingPhase) {
-			if (ignoreDataRequest)
+			if (ignoreDataRequest) {
 				// data already requested (by passing MainBlockListener to SelectorRunner)
 				// once in this data-processing cycle, so we ignore the request and clear
 				// the flag
+				log.debug("Ignoring waitForData() call because data was already requested");
 				ignoreDataRequest = false;
-			else
+			} else
 				super.waitForData();
 		} else {
 			if (buffer == null)
