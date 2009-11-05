@@ -125,7 +125,7 @@ public class EventsHandler {
 				for (FailureEventPlugin plugin : failureEventPlugins) {
 					try {
 						if (responsePresent)
-							plugin.responseReadFailed(request, response);
+							plugin.responseReadFailed(response);
 						else
 							plugin.responseReadFailed(request);
 					} catch (Exception e) {
@@ -138,14 +138,13 @@ public class EventsHandler {
 	}
 
 	public void logResponseDeliveryFailed(Connection con) {
-		final ModifiableHttpRequest request = adaptiveEngine.getRequestForConnection(con);
 		final ModifiableHttpResponse response = adaptiveEngine.getResponseForConnection(con);
 		adaptiveEngine.getProxy().getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
 				for (FailureEventPlugin plugin : failureEventPlugins) {
 					try {
-						plugin.responseDeliveryFailed(request, response);
+						plugin.responseDeliveryFailed(response);
 					} catch (Exception e) {
 						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
 					}
@@ -204,7 +203,7 @@ public class EventsHandler {
 				for (TimeoutEventPlugin plugin : timeoutEventPlugins) {
 					try {
 						if (responePresent)
-							plugin.responseReadTimeout(request, response);
+							plugin.responseReadTimeout(response);
 						else
 							plugin.responseReadTimeout(request);
 					} catch (Exception e) {
@@ -217,14 +216,13 @@ public class EventsHandler {
 	}
 
 	public void logResponseDeliveryTimeout(Connection con) {
-		final ModifiableHttpRequest request = adaptiveEngine.getRequestForConnection(con);
 		final ModifiableHttpResponse response = adaptiveEngine.getResponseForConnection(con);
 		adaptiveEngine.getProxy().getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
 				for (TimeoutEventPlugin plugin : timeoutEventPlugins) {
 					try {
-						plugin.responseDeliveryTimeout(request, response);
+						plugin.responseDeliveryTimeout(response);
 					} catch (Exception e) {
 						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
 					}
