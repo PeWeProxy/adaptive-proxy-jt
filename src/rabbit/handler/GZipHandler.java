@@ -88,7 +88,12 @@ public class GZipHandler extends BaseHandler {
     		 * "If no Accept-Encoding field is present in a request, the server MAY
     		 * assume that the client will accept any content coding."
     		 */
-			return true;
+			//return true;
+    		
+    		/* FireFox corrupts responses when it's Accept-Encoding config value is cleared
+    		 * and it does not include any Accept-Encoding field in request
+    		 */
+    		return false;
 		}
     	while(iter.hasNext()) {
     		String prefs = iter.next();
