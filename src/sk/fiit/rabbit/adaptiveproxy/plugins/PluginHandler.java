@@ -311,7 +311,7 @@ public class PluginHandler {
 		try {
 			return plugin.setup(props);
 		} catch (Exception e) {
-			log.warn("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'");
+			log.warn("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -322,7 +322,7 @@ public class PluginHandler {
 			plugin.start();
 			return true;
 		} catch (Exception e) {
-			log.warn("Exception occured while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'");
+			log.warn("Exception occured while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -333,7 +333,7 @@ public class PluginHandler {
 			plugin.stop();
 			return true;
 		} catch (Exception e) {
-			log.warn("Exception occured while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'");
+			log.warn("Exception occured while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -374,14 +374,14 @@ public class PluginHandler {
 		
 		NodeList nodeList = docRoot.getElementsByTagName(ELEMENT_NAME);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_NAME+"'");
+			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_NAME+"'");
 		Element pluginNameElement = (Element)nodeList.item(0);
 		String pluginName = pluginNameElement.getTextContent();
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_CLASSLOC);
 		String classLocation = "";
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_CLASSLOC+"' for plugin with name '"+pluginName
+			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSLOC+"' for plugin with name '"+pluginName
 					+"', using default class location");
 		else {
 			Element classLocationElement = (Element)docRoot.getElementsByTagName(ELEMENT_CLASSLOC).item(0);
@@ -390,20 +390,20 @@ public class PluginHandler {
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_CLASSNAME);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_CLASSNAME+"'");
+			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSNAME+"'");
 		Element classNameElement = (Element)nodeList.item(0);
 		String className = classNameElement.getTextContent();
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_LIBS);
 		List<String> pluginLibs = new LinkedList<String>();
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
+			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
 					+"', no additional libraries will be loaded");
 		else {
 			Element libsElement = (Element)nodeList.item(0);
 			NodeList libs = libsElement.getElementsByTagName(ELEMENT_LIB);
 			if (libs.getLength() == 0)
-				log.trace("Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
+				log.trace("Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
 						+"', no additional libraries will be loaded");
 			else {
 				for (int i = 0; i < libs.getLength(); i++) {
@@ -415,12 +415,12 @@ public class PluginHandler {
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_TYPES);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_TYPES+"'");
+			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"'");
 		Element typesElement = (Element)nodeList.item(0);
 		NodeList types = typesElement.getElementsByTagName(ELEMENT_TYPE);
 		List<String> pluginTypes = new ArrayList<String>(types.getLength());
 		if (types.getLength() == 0)
-			log.warn("Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_TYPES+"' for plugin with name '"+pluginName
+			log.warn("Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"' for plugin with name '"+pluginName
 					+"', this plugin won't be used");
 		for (int i = 0; i < types.getLength(); i++) {
 			Element type = (Element)types.item(i);
@@ -430,13 +430,13 @@ public class PluginHandler {
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
 		PluginPropertiesImpl properties = new PluginPropertiesImpl();
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
+			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
 					+"', no parameters will be provided at plugin configuration");
 		else {
 			Element parametersElement = (Element)nodeList.item(0);
 			NodeList params = parametersElement.getElementsByTagName(ELEMENT_PARAM);
 			if (params.getLength() == 0)
-				log.trace("Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"'/'"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
+				log.trace("Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
 						+"', no parameters will be provided at plugin configuration");
 			else
 				for (int i = 0; i < params.getLength(); i++) {
