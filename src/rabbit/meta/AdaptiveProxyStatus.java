@@ -167,25 +167,27 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		loadedPlugins.addAll(cePlugins);
 		loadedPlugins.addAll(toPlugins);
 		loadedPlugins.addAll(flPlugins);
-		for (ProxyPlugin plugin : loadedPlugins) {
-			sb.append ("<tr><td>");
-			sb.append(pluginHandler.getPluginName(plugin));
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (cePlugins.contains(plugin))
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (toPlugins.contains(plugin))
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (flPlugins.contains(plugin))
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td></tr>");
+		synchronized (pluginHandler) {
+			for (ProxyPlugin plugin : loadedPlugins) {
+				sb.append ("<tr><td>");
+				sb.append(pluginHandler.getPluginName(plugin));
+				sb.append ("</td>\n<td align=\"center\">\n");
+				if (cePlugins.contains(plugin))
+					sb.append ("<b>X</b>");
+				else
+					sb.append ("&nbsp");
+				sb.append ("</td>\n<td align=\"center\">\n");
+				if (toPlugins.contains(plugin))
+					sb.append ("<b>X</b>");
+				else
+					sb.append ("&nbsp");
+				sb.append ("</td>\n<td align=\"center\">\n");
+				if (flPlugins.contains(plugin))
+					sb.append ("<b>X</b>");
+				else
+					sb.append ("&nbsp");
+				sb.append ("</td></tr>");
+			}
 		}
 		sb.append ("</table>\n<br>\n");
 	}

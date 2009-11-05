@@ -1,6 +1,8 @@
 package sk.fiit.rabbit.adaptiveproxy;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
@@ -10,14 +12,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.Set;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import rabbit.handler.AdaptiveHandler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
@@ -48,13 +48,15 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.R
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.utils.XMLFileParser;
 import sk.fiit.redeemer.test.stackTraceWatcher;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
 	
 	private static final File homeDir = new File(System.getProperty("user.dir"));
+	private static final String ORDERING_REQUEST_TEXT = "[request]";
+	private static final String ORDERING_RESPONSE_TEXT = "[response]";
+	
 	/*private static AdaptiveEngine instance;
 	
 	public static void setup(HttpProxy proxy) {
@@ -449,7 +451,7 @@ public class AdaptiveEngine  {
 		boolean homeDirConfigPresent = pluginsHomeProp != null;
 		if (pluginsHomeProp == null) pluginsHomeProp = "plugins"; 
 		File pluginsHomeDir = new File(homeDir,pluginsHomeProp);
-		String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering.xml");
+		String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering");
 		pluginsOrderFile = new File(pluginsHomeDir,pluginsOrderFileName);
 		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
 			log.info("Unable to find or access "+((!homeDirConfigPresent)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
@@ -472,7 +474,7 @@ public class AdaptiveEngine  {
 		Set<ResponseProcessingPlugin> responsePluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
 		boolean pluginsOrderingSuccess;
 		if (pluginsOrderFile != null && pluginsOrderFile.canRead()) {
-			pluginsOrderingSuccess = loadProcessingPlugins(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
+			pluginsOrderingSuccess = addProcessingPluginsInOrder(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
 		} else {
 			log.info("Unable to find or read plugins ordering file "+pluginsOrderFile.getAbsolutePath());
 			pluginsOrderingSuccess = false;
@@ -485,35 +487,51 @@ public class AdaptiveEngine  {
 		responsePlugins.addAll(responsePluginsSet);
 	}
 	
-	private boolean loadProcessingPlugins(File pluginsOrderFile, Set<RequestProcessingPlugin> requestPluginsSet,
+	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, Set<RequestProcessingPlugin> requestPluginsSet,
 			Set<ResponseProcessingPlugin> responsePluginsSet) {
-		Document pluginsOrderDoc = XMLFileParser.parseFile(pluginsOrderFile);
-		if (pluginsOrderDoc != null) {
-			Element docRoot = pluginsOrderDoc.getDocumentElement();
-			Element requestPluginsElement = (Element)docRoot.getElementsByTagName("request").item(0);
-			loadPluginsOrder(requestPluginsElement, this.requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
-			Element responsePluginsElement = (Element)docRoot.getElementsByTagName("response").item(0);
-			loadPluginsOrder(responsePluginsElement, this.responsePlugins, responsePluginsSet, ResponseProcessingPlugin.class);
-			return true;
-			
-		} else {
-			log.warn("Corrupted plugins ordering file "+pluginsOrderFile.getAbsolutePath());
-			return false;
+		Scanner sc = null;
+		try {
+			sc = new Scanner(new FileInputStream(pluginsOrderFile), "UTF-8");
+		} catch (FileNotFoundException e) {
+			log.warn("Unable to locate plugins ordering file at "+pluginsOrderFile.getPath());
 		}
-	}
-	
-	private <T extends ProxyPlugin> void loadPluginsOrder(Element pluginsElement, List<T> pluginsList,
-			Set<T> pluginsSet, Class<T> pluginsClass) {
-		NodeList plugins = pluginsElement.getElementsByTagName("plugin");
-		for (int i = 0; i < plugins.getLength(); i++) {
-			Element pluginElement = (Element)plugins.item(i);
-			String pluginName = pluginElement.getTextContent();
-			T plugin = pluginHandler.getPlugin(pluginName, pluginsClass);
-			if (plugin != null) {
-				pluginsList.add(plugin);
-				pluginsSet.remove(plugin);
+		if (sc == null)
+			return false;
+		boolean wasRequestMark = false;
+		boolean wasResponseMark = false;
+		while (sc.hasNextLine()) {
+			String line = sc.nextLine().trim();
+			if (line.startsWith("#") || line.isEmpty())
+				continue;
+			if (!wasRequestMark && ORDERING_REQUEST_TEXT.equals(line)) {
+				wasRequestMark = true;
+				continue;
+			}
+			if (!wasResponseMark && ORDERING_RESPONSE_TEXT.equals(line)) {
+				wasResponseMark = true;
+				continue;
+			}
+			if (wasRequestMark) {
+				boolean sucess = false;
+				if (wasResponseMark)
+					sucess = loadPlugin(line, responsePlugins, responsePluginsSet, ResponseProcessingPlugin.class);
+				else
+					sucess = loadPlugin(line, requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
+				if (!sucess)
+					log.warn("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order, because such plugin is not present");
 			}
 		}
+		return true;
+	}
+	
+	private <T extends ProxyPlugin> boolean loadPlugin(String pluginName, List<T> pluginsList,
+		Set<T> pluginsSet, Class<T> pluginsClass) {
+		T plugin = pluginHandler.getPlugin(pluginName, pluginsClass);
+		if (plugin == null)
+			return false;
+		pluginsList.add(plugin);
+		pluginsSet.remove(plugin);
+		return true;
 	}
 	
 	public List<RequestProcessingPlugin> getLoadedRequestPlugins() {

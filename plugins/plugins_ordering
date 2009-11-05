@@ -1,0 +1,7 @@
+# This file defines the order in which AdaptiveProxy calls loaded processing plugins.
+# Order in which plugins are called during HTTP message processing is top-down.  
+# Each line is considered to be one plugin's. Lines texts are trimmed !
+ 
+[request]
+ 
+[response]
