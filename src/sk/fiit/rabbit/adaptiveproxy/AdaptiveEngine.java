@@ -164,6 +164,7 @@ public class AdaptiveEngine  {
 			if (!prefetch) {
 				for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 					if (requestPlugin.wantRequestContent(conHandle.request.getClientRequestHeaders())) {
+						log.debug("Plugin "+requestPlugin+" wants request content");
 						prefetch = true;
 						break;
 					}
@@ -292,7 +293,8 @@ public class AdaptiveEngine  {
 					proxy.getNioHandler().runThreadTask(new Runnable() {
 						@Override
 						public void run() {
-							log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
+							if (log.isTraceEnabled())
+								log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 							proceedTask.run();
 						}
 					}, new DefaultTaskIdentifier(AdaptiveEngine.this.getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
@@ -322,7 +324,8 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
+				if (log.isTraceEnabled())
+					log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 				handler.sendResponse(response.getProxyResponseHeaders().getBackedHeader(),modifiedContent);
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
@@ -445,7 +448,7 @@ public class AdaptiveEngine  {
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
 			log.setLevel(lvl);
 			BasicConfigurator.configure();
-			log.warn("No Log4j configuration file specified, using default configuration");
+			log.info("No Log4j configuration file specified, using default configuration");
 		}
 		String pluginsHomeProp = prop.getProperty("pluginsHome");
 		boolean homeDirConfigPresent = pluginsHomeProp != null;
@@ -493,7 +496,7 @@ public class AdaptiveEngine  {
 		try {
 			sc = new Scanner(new FileInputStream(pluginsOrderFile), "UTF-8");
 		} catch (FileNotFoundException e) {
-			log.warn("Unable to locate plugins ordering file at "+pluginsOrderFile.getPath());
+			log.info("Unable to locate plugins ordering file at "+pluginsOrderFile.getPath());
 		}
 		if (sc == null)
 			return false;
@@ -518,7 +521,7 @@ public class AdaptiveEngine  {
 				else
 					sucess = loadPlugin(line, requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
 				if (!sucess)
-					log.warn("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order, because such plugin is not present");
+					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order, because such plugin is not present");
 			}
 		}
 		return true;

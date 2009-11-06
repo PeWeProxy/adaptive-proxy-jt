@@ -36,6 +36,11 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase {
 	}
 	
 	@Override
+	String getText4Logging() {
+		return "response";
+	}
+	
+	@Override
 	void doSpecificServiceDiscovery() {
 		for (ResponseServicePlugin plugin : plugins) {
 			List<ResponseServiceProvider> providers = null;

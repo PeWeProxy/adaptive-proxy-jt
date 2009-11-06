@@ -128,7 +128,7 @@ public class PluginHandler {
 				}
 				if (libFile == null || !libFile.canRead()) {
 					// unable to locate library file (jar/dir)
-					log.warn("Library location '"+libLocation+"' for the plugin '"+cfgEntry.name+
+					log.info("Library location '"+libLocation+"' for the plugin '"+cfgEntry.name+
 						"' does not point to not valid jar/directory, this plugin will not be loaded");
 					libsOK = false;
 					break;
@@ -159,7 +159,7 @@ public class PluginHandler {
 			}
 			if (pluginFile == null || !pluginFile.canRead()) {
 				// unable to locate plugin's binary file (jar/dir)
-				log.warn("Can not read classpath file/directory "+pluginFile.getPath()+",  Plugin '"+cfgEntry.name
+				log.info("Can not read classpath file/directory "+pluginFile.getPath()+",  Plugin '"+cfgEntry.name
 					+"' will not be loaded");
 				iterator.remove();
 				continue;
@@ -234,16 +234,16 @@ public class PluginHandler {
 					try {
 						supportsReconfigure = loadedPlugin.supportsReconfigure();
 					} catch (Exception e) {
-						log.warn("Exception occured while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'");
+						log.info("Exception occured while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'");
 					}
 					if (supportsReconfigure) {
-						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring");
+						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring at it's current state");
 						if (newCfgEntry != null) {
 							Class<?> newClazz = null;
 							try {
 								newClazz = loadClass(newCfgEntry.className, newCfgEntry.classLoader);
 							} catch (ClassNotFoundException e) {
-								log.warn("Plugin '"+newCfgEntry.name+"' | plugin class '"+newCfgEntry.className+"' not found at '"+
+								log.info("Plugin '"+newCfgEntry.name+"' | plugin class '"+newCfgEntry.className+"' not found at '"+
 										new File(pluginRepositoryDir,newCfgEntry.classLocation).getAbsolutePath()+"'", e);
 							}
 							Class<?> oldClass = loadedPlugin.getClass();
@@ -311,7 +311,7 @@ public class PluginHandler {
 		try {
 			return plugin.setup(props);
 		} catch (Exception e) {
-			log.warn("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+			log.info("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -322,7 +322,7 @@ public class PluginHandler {
 			plugin.start();
 			return true;
 		} catch (Exception e) {
-			log.warn("Exception occured while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+			log.info("Exception occured while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -333,7 +333,7 @@ public class PluginHandler {
 			plugin.stop();
 			return true;
 		} catch (Exception e) {
-			log.warn("Exception occured while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+			log.info("Exception occured while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
 		}
 		return false;
 	}
@@ -350,7 +350,7 @@ public class PluginHandler {
 				try {
 					cfgEntry = loadPluginConfig(document);
 				} catch (PluginConfigurationException e) {
-					log.warn("Invalid configuration file "+file.getAbsolutePath()+" ("+e.getText()+")");
+					log.info("Invalid configuration file "+file.getAbsolutePath()+" ("+e.getText()+")");
 					continue;
 				}
 				int num = 1;
@@ -363,7 +363,7 @@ public class PluginHandler {
 				configEntries.add(cfgEntry);
 				pluginNames.add(cfgEntry.name);
 			} else
-				log.warn("Corrupted plugin configuration file "+file.getAbsolutePath());
+				log.info("Corrupted plugin configuration file "+file.getAbsolutePath());
 		}
 	}
 	
@@ -381,7 +381,7 @@ public class PluginHandler {
 		nodeList = docRoot.getElementsByTagName(ELEMENT_CLASSLOC);
 		String classLocation = "";
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSLOC+"' for plugin with name '"+pluginName
+			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSLOC+"' for plugin with name '"+pluginName
 					+"', using default class location");
 		else {
 			Element classLocationElement = (Element)docRoot.getElementsByTagName(ELEMENT_CLASSLOC).item(0);
@@ -397,13 +397,13 @@ public class PluginHandler {
 		nodeList = docRoot.getElementsByTagName(ELEMENT_LIBS);
 		List<String> pluginLibs = new LinkedList<String>();
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
+			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
 					+"', no additional libraries will be loaded");
 		else {
 			Element libsElement = (Element)nodeList.item(0);
 			NodeList libs = libsElement.getElementsByTagName(ELEMENT_LIB);
 			if (libs.getLength() == 0)
-				log.trace("Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
+				log.debug("Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
 						+"', no additional libraries will be loaded");
 			else {
 				for (int i = 0; i < libs.getLength(); i++) {
@@ -420,7 +420,7 @@ public class PluginHandler {
 		NodeList types = typesElement.getElementsByTagName(ELEMENT_TYPE);
 		List<String> pluginTypes = new ArrayList<String>(types.getLength());
 		if (types.getLength() == 0)
-			log.warn("Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"' for plugin with name '"+pluginName
+			log.debug("Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"' for plugin with name '"+pluginName
 					+"', this plugin won't be used");
 		for (int i = 0; i < types.getLength(); i++) {
 			Element type = (Element)types.item(i);
@@ -430,13 +430,13 @@ public class PluginHandler {
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
 		PluginPropertiesImpl properties = new PluginPropertiesImpl();
 		if (nodeList.getLength() == 0)
-			log.trace("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
+			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
 					+"', no parameters will be provided at plugin configuration");
 		else {
 			Element parametersElement = (Element)nodeList.item(0);
 			NodeList params = parametersElement.getElementsByTagName(ELEMENT_PARAM);
 			if (params.getLength() == 0)
-				log.trace("Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
+				log.debug("Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
 						+"', no parameters will be provided at plugin configuration");
 			else
 				for (int i = 0; i < params.getLength(); i++) {
@@ -463,9 +463,9 @@ public class PluginHandler {
 		try {
 			instance = clazz.newInstance();
 		} catch (InstantiationException e) {
-			log.warn("Unable to create an instance of the class '"+clazz.getName()+"'",e);
+			log.info("Unable to create an instance of the class '"+clazz.getName()+"'",e);
 		} catch (IllegalAccessException e) {
-			log.warn("Instantiation forbidden for class '"+clazz.getName()+"'",e);
+			log.info("Instantiation with zero arguments constructor forbidden for class '"+clazz.getName()+"'",e);
 		}
 		return instance;
 	}
@@ -477,12 +477,12 @@ public class PluginHandler {
 			clazz = loadClass(cfgEntry.className, cfgEntry.classLoader);
 		} catch (ClassNotFoundException e) {
 			cfgEntry.classLocValid = false;
-			log.warn("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' not found at '"+
+			log.info("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' not found at '"+
 					new File(pluginRepositoryDir,cfgEntry.classLocation).getAbsolutePath()+"'");
 			return null;
 		}
 		if (!asClass.isAssignableFrom(clazz)) {
-			log.warn("Found class '"+clazz.getName()+"' is not a subclass of '"+
+			log.info("Found class '"+clazz.getName()+"' is not a subclass of '"+
 					asClass.getName()+"' class/interface");
 			return null;
 		}
@@ -495,7 +495,7 @@ public class PluginHandler {
 		try {
 			classFileUri = clazz.getProtectionDomain().getCodeSource().getLocation().toURI();
 		} catch (URISyntaxException e) {
-			log.warn("Unable to get code source location for class '"+clazz.getName()+"'");
+			log.info("Unable to get code source location for class '"+clazz.getName()+"'");
 			return null;
 		}
 		File codeSourceFile = new File(classFileUri);
@@ -505,7 +505,7 @@ public class PluginHandler {
 			String classPath = clazz.getName().replace(".", filepathSeparator);
 			classFile = new File(codeSourceFile,classPath+".class");
 			if (!classFile.isFile()) {
-				log.warn("Unable to find actual class at "+classFile.getAbsolutePath());
+				log.info("Unable to find actual class at "+classFile.getAbsolutePath());
 			}
 		}
 		return classFile;
@@ -518,7 +518,7 @@ public class PluginHandler {
 			log.trace("File from which the class '"+clazz.getSimpleName()+"' was loaded: "+classFile.toString());
 			checksums4ldClassMap.put(clazz, MD5ChecksumGenerator.createHexChecksum(classFile));
 		} catch (IOException e) {
-			log.warn("Error while reading class file for MD5 checksum computing");
+			log.info("Error while reading class file for MD5 checksum computing");
 		} 
 		return clazz;
 	}
@@ -530,7 +530,7 @@ public class PluginHandler {
 			try {
 				plugin = asClass.cast(loadedPlugin);
 			} catch (ClassCastException e) {
-				log.warn("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' is not a subclass of '"
+				log.info("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' is not a subclass of '"
 						+asClass.getName()+"' class/interface");
 			}
 		} else if (cfgEntry.classLocValid) {

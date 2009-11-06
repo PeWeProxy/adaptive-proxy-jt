@@ -62,7 +62,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			header.setHeader("Via", con.getProxy().getProxyIdentity());
 			HttpHeader filteredHeaders =  con.filterConstructedResponse(header);
 			if (filteredHeaders != null)
-				log.trace("If the client was an origin server, it's response would have been blocked");
+				log.debug("If this was a normaly received response, it would have been blocked by header filters");
 				// but now we don't care
 		}
 		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(fromHeaders,request);

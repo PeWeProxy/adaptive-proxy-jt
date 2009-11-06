@@ -59,16 +59,17 @@ public class AdaptiveHandler extends FilterHandler {
 		if (!askForCaching)
 			h.notCaching = false;
 		askForCaching = true;
+		if (log.isDebugEnabled())
+			log.debug("AdaptiveHandler "+h+" is handling connection "+con);
 		return h;
 	}
 	
 	private void setHTMLparsing() {
 		String ct = response.getHeader("Content-Type");
-		if (ct != null && ct.startsWith("text/html")) {
+		if (ct != null && ct.startsWith("text/html"))
 			doHTMLparsing = true;
-			log.trace("Setting to parse HTML");
-		} else
-			log.trace("Setting not to parse HTML");
+		if (log.isDebugEnabled())
+			log.debug(this+ " setting"+((doHTMLparsing)? "":" not")+" to parse HTML");
 	}
 	
 	@Override
@@ -108,8 +109,8 @@ public class AdaptiveHandler extends FilterHandler {
 		if (notCaching || sendingPhase)
 			super.finishData();
 		else {
-			if (log.isTraceEnabled())
-				log.trace("Cached data length = "+memStore.getBytes().length);
+			if (log.isDebugEnabled())
+				log.debug(this+" cached data length = "+memStore.getBytes().length);
 			con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes(), this);
 		}
 	}
@@ -122,8 +123,8 @@ public class AdaptiveHandler extends FilterHandler {
 		}
 		response = responseHeaders;
 		if (content != null) {
-			if (log.isTraceEnabled())
-				log.trace("Sending response with data of length = "+content.length);
+			if (log.isDebugEnabled())
+				log.debug(this+" sending response with data of length = "+content.length);
 			/*if (con.getChunking() && size > 0) {
 					log.debug("Rozdiel je "+(content.length - memStore.getSize()));
 					size += content.length - memStore.getSize();
@@ -134,7 +135,8 @@ public class AdaptiveHandler extends FilterHandler {
 			buffer = ByteBuffer.wrap(content);
 			if (con.getChunking()) {
 				String contentEncoding = response.getHeader("Transfer-Encoding");
-				log.trace("contentEncoding: "+contentEncoding);
+				if (log.isDebugEnabled())
+					log.debug(this+" contentEncoding: "+contentEncoding);
 				if (contentEncoding == null)
 					contentEncoding = "";
 				if (!contentEncoding.endsWith("chunked"))
@@ -142,8 +144,8 @@ public class AdaptiveHandler extends FilterHandler {
 				response.setHeader("Transfer-Encoding", contentEncoding);
 			}
 		} else {
-			if (log.isTraceEnabled())
-				log.trace("Sending response with no data");
+			if (log.isDebugEnabled())
+				log.debug("Sending response with no data");
 			ContentHeadersRemover.removeContentHeaders(response);
 			isCompressing = false;
 			if (this.content != null) {
@@ -209,7 +211,8 @@ public class AdaptiveHandler extends FilterHandler {
 				// if this condition is true, this handler will have an access to
 				// not-compressed or uncompressed data passing through it
 				notCaching = !con.getProxy().getAdaptiveEngine().cacheResponse(con, response);
-			log.trace("Caching response data: "+!notCaching);
+			if (log.isDebugEnabled())
+				log.debug(this+" caching response data: "+!notCaching);
 		}
 	}
 }

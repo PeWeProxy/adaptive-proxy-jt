@@ -27,9 +27,9 @@ public final class XMLFileParser {
 		try {
 			return builder.parse(xmlFile);
 		} catch (SAXException e) {
-			log.warn("Error during parsing of config file "+xmlFile.getAbsolutePath()+"\n"+e.toString());
+			log.info("Error during parsing of config file "+xmlFile.getAbsolutePath()+"\n"+e.toString());
 		} catch (IOException e) {
-			log.warn("Error during reading of config file "+xmlFile.getAbsolutePath()+"\n"+e.toString());
+			log.info("Error during reading of config file "+xmlFile.getAbsolutePath()+"\n"+e.toString());
 		}
 		return null;
 	}

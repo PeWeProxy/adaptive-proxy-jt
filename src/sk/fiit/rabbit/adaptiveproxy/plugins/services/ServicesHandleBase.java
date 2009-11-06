@@ -275,6 +275,8 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		for (T plugin : plugins) {
 			if (discoverContentNeed(plugin)) {
 					wantContent = true;
+					if (log.isDebugEnabled())
+						log.debug("Service plugin "+plugin+" wants "+getText4Logging()+" content");
 					break;
 			}
 			//discoverContentNeed(pluginDependencies);
@@ -282,6 +284,8 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	}
 	
 	abstract <T extends ServicePlugin> boolean discoverContentNeed(T plugin);
+	
+	abstract String getText4Logging();
 	
 	/*protected void discoverContentNeed(Set<Class<ProxyService>> dependencies) {
 		for (Class<ProxyService> serviceClass : dependencies) {
@@ -318,7 +322,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 				try {
 					charbuf = decoder.decode(ByteBuffer.wrap(data));
 				} catch (CharacterCodingException e) {
-					log.trace("Data of this message is not valid text data [requested: "+
+					log.debug("Data of this message is not valid text data [requested: "+
 							getRequestHeader().getRequestLine()+" | message entity type: "+contentType+"]");
 				}
 				if (charbuf != null) {
@@ -349,7 +353,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			ProxyService service = serviceProvider.getService();
 			Class<? extends ProxyService> implementedService = serviceProvider.getServiceClass();
 			if (!implementedService.isInstance(service)) {
-				log.error("Provided service "+service+" is not of claimed type "+implementedService+" ("+
+				log.info("Provided service "+service+" is not of claimed type "+implementedService+" ("+
 						"service provided by "+serviceProvider+" obtained from plugin "+plugin+")");
 				continue;
 			}

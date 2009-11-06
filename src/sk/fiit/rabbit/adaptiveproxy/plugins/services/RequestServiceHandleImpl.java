@@ -36,6 +36,11 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 	}
 	
 	@Override
+	String getText4Logging() {
+		return "request";
+	}
+	
+	@Override
 	void doSpecificServiceDiscovery() {
 		for (RequestServicePlugin plugin : plugins) {
 			List<RequestServiceProvider> providers = null;
