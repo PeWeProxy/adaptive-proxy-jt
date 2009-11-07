@@ -236,8 +236,8 @@ public class AdaptiveEngine  {
 						conHandle.response = (ModifiableHttpResponseImpl)requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
 						sendResponse = true;
 					}
-				} catch (Exception e) {
-					log.error("Exception thrown while processing request with RequestProcessingPlugin '"+requestPlugin+"'",e);
+				} catch (Throwable t) {
+					log.info("Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
@@ -352,8 +352,8 @@ public class AdaptiveEngine  {
 						}
 						break;
 					}
-				} catch (Exception e) {
-					log.error("Exception thrown while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",e);
+				} catch (Throwable t) {
+					log.info("Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
 				}
 			}
 		} while (again);

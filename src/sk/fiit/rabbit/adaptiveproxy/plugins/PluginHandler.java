@@ -233,8 +233,8 @@ public class PluginHandler {
 					boolean supportsReconfigure = false;
 					try {
 						supportsReconfigure = loadedPlugin.supportsReconfigure();
-					} catch (Exception e) {
-						log.info("Exception occured while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'");
+					} catch (Throwable t) {
+						log.info("Throwable raised while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'",t);
 					}
 					if (supportsReconfigure) {
 						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring at it's current state");
@@ -310,8 +310,8 @@ public class PluginHandler {
 		log.info("Setting up plugin '"+plugin+"'");
 		try {
 			return plugin.setup(props);
-		} catch (Exception e) {
-			log.info("Exception occured while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+		} catch (Throwable t) {
+			log.info("Throwable raised while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
 		return false;
 	}
@@ -321,8 +321,8 @@ public class PluginHandler {
 		try {
 			plugin.start();
 			return true;
-		} catch (Exception e) {
-			log.info("Exception occured while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+		} catch (Throwable t) {
+			log.info("Throwable raised while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
 		return false;
 	}
@@ -332,8 +332,8 @@ public class PluginHandler {
 		try {
 			plugin.stop();
 			return true;
-		} catch (Exception e) {
-			log.info("Exception occured while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",e);
+		} catch (Throwable t) {
+			log.info("Throwable raised while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
 		return false;
 	}
@@ -466,6 +466,8 @@ public class PluginHandler {
 			log.info("Unable to create an instance of the class '"+clazz.getName()+"'",e);
 		} catch (IllegalAccessException e) {
 			log.info("Instantiation with zero arguments constructor forbidden for class '"+clazz.getName()+"'",e);
+		} catch (Throwable t) {
+			log.info("Throwable raised while instantiation of the class '"+clazz.getName()+"'",t);
 		}
 		return instance;
 	}

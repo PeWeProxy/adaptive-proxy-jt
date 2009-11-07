@@ -41,8 +41,8 @@ public class EventsHandler {
 				for (CloseEventPlugin plugin : closeEventPlugins) {
 					try {
 						plugin.clientClosedConnection(clientSocketAdr);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -63,8 +63,8 @@ public class EventsHandler {
 							plugin.proxyClosedConnection(request);
 						else
 							plugin.proxyClosedConnection(clientSocketAdr);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -89,8 +89,8 @@ public class EventsHandler {
 							plugin.requestReadFailed(request);
 						else
 							plugin.requestReadFailed(clientSocketAdr);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -106,8 +106,8 @@ public class EventsHandler {
 				for (FailureEventPlugin plugin : failureEventPlugins) {
 					try {
 						plugin.requestDeliveryFailed(request);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -128,8 +128,8 @@ public class EventsHandler {
 							plugin.responseReadFailed(response);
 						else
 							plugin.responseReadFailed(request);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -145,8 +145,8 @@ public class EventsHandler {
 				for (FailureEventPlugin plugin : failureEventPlugins) {
 					try {
 						plugin.responseDeliveryFailed(response);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -167,8 +167,8 @@ public class EventsHandler {
 							plugin.requestReadTimeout(request);
 						else
 							plugin.requestReadTimeout(clientSocketAdr);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -184,8 +184,8 @@ public class EventsHandler {
 				for (TimeoutEventPlugin plugin : timeoutEventPlugins) {
 					try {
 						plugin.requestDeliveryTimeout(request);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -206,8 +206,8 @@ public class EventsHandler {
 							plugin.responseReadTimeout(response);
 						else
 							plugin.responseReadTimeout(request);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}
@@ -223,8 +223,8 @@ public class EventsHandler {
 				for (TimeoutEventPlugin plugin : timeoutEventPlugins) {
 					try {
 						plugin.responseDeliveryTimeout(response);
-					} catch (Exception e) {
-						log.error("Exception thrown during processing event by event plugin '"+plugin+"'",e);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
 					}
 				}
 			}

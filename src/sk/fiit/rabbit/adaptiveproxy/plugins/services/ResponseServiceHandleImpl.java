@@ -46,8 +46,8 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase {
 			List<ResponseServiceProvider> providers = null;
 			try {
 				providers = plugin.provideResponseServices(response);
-			} catch (Exception e) {
-				log.error("Exception thrown while obtaining service providers from ResponseServiceProvider of class '"+plugin.getClass()+"'");
+			} catch (Throwable t) {
+				log.info("Throwable raised while obtaining service providers from ResponseServiceProvider of class '"+plugin.getClass()+"'",t);
 			}
 			if (providers != null)
 				addServiceProviders(plugin,providers);
