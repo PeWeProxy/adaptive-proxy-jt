@@ -503,9 +503,13 @@ public class AdaptiveEngine  {
 		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
 			log.info("Unable to find or access "+((!homeDirConfigPresent)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
 		} else {
+			File sharedLibDir = null;
+			String sharedLibDirName = prop.getProperty("shared_libs_folder","shared_libs");
+			if (!sharedLibDirName.trim().isEmpty())
+				sharedLibDir = new File(pluginsHomeDir,sharedLibDirName);
 			Set<String> excludeFiles = new HashSet<String>();
 			excludeFiles.add(pluginsOrderFileName);
-			pluginHandler.setPluginRepository(pluginsHomeDir,excludeFiles);
+			pluginHandler.setPluginRepository(pluginsHomeDir,sharedLibDir,excludeFiles);
 		}
 		reloadPlugins();
 	}
@@ -514,11 +518,15 @@ public class AdaptiveEngine  {
 		log.info("Reloading plugins");
 		pluginHandler.reloadPlugins();
 		loggingHandler.setup();
+		log.info("Loading request service plugins");
 		RequestServiceHandleImpl.initPlugins(pluginHandler);
+		log.info("Loading response service plugins");
 		ResponseServiceHandleImpl.initPlugins(pluginHandler);
 		requestPlugins.clear();
 		responsePlugins.clear();
+		log.info("Loading request processing plugins");
 		Set<RequestProcessingPlugin> requestPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
+		log.info("Loading response processing plugins");
 		Set<ResponseProcessingPlugin> responsePluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
 		boolean pluginsOrderingSuccess;
 		if (pluginsOrderFile != null && pluginsOrderFile.canRead()) {

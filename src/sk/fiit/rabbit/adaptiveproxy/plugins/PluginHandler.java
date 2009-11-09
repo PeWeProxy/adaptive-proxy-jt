@@ -46,7 +46,8 @@ public class PluginHandler {
 	private static final String ATTR_NAME = "name";
 	
 	private File pluginRepositoryDir;
-	//private URLClassLoader classLoader;
+	private File sharedLibsDir;
+	private URL[] sharedLibsURLs;
 	private Set<String> excludeFileNames;
 	
 	private final List<PluginConfigEntry> configEntries;
@@ -55,7 +56,6 @@ public class PluginHandler {
 	private final Map<String, Set<? extends ProxyPlugin>> ldPlugins4TypeMap;
 	private final Map<Class<?>, String> checksums4ldClassMap;
 	private final Map<URL, String> checksums4ldLibsMap;
-	//private final Map<URI, ClassLoader> cLoaders4ldLibsMap;
 	private final AbcPluginsComparator comparator;
 	
 	public PluginHandler() {
@@ -65,14 +65,14 @@ public class PluginHandler {
 		ldPlugins4TypeMap = new LinkedHashMap<String, Set<? extends ProxyPlugin>>();
 		checksums4ldClassMap = new HashMap<Class<?>, String>();
 		checksums4ldLibsMap = new HashMap<URL, String>();
-		//cLoaders4ldLibsMap = new HashMap<URI, ClassLoader>();
 		comparator = new AbcPluginsComparator();
 	}
 	
-	public void setPluginRepository(File pluginRepositoryDir, Set<String> excludeFileNames) {
+	public void setPluginRepository(File pluginRepositoryDir, File sharedLibsDir, Set<String> excludeFileNames) {
 		if (!pluginRepositoryDir.isDirectory()) {
 			throw new IllegalArgumentException("Argument does not denote a directory");
 		}
+		this.sharedLibsDir = sharedLibsDir;
 		this.pluginRepositoryDir = pluginRepositoryDir;
 		this.excludeFileNames = excludeFileNames;
 	}
@@ -100,6 +100,7 @@ public class PluginHandler {
 		ClassLoader classLoader;
 		final Set<URL> libsrariesURLSet;
 		boolean classLocValid = true;
+		boolean loadError = false;
 		
 		public PluginConfigEntry(String name, String className, String classLocation,
 				List<String> libraries, List<String> types, PluginProperties properties) {
@@ -124,12 +125,12 @@ public class PluginHandler {
 				try {
 					libFile = libRelFile.getCanonicalFile();
 				} catch (IOException e1) {
-					log.warn("Error when converting library file '"+libRelFile.getPath()+"' to cannonical form");
+					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' to cannonical form");
 				}
 				if (libFile == null || !libFile.canRead()) {
 					// unable to locate library file (jar/dir)
 					log.info("Library location '"+libLocation+"' for the plugin '"+cfgEntry.name+
-						"' does not point to not valid jar/directory, this plugin will not be loaded");
+						"' does not point to valid jar/directory, this plugin will not be loaded");
 					libsOK = false;
 					break;
 				}
@@ -138,7 +139,7 @@ public class PluginHandler {
 				try {
 					url = libLocURI.toURL();
 				} catch (MalformedURLException e) {
-					log.warn("Error when converting valid library file path '"+libFile.getPath()+"' to URL, plugin '"+cfgEntry.name
+					log.info("Error when converting valid library file path '"+libFile.getAbsolutePath()+"' to URL, plugin '"+cfgEntry.name
 							+" will not be loaded");
 					libsOK = false;
 					break;
@@ -155,11 +156,11 @@ public class PluginHandler {
 			try {
 				pluginFile = pluginRelFile.getCanonicalFile();
 			} catch (IOException e1) {
-				log.warn("Error when converting plugin class file '"+pluginRelFile.getPath()+"' to cannonical form");
+				log.info("Error when converting plugin class file '"+pluginRelFile.getAbsolutePath()+"' to cannonical form");
 			}
 			if (pluginFile == null || !pluginFile.canRead()) {
 				// unable to locate plugin's binary file (jar/dir)
-				log.info("Can not read classpath file/directory "+pluginFile.getPath()+",  Plugin '"+cfgEntry.name
+				log.info("Can not read classpath file/directory "+pluginFile.getAbsolutePath()+",  Plugin '"+cfgEntry.name
 					+"' will not be loaded");
 				iterator.remove();
 				continue;
@@ -169,14 +170,17 @@ public class PluginHandler {
 			try {
 				classLocURL = classLocURI.toURL();
 			} catch (MalformedURLException e) {
-				log.warn("Error when converting valid plugin class file path '"+pluginFile.getPath()+"' to URL, plugin '"+cfgEntry.name
+				log.info("Error when converting valid plugin class file path '"+pluginFile.getAbsolutePath()+"' to URL, plugin '"+cfgEntry.name
 					+" will not be loaded");
 				continue;
 			}
 			ClassLoader sharedClassLoader = cLoaders.get(classLocURL);
 			// check if the parent class loader uses the same libraries
 			if (sharedClassLoader != null) {
-				if (sameURLsInCLoader(cfgEntry.classLoader.getParent(), cfgEntry.libsrariesURLSet)) {
+				ClassLoader libsClassLoader = sharedClassLoader.getParent().getParent();
+				if (libsClassLoader == null)
+					libsClassLoader = sharedClassLoader.getParent();
+				if (sameURLsInCLoader(libsClassLoader, cfgEntry.libsrariesURLSet)) {
 					cfgEntry.classLoader = sharedClassLoader;
 					log.trace("Plugin '"+cfgEntry.name+"' shares already created ClassLoader "+cfgEntry.classLoader);
 				} else {
@@ -186,19 +190,69 @@ public class PluginHandler {
 			}
 			if (cfgEntry.classLoader == null) {
 				// plugin can not share existing ClassLoader
+				URLClassLoader parentCLoader = null;
 				URL[] urls = new URL[] {classLocURL};
 				if (!cfgEntry.libsrariesURLSet.isEmpty()) {
-					URLClassLoader parentCLoader = URLClassLoader.newInstance(cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]));
-					log.trace("Creating new ClassLoader "+parentCLoader+" with URLs set to "+Arrays.toString(parentCLoader.getURLs())
-							+" with parent ClassLoader set to "+parentCLoader.getParent()+ " for use by plugin '"+cfgEntry.name+"'");
-					cfgEntry.classLoader = URLClassLoader.newInstance(urls,parentCLoader);
+					URL[] libsURLs = cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]);
+					parentCLoader = createClassLoader(libsURLs, null, cfgEntry); 
+					parentCLoader = createClassLoader(urls, parentCLoader, cfgEntry); 
+				} else {
+					parentCLoader = createClassLoader(urls, null, cfgEntry);
+				}
+				if (sharedLibsURLs != null) {
+					cfgEntry.classLoader = parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, cfgEntry);
 				} else
-					cfgEntry.classLoader = URLClassLoader.newInstance(urls);
+					cfgEntry.classLoader = parentCLoader;
 				cLoaders.put(classLocURL, cfgEntry.classLoader);
 				log.trace("Plugin '"+cfgEntry.name+"' will be loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
 						+" with parent ClassLoader set to "+cfgEntry.classLoader.getParent());
 			}
 		}
+	}
+	
+	private URLClassLoader createClassLoader(URL[] urls, URLClassLoader parent, PluginConfigEntry cfgEntry) {
+		URLClassLoader retVal = null;
+		if (parent != null)
+			retVal = URLClassLoader.newInstance(urls,parent);
+		else
+			retVal = URLClassLoader.newInstance(urls);
+		log.trace("Creating new ClassLoader "+retVal+" with URLs set to "+Arrays.toString(retVal.getURLs())
+				+" with parent ClassLoader set to "+retVal.getParent()+ " for use by plugin '"+cfgEntry.name+"'");
+		return retVal;
+	}
+	
+	private void createSharedLibsURLs() {
+		if (sharedLibsDir != null && sharedLibsDir.isDirectory() && sharedLibsDir.canRead()) {
+			URL sharedDirURL = null;
+			try {
+				sharedDirURL = sharedLibsDir.toURI().toURL();
+			} catch (MalformedURLException e) {
+				log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
+						+"' to URL, no shared libraries will be used");
+			}
+			if (sharedDirURL != null) {
+				FilenameFilter jarFilter = new FilenameFilter() {
+					@Override
+					public boolean accept(File dir, String name) {
+						return name.endsWith(".jar");
+					}
+				};
+				File[] jarFiles = sharedLibsDir.listFiles(jarFilter);
+				URL[] urls = new URL[jarFiles.length+1];
+				urls[0] = sharedDirURL;
+				int i = 1;
+				for (File lib : jarFiles) {
+					try {
+						urls[i++] = lib.toURI().toURL();
+					} catch (MalformedURLException e) {
+						log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
+								+"' to URL, no shared libraries will be used");
+					}
+				}
+				sharedLibsURLs = urls;
+			}
+		} else
+			log.info("Can not access shared libraries directory "+sharedLibsDir.getAbsolutePath()+", no shared libraries will be used");
 	}
 	
 	public synchronized void reloadPlugins() {
@@ -208,6 +262,7 @@ public class PluginHandler {
 		entry4ldPluginMap.clear();
 		loadPluginsConfigs();
 		Map<URL, String> newLibChecksums = new HashMap<URL, String>();
+		createSharedLibsURLs();
 		createClassLoaders(newLibChecksums);
 		Map<PluginConfigEntry, ProxyPlugin> tmpPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
 		for (PluginConfigEntry oldCfgEntry : ldPlugin4EntryMap.keySet()) {
@@ -294,6 +349,8 @@ public class PluginHandler {
 	
 	private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
 		ClassLoader appClassLoader = this.getClass().getClassLoader();
+		if (cLoader == null)
+			return false;
 		if (urls.isEmpty())
 			if (cLoader.equals(appClassLoader))
 				return true;
@@ -526,6 +583,8 @@ public class PluginHandler {
 	}
 	
 	private  <T extends ProxyPlugin> T getPlugin(PluginConfigEntry cfgEntry, Class<T> asClass) {
+		if (cfgEntry.loadError)
+			return null;
 		T plugin = null;
 		ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(cfgEntry);
 		if (loadedPlugin != null) {
@@ -547,6 +606,8 @@ public class PluginHandler {
 						log.debug("Plugin of class '"+cfgEntry.className+"' is not set up properly, it is thrown away");
 						plugin = null;
 					}
+				} else {
+					cfgEntry.loadError = true;
 				}
 			}
 		}
