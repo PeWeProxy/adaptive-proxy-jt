@@ -23,12 +23,12 @@ public class RequestAndResponseServicePluginAdapter implements
 	public List<RequestServiceProvider> provideRequestServices(
 			HttpRequest request) {
 		List<RequestServiceProvider> providedServices = new ArrayList<RequestServiceProvider>(1);
-		addProvidedRequestServices(providedServices);
+		addProvidedRequestServices(providedServices, request);
 		return providedServices;
 	}
 
 	protected void addProvidedRequestServices(
-			List<RequestServiceProvider> providedServices) {
+			List<RequestServiceProvider> providedServices, HttpRequest request) {
 	}
 
 	@Override
@@ -79,12 +79,12 @@ public class RequestAndResponseServicePluginAdapter implements
 	public List<ResponseServiceProvider> provideResponseServices(
 			HttpResponse response) {
 		List<ResponseServiceProvider> providedServices = new ArrayList<ResponseServiceProvider>(1);
-		addProvidedResponseServices(providedServices);
+		addProvidedResponseServices(providedServices, response);
 		return providedServices;
 	}
 
 	protected void addProvidedResponseServices(
-			List<ResponseServiceProvider> providedServices) {
+			List<ResponseServiceProvider> providedServices, HttpResponse response) {
 	}
 
 	@Override

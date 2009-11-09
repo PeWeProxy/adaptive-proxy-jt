@@ -18,12 +18,12 @@ public class ResponseServicePluginAdapter implements ResponseServicePlugin {
 	public List<ResponseServiceProvider> provideResponseServices(
 			HttpResponse response) {
 		List<ResponseServiceProvider> providedServices = new ArrayList<ResponseServiceProvider>(1);
-		addProvidedResponseServices(providedServices);
+		addProvidedResponseServices(providedServices, response);
 		return providedServices;
 	}
 
 	protected void addProvidedResponseServices(
-			List<ResponseServiceProvider> providedServices) {
+			List<ResponseServiceProvider> providedServices, HttpResponse response) {
 	}
 
 	@Override

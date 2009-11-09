@@ -17,11 +17,11 @@ public class RequestServicePluginAdapter implements RequestServicePlugin {
 	@Override
 	public List<RequestServiceProvider> provideRequestServices(HttpRequest request) {
 		List<RequestServiceProvider> providedServices = new ArrayList<RequestServiceProvider>(1);
-		addProvidedRequestServices(providedServices);
+		addProvidedRequestServices(providedServices, request);
 		return providedServices;
 	}
 
-	protected void addProvidedRequestServices(List<RequestServiceProvider> providedServices) {
+	protected void addProvidedRequestServices(List<RequestServiceProvider> providedServices, HttpRequest request) {
 	}
 
 	@Override
