@@ -36,7 +36,11 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 	}
 	
 	@Override
-	String getText4Logging() {
+	String getText4Logging(loggingTextTypes type) {
+		if (type == loggingTextTypes.CAPITAL)
+			return "Request";
+		if (type == loggingTextTypes.SHORT)
+			return "RQ";
 		return "request";
 	}
 	

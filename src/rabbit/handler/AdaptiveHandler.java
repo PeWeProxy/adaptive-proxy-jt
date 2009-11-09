@@ -60,7 +60,7 @@ public class AdaptiveHandler extends FilterHandler {
 			h.notCaching = false;
 		askForCaching = true;
 		if (log.isDebugEnabled())
-			log.debug("AdaptiveHandler "+h+" is handling connection "+con);
+			log.debug(h+" is handling connection "+con);
 		return h;
 	}
 	
@@ -206,13 +206,19 @@ public class AdaptiveHandler extends FilterHandler {
 	protected void setupHandler() {
 		super.setupHandler();
 		if (askForCaching) {
-			if (super.willCompress())
+			if (isCompressing || (!compress && super.willCompress())) {
 				// [ignore the method name !]
 				// if this condition is true, this handler will have an access to
 				// not-compressed or uncompressed data passing through it
 				notCaching = !con.getProxy().getAdaptiveEngine().cacheResponse(con, response);
-			if (log.isDebugEnabled())
-				log.debug(this+" caching response data: "+!notCaching);
+				if (log.isDebugEnabled())
+					log.debug(this+" caching response data: "+!notCaching);
+			}
 		}
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
 }

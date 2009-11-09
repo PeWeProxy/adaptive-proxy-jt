@@ -48,7 +48,6 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.R
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
-import sk.fiit.redeemer.test.stackTraceWatcher;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
@@ -87,10 +86,16 @@ public class AdaptiveEngine  {
 		private boolean requestChunking = false;
 		private boolean adaptiveHandling = false;
 		private final long requestTime;
+		private long responseTime;
 
 		public ConnectionHandle(Connection con) {
 			this.con = con;
 			requestTime = System.currentTimeMillis();
+		}
+		
+		@Override
+		public String toString() {
+			return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 		}
 	}
 	
@@ -107,12 +112,12 @@ public class AdaptiveEngine  {
 	
 	public ModifiableHttpRequest getRequestForConnection(Connection con) {
 		if (con == null) {
-			log.debug("Trying to get request for null connection");
+			log.warn("Trying to get request for null connection");
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			stackTraceWatcher.printStackTrace(con);
-			log.debug("No handle for connection, can't return request");
+			//stackTraceWatcher.printStackTrace(con);
+			log.warn("No handle for connection, can't return request");
 			return null;
 		}
 		return requestHandles.get(con).request;
@@ -120,28 +125,29 @@ public class AdaptiveEngine  {
 	
 	public ModifiableHttpResponse getResponseForConnection(Connection con) {
 		if (con == null) {
-			log.debug("Trying to get response for null connection");
+			log.warn("Trying to get response for null connection");
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			stackTraceWatcher.printStackTrace(con);
-			log.debug("No handle for connection, can't return response");
+			//stackTraceWatcher.printStackTrace(con);
+			log.warn("No handle for connection, can't return response");
 			return null;
 		}
 		return requestHandles.get(con).response;
 	}
 	
 	public void newRequestAttempt(Connection con) {
+		ConnectionHandle newHandle = new ConnectionHandle(con);
+		requestHandles.put(con, newHandle);
 		if (log.isTraceEnabled())
-			log.trace("Registering new ConnectionHandle for connection "+con);
-		requestHandles.put(con, new ConnectionHandle(con));
+			log.trace("RQ: Registering new connection handle "+newHandle+" for connection "+con);
 	}
 	
 	public void connectionClosed(Connection con) {
+		//stackTraceWatcher.addStackTrace(con);
+		ConnectionHandle conHandle = requestHandles.remove(con);
 		if (log.isTraceEnabled())
-			log.trace("Removing ConnectionHandle for connection "+con);
-		stackTraceWatcher.addStackTrace(con);
-		requestHandles.remove(con);
+			log.trace("Removing connection handle "+conHandle+" for connection "+con);
 	}
 	
 	public void newRequest(Connection con, boolean chunking) {
@@ -151,6 +157,8 @@ public class AdaptiveEngine  {
 		conHandle.messageFactory = new HttpMessageFactoryImpl(con,conHandle.request);
 		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getProxyRequestHeaders().getBackedHeader());
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | New request received");
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -164,7 +172,8 @@ public class AdaptiveEngine  {
 			if (!prefetch) {
 				for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 					if (requestPlugin.wantRequestContent(conHandle.request.getClientRequestHeaders())) {
-						log.debug("Plugin "+requestPlugin+" wants request content");
+						if (log.isDebugEnabled())
+							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants request content");
 						prefetch = true;
 						break;
 					}
@@ -175,6 +184,8 @@ public class AdaptiveEngine  {
 				new ContentFetcher(con,bufHandle,tlh,separator,contentCachedListener,dataSize);
 				return;
 			} else {
+				if (log.isDebugEnabled())
+					log.debug("RQ: "+conHandle+" | No plugin wants request content");
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator);
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
@@ -184,13 +195,15 @@ public class AdaptiveEngine  {
 			@Override
 			public void run() {
 				if (runRequestAdapters(conHandle))
-					processWithRequest(conHandle, handler);
+					proceedWithRequest(conHandle, handler);
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
 	public void requestContentCached(final Connection con, final byte[] requestContent, final Queue<Integer> dataIncrements) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached");
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -202,13 +215,15 @@ public class AdaptiveEngine  {
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent,dataIncrements);
 						resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,conHandle.requestChunking);
 					}
-					processWithRequest(conHandle, resourceHandler);
+					proceedWithRequest(conHandle, resourceHandler);
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
 	private boolean runRequestAdapters(ConnectionHandle conHandle) {
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | Running request adapters");
 		RequestServiceHandleImpl serviceHandle = conHandle.request.getServiceHandle();
 		serviceHandle.doServiceDiscovery();
 		boolean again = false;
@@ -237,7 +252,7 @@ public class AdaptiveEngine  {
 						sendResponse = true;
 					}
 				} catch (Throwable t) {
-					log.info("Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
+					log.info("RQ: "+conHandle+" | Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
@@ -249,10 +264,14 @@ public class AdaptiveEngine  {
 		return true;
 	}
 
-	void processWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
+	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
+				if (log.isTraceEnabled()) {
+					log.trace("RQ: "+conHandle+" | Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in processing request");
+				}
 				conHandle.con.processRequest(resourceHandler);
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestAdvancing", requestSendingTaskInfo(conHandle)));
@@ -260,7 +279,10 @@ public class AdaptiveEngine  {
 	
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
+		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | New response received");
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
@@ -277,9 +299,14 @@ public class AdaptiveEngine  {
 		if (conHandle.response.getServiceHandle().wantContent())
 			return true;
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
-			if (responsePlugin.wantResponseContent(conHandle.response.getWebResponseHeaders()))
+			if (responsePlugin.wantResponseContent(conHandle.response.getWebResponseHeaders())) {
+				if (log.isDebugEnabled())
+					log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants request content");
 				return true;
+			}
 		}
+		if (log.isDebugEnabled())
+			log.debug("RP: "+conHandle+" | No plugin wants response");
 		return false;
 	}
 
@@ -290,23 +317,25 @@ public class AdaptiveEngine  {
 				@Override
 				public void run() {
 					runResponseAdapters(conHandle);
-					proxy.getNioHandler().runThreadTask(new Runnable() {
+					proceedWithResponse(conHandle, new Runnable() {
 						@Override
 						public void run() {
-							if (log.isTraceEnabled())
-								log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 							proceedTask.run();
 						}
-					}, new DefaultTaskIdentifier(AdaptiveEngine.this.getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
+					});
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 		} else {
+			if (log.isTraceEnabled())
+				log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
 			proceedTask.run();
 		}
 	}
 	
 	public void responseContentCached(Connection con, final byte[] responseContent, final AdaptiveHandler handler) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached");
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -320,18 +349,17 @@ public class AdaptiveEngine  {
 		runResponseAdapters(conHandle);
 		final ModifiableHttpResponseImpl response = conHandle.response;
 		final byte[] modifiedContent = conHandle.response.getData();
-		
-		proxy.getNioHandler().runThreadTask(new Runnable() {
+		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {
-				if (log.isTraceEnabled())
-					log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 				handler.sendResponse(response.getProxyResponseHeaders().getBackedHeader(),modifiedContent);
 			}
-		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
+		});
 	}
 	
 	private void runResponseAdapters(ConnectionHandle conHandle) {
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | Running response adapters");
 		ResponseServiceHandleImpl serviceHandle = conHandle.response.getServiceHandle();
 		serviceHandle.doServiceDiscovery();
 		boolean again = false;
@@ -353,12 +381,26 @@ public class AdaptiveEngine  {
 						break;
 					}
 				} catch (Throwable t) {
-					log.info("Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
+					log.info("RP: "+conHandle+" | Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
 				}
 			}
 		} while (again);
 		conHandle.response.getServiceHandle().doChanges();
 	}
+	
+	private void proceedWithResponse(final ConnectionHandle conHandle, final Runnable proceedTask) {
+		proxy.getNioHandler().runThreadTask(new Runnable() {
+			@Override
+			public void run() {
+				if (log.isTraceEnabled()) {
+					log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in processing response");
+				}
+				proceedTask.run();
+			}
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
+	}
+
 	
 	private void sendResponse(final ConnectionHandle conHandle, boolean processResponse) {
 		if (processResponse) {
@@ -366,6 +408,8 @@ public class AdaptiveEngine  {
 		} else {
 			conHandle.response.getServiceHandle().doChanges();
 		}
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | Sending response");
 		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
 		BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(new byte[4096]));
 		Connection con = conHandle.con;
@@ -375,14 +419,14 @@ public class AdaptiveEngine  {
 		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
 		handlerFactory.nextInstanceWillNotCache();
 		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, bufHandle, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
-		proxy.getNioHandler().runThreadTask(new Runnable() {
+		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {
 				sendingHandler.sendResponse(responseHeaders, conHandle.response.getData());
 			}
-		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
+		});
 	}
-
+	
 	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
 		return "Running plugins processing on request \""
 			+ conHandle.request.getClientRequestHeaders().getRequestLine()
@@ -467,6 +511,7 @@ public class AdaptiveEngine  {
 	}
 	
 	public void reloadPlugins() {
+		log.info("Reloading plugins");
 		pluginHandler.reloadPlugins();
 		loggingHandler.setup();
 		RequestServiceHandleImpl.initPlugins(pluginHandler);

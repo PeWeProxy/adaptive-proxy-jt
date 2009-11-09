@@ -5,9 +5,8 @@ import java.nio.charset.UnsupportedCharsetException;
 import rabbit.http.HttpHeader;
 
 public abstract class CharsetDetector {
-	private static final String defaultCharset = "ISO-8859-1";
 	
-	public static final String detectCharsetString(HttpHeader headers) {
+	public static String detectCharsetString(HttpHeader headers) {
 		String cs = null;
 		String ct = headers.getHeader("Content-Type");
 		if (ct != null) {
@@ -28,16 +27,10 @@ public abstract class CharsetDetector {
 		return cs;
 	}
 	
-	public static final Charset detectCharset(HttpHeader headers) {
+	public static Charset detectCharset(HttpHeader headers) throws UnsupportedCharsetException {
 		String cs = detectCharsetString(headers);
 		if (cs == null)
-			cs = defaultCharset;
-		Charset charSet = null;
-	    try {
-			charSet = Charset.forName(cs);
-		    } catch (UnsupportedCharsetException e) {
-			charSet = Charset.forName(defaultCharset);
-	    }
-		return charSet;
+			return null;
+		return Charset.forName(cs);
 	}
 }

@@ -83,10 +83,11 @@ public class FilterHandler extends GZipHandler {
 		gzListener = new GZListener ();
 		gzu = new GZipUnpacker (gzListener, true);
 	    } else {
-		getLogger ().warning ("Encloding: " + ce);
+		getLogger ().warning ("Encoding: " + ce);
 	    }
 	}
-
+	if (gzu != null)
+		compress = true;
 	super.setupHandler ();
 	if (mayFilter) {
 	    response.removeHeader ("Content-Length");
