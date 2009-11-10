@@ -21,8 +21,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Map.Entry;
-
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -185,12 +183,12 @@ public class PluginHandler {
 			if (sharedClassLoader != null) {
 				ClassLoader libsClassLoader = sharedClassLoader.getParent();
 				if (sharedLibsURLs != null)
-					libsClassLoader = sharedClassLoader.getParent();
+					libsClassLoader = libsClassLoader.getParent();
 				if (sameURLsInCLoader(libsClassLoader, cfgEntry.libsrariesURLSet)) {
 					cfgEntry.classLoader = sharedClassLoader;
 					log.trace("Plugin '"+cfgEntry.name+"' shares already created ClassLoader "+cfgEntry.classLoader);
 				} else {
-					log.trace("Plugin '"+cfgEntry.name+"' can not share already created ClassLoader "+cfgEntry.classLoader
+					log.trace("Plugin '"+cfgEntry.name+"' can not share already created ClassLoader "+sharedClassLoader
 						+" because of different library dependencies");
 				}
 			}
@@ -210,7 +208,7 @@ public class PluginHandler {
 				} else
 					cfgEntry.classLoader = parentCLoader;
 				cLoaders.put(classLocURL, cfgEntry.classLoader);
-				log.trace("Plugin '"+cfgEntry.name+"' will be loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
+				log.trace("Plugin '"+cfgEntry.name+"' may be (if such need occurs) loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
 						+" with parent ClassLoader set to "+cfgEntry.classLoader.getParent());
 			}
 		}
@@ -255,7 +253,7 @@ public class PluginHandler {
 						return;
 					}
 					try {
-						urls[i] = lib.toURI().toURL();
+						urls[i++] = lib.toURI().toURL();
 					} catch (MalformedURLException e) {
 						log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
 								+"' to URL, no shared libraries will be used");
@@ -313,9 +311,9 @@ public class PluginHandler {
 				log.debug("Shared library direcotry changed so plugin '"+loadedPlugin+"' will be reloaded");
 			if (newCfgEntry != null && oldCfgEntry.libsrariesURLSet.equals(newCfgEntry.libsrariesURLSet)) {
 				boolean libsChanged = false;
-				for (Entry<URL, String> entry : newLibChecksums.entrySet()) {
-					String oldChecksum = checksums4ldLibsMap.get(entry.getKey());
-					if (!oldChecksum.equals(entry.getValue())) {
+				for (URL libURL : newCfgEntry.libsrariesURLSet) {
+					String newChecksum = newLibChecksums.get(libURL);
+					if (!newChecksum.equals(checksums4ldLibsMap.get(libURL))) {
 						libsChanged = true;
 						break;
 					}
@@ -363,6 +361,8 @@ public class PluginHandler {
 				} else {
 					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed so it'll be reloaded");
 				}
+			} else {
+				log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
 			}
 			checksums4ldClassMap.remove(loadedPlugin.getClass());
 			stopPlugin(loadedPlugin);
