@@ -215,7 +215,7 @@ public class SWC implements HttpHeaderSentListener,
 	    wh.removeWarnings (rh.getWebHeader (), false);
 	    HttpHeader webHeader = rh.getWebHeader ();
 	    String proxyChain = header.getHeader("Via");
-		webHeader.setHeader ("Via", (proxyChain != null)? proxyChain+", " : "" + responseVersion+con.getProxy().getProxyIdentity());
+		webHeader.setHeader ("Via", (proxyChain != null)? proxyChain+", " : "" + con.getProxy().getProxyIdentity());
 	    //original code: rh.getWebHeader ().addHeader ("Via", responseVersion + " RabbIT");
 	    HttpProxy proxy = con.getProxy ();
 	    rh.setSize (dataSize);

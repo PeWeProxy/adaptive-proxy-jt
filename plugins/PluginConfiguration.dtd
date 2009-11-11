@@ -15,7 +15,8 @@
 	Plugin's classes class-path. Can point to either directory or a jar file. If
 	there's no such element, default path pointing to plugin's home directory
 	(configured by pluginsHome parameter in AdaptiveEngine section of proxy conf file)
-	is used.
+	is used. This path is relative to plugins home directory configured by proxy's
+	configuration file.
 -->
 <!ELEMENT classLocation (#PCDATA)>
 
@@ -28,7 +29,8 @@
 <!--
 	Plugin's dependencies class-paths. Each subelement can point to either directory or
 	jar file. ClassLoader loading this plugin's class will also be able to load classes
-	from these paths.
+	from these paths. This path is relative to plugins home directory configured by proxy's
+	configuration file.
 -->
 <!ELEMENT libraries (lib*)>
 <!ELEMENT lib (#PCDATA)>

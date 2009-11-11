@@ -43,6 +43,10 @@ public class PluginHandler {
 	private static final String ELEMENT_PARAM = "param";
 	private static final String ATTR_NAME = "name";
 	
+	private static final FilenameFilter jarFilter;
+	private static final FilenameFilter classFilter;
+	private static final FilenameFilter loadableFilter;
+	
 	private File pluginRepositoryDir;
 	private File sharedLibsDir;
 	private URL[] sharedLibsURLs;
@@ -55,6 +59,28 @@ public class PluginHandler {
 	private final Map<Class<?>, String> checksums4ldClassMap;
 	private final Map<URL, String> checksums4ldLibsMap;
 	private final AbcPluginsComparator comparator;
+	
+	static {
+		jarFilter = new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				return name.endsWith(".jar");
+			}
+		};
+		classFilter = new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				return name.endsWith(".class");
+			}
+		};
+		
+		loadableFilter = new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				return jarFilter.accept(dir, name) || classFilter.accept(dir, name);
+			}
+		};
+	}
 	
 	public PluginHandler() {
 		configEntries = new LinkedList<PluginConfigEntry>();
@@ -73,6 +99,13 @@ public class PluginHandler {
 		this.sharedLibsDir = sharedLibsDir;
 		this.pluginRepositoryDir = pluginRepositoryDir;
 		this.excludeFileNames = excludeFileNames;
+		String path = pluginRepositoryDir.getAbsolutePath();
+		try {
+			path = pluginRepositoryDir.getCanonicalPath();
+		} catch (IOException e) {
+			log.info("Error when converting plugins home directory file '"+path+"' to cannonical form");
+		}
+		log.info("Plugins home directory is set to "+path);
 	}
 	
 	class PluginsXMLFileFilter implements FilenameFilter {
@@ -144,7 +177,7 @@ public class PluginHandler {
 				}
 				
 				try {
-					newLibChecksums.put(url, MD5ChecksumGenerator.createHexChecksum(libFile));
+					newLibChecksums.put(url, MD5ChecksumGenerator.createHexChecksum(libFile,classFilter));
 				} catch (IOException e) {
 					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' for MD5 checksum computing");
 				}
@@ -225,6 +258,32 @@ public class PluginHandler {
 		return retVal;
 	}
 	
+	private File[] getNestedFiles(File dir, FilenameFilter nameFilter) {
+		int filesNum = 0;
+		File[] childs = dir.listFiles();
+		List<File[]> nestedFiles = new LinkedList<File[]>();
+		List<File> directChilds = new LinkedList<File>();
+		for (File child : childs) {
+			if (child.isDirectory()) {
+				File[] nestedFilesArr = getNestedFiles(child, nameFilter);
+				nestedFiles.add(nestedFilesArr);
+				filesNum += nestedFilesArr.length;
+			} else if (nameFilter.accept(dir, child.getName()))
+				directChilds.add(child);
+		}
+		filesNum += directChilds.size();
+		File[] retVal = new File[filesNum];
+		int pos = 0;
+		for (File file : directChilds) {
+			retVal[pos++] = file;
+		}
+		for (File[] files : nestedFiles) {
+			System.arraycopy(files, 0, retVal, pos, files.length);
+			pos += files.length;
+		}
+		return retVal;
+	}
+	
 	private void createSharedLibsURLs(Map<URL, String> newLibChecksums) {
 		if (sharedLibsDir != null && sharedLibsDir.isDirectory() && sharedLibsDir.canRead()) {
 			URL sharedDirURL = null;
@@ -235,13 +294,14 @@ public class PluginHandler {
 						+"' to URL, no shared libraries will be used");
 			}
 			if (sharedDirURL != null) {
-				FilenameFilter jarFilter = new FilenameFilter() {
-					@Override
-					public boolean accept(File dir, String name) {
-						return name.endsWith(".jar");
-					}
-				};
-				File[] jarFiles = sharedLibsDir.listFiles(jarFilter);
+				String path = sharedLibsDir.getAbsolutePath();
+				try {
+					path = sharedLibsDir.getCanonicalPath();
+				} catch (IOException e) {
+					log.info("Error when converting shared libraries directory file '"+path+"' to cannonical form");
+				}
+				log.info("Using shared libraries directory "+path);
+				File[] jarFiles = getNestedFiles(sharedLibsDir, jarFilter);
 				URL[] urls = new URL[jarFiles.length+1];
 				urls[0] = sharedDirURL;
 				int i = 1;
@@ -254,18 +314,18 @@ public class PluginHandler {
 					}
 					try {
 						urls[i++] = lib.toURI().toURL();
+						log.trace("Using shared library "+urls[i-1]);
 					} catch (MalformedURLException e) {
 						log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
 								+"' to URL, no shared libraries will be used");
 					}
 				}
 				try {
-					newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(sharedLibsDir));
+					newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(sharedLibsDir,loadableFilter));
 				} catch (IOException e) {
 					log.info("Error when reading shared libraries direcotry '"+sharedLibsDir.getAbsolutePath()+"' for MD5 checksum computing");
 				}
 				sharedLibsURLs = urls;
-				log.info("Using shared libraries directory "+sharedLibsDir.getAbsolutePath());
 			}
 		} else
 			log.info("Can not access shared libraries directory "+sharedLibsDir.getAbsolutePath()+", no shared libraries will be used");
@@ -294,6 +354,8 @@ public class PluginHandler {
 			if (newChecksum != null)
 				sharedLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(sharedDirURL));
 		}
+		if (sharedLibsDirSame)
+			log.debug("Shared libraries directory hasn not been changed");
 		Map<PluginConfigEntry, ProxyPlugin> tmpPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
 		for (PluginConfigEntry oldCfgEntry : ldPlugin4EntryMap.keySet()) {
 			ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(oldCfgEntry);
@@ -308,7 +370,7 @@ public class PluginHandler {
 					}
 				};
 			} else
-				log.debug("Shared library direcotry changed so plugin '"+loadedPlugin+"' will be reloaded");
+				log.debug("Shared libraries directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
 			if (newCfgEntry != null && oldCfgEntry.libsrariesURLSet.equals(newCfgEntry.libsrariesURLSet)) {
 				boolean libsChanged = false;
 				for (URL libURL : newCfgEntry.libsrariesURLSet) {
@@ -362,7 +424,8 @@ public class PluginHandler {
 					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed so it'll be reloaded");
 				}
 			} else {
-				log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
+				if (sharedLibsDirSame)
+					log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
 			}
 			checksums4ldClassMap.remove(loadedPlugin.getClass());
 			stopPlugin(loadedPlugin);
@@ -617,7 +680,7 @@ public class PluginHandler {
 		try {
 			File classFile = getClassFile(clazz);
 			log.trace("File from which the class '"+clazz.getSimpleName()+"' was loaded: "+classFile.toString());
-			checksums4ldClassMap.put(clazz, MD5ChecksumGenerator.createHexChecksum(classFile));
+			checksums4ldClassMap.put(clazz, MD5ChecksumGenerator.createHexChecksum(classFile,null));
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");
 		} 

@@ -486,7 +486,7 @@ public class AdaptiveEngine  {
 		} else {
 			String loggingLvL = prop.getProperty("logging_level");
 			if (loggingLvL == null)
-				loggingLvL = System.getProperty("sk.fiit.adaptiveproxy.logging_level", "ALL").trim();
+				loggingLvL = System.getProperty("sk.fiit.adaptiveproxy.logging_level", "INFO").trim();
 			Level lvl = Level.toLevel(loggingLvL);
 			Logger.getRootLogger().setLevel(lvl);
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
@@ -512,6 +512,7 @@ public class AdaptiveEngine  {
 			pluginHandler.setPluginRepository(pluginsHomeDir,sharedLibDir,excludeFiles);
 		}
 		reloadPlugins();
+		log.info("AdaptiveProxy set up and ready for action");
 	}
 	
 	public void reloadPlugins() {

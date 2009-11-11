@@ -3,8 +3,10 @@ package sk.fiit.rabbit.adaptiveproxy.utils;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ public final class MD5ChecksumGenerator {
 	private MD5ChecksumGenerator() {}
 	
 	private static byte[] createChecksum(File file) throws IOException {
+		//log.debug("\tCalculating MD5 checksum for file "+file);
 	  return computeChecksum(new FileInputStream(file));
 	}
 	
@@ -50,18 +53,23 @@ public final class MD5ChecksumGenerator {
 		  return md5Generator.digest();
 	}
 	
-	private static byte[] createDirChecksum(File dir) throws IOException {
+	private static byte[] createDirChecksum(File dir, FilenameFilter nameFilter) throws IOException {
+		//log.debug("\tCalculating MD5 checksum for directory "+dir);
+		if (nameFilter == null)
+			throw new IllegalArgumentException("FilenameFilter can not be null");
 		File[] dirFiles = dir.listFiles();
 		List<byte[]> checksumBufs = new ArrayList<byte[]>(dirFiles.length);
 		int bufsLength = 0;
 		for (File file : dirFiles) {
 			byte[] checksum = null;
 			if (file.isDirectory())
-				checksum = createDirChecksum(file);
-			else
+				checksum = createDirChecksum(file,nameFilter);
+			else if (nameFilter.accept(dir, file.getName()))
 				checksum = createChecksum(file);
-			checksumBufs.add(checksum);
-			bufsLength += checksum.length;
+			if (checksum != null) {
+				checksumBufs.add(checksum);
+				bufsLength += checksum.length;
+			}
 		}
 		byte[] buffer = new byte[bufsLength];
 		int copied = 0;
@@ -73,9 +81,7 @@ public final class MD5ChecksumGenerator {
 		return computeChecksum(stream);
 	}
 	
-	public static String createHexChecksum(File file) throws IOException {
-		byte[] checksum = null;
-		checksum  = (file.isDirectory())? createDirChecksum(file):createChecksum(file);
+	private static final String getChecksumString(byte[] checksum) throws UnsupportedEncodingException {
 		byte[] hex = new byte[2 * checksum.length];
 		int index = 0;
 	    for (byte b : checksum) {
@@ -84,5 +90,13 @@ public final class MD5ChecksumGenerator {
 	      hex[index++] = HEX_CHAR_TABLE[v & 0xF];
 	    }
 	    return new String(hex, "ASCII");
+	}
+	
+	public static String createHexChecksum(File file, FilenameFilter nameFilter) throws IOException {
+		//log.debug("Calculating MD5 checksum for "+file);
+		if (file.isDirectory())
+			return getChecksumString(createDirChecksum(file,nameFilter));
+		else
+			return getChecksumString(createChecksum(file));
 	}
 }

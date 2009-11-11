@@ -178,7 +178,6 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		byte[] lastByteData = null;
 		StringBuilder sb;
 		Charset charset = defaultCharset;
-		
 		private boolean invoked = false;
 		
 		public ContentServicesProvider(String content, Charset charset) {
@@ -187,6 +186,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			if (charset == null)
 				throw new IllegalStateException("Charset can not be hull");
 			this.charset = charset;
+			lastByteData = httpMessage.getData();
 			sb = new StringBuilder(content);
 		}
 		
@@ -202,12 +202,17 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		@Override
 		public String getContent() {
 			this.invoked = true;
-			
 			if (underlyingBytesChanged()) {
 				byte[] data = httpMessage.getData();
 				//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
 				inspectCharset();
-				sb = new StringBuilder(new String(data,charset));
+				CharBuffer charBuf = null;
+				try {
+					charBuf = decodeBytes(data, charset,true);
+				} catch (CharacterCodingException e) {
+					log.debug(getLogTextHead()+"Data of this message has changed and cant be decoded");
+				}
+				sb = new StringBuilder(charBuf);
 				//MemoryUsageInspector.printMemoryUsage(log, "After StringBuilder creation");
 				lastByteData = data;
 			}
@@ -308,7 +313,6 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 								+getText4Logging(loggingTextTypes.NORMAL)+" content");
 					break;
 			}
-			//discoverContentNeed(pluginDependencies);
 		}
 	}
 	
@@ -321,16 +325,6 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	}
 	
 	abstract String getText4Logging(loggingTextTypes type);
-	
-	/*protected void discoverContentNeed(Set<Class<ProxyService>> dependencies) {
-		for (Class<ProxyService> serviceClass : dependencies) {
-			if (serviceClass.equals(StringContentService.class) ||
-					serviceClass.equals(ModifiableContentService.class)) {
-				wantContent = true;
-				return;
-			}
-		}
-	}*/
 	
 	public boolean wantContent() {
 		return wantContent;
@@ -368,12 +362,9 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 				}
 				if (charset == null)
 					charset = defaultCharset;
-				CharsetDecoder decoder = charset.newDecoder();
-				decoder.onMalformedInput(CodingErrorAction.REPORT);
-				decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
 				CharBuffer charbuf = null;
 				try {
-					charbuf = decoder.decode(ByteBuffer.wrap(data));
+					charbuf = decodeBytes(data, charset, false);
 				} catch (CharacterCodingException e) {
 					log.debug(getLogTextHead()+"Data of this message is not valid text data [requested: "+
 							getRequestHeader().getRequestLine()+" | message entity type: "+contentType+"]");
@@ -391,6 +382,14 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		}
 		doSpecificServiceDiscovery();
 		setServicesContext();
+	}
+	
+	private CharBuffer decodeBytes(byte[] bytes, Charset charset, boolean report) throws CharacterCodingException {
+		CodingErrorAction action = (report)? CodingErrorAction.REPORT : CodingErrorAction.REPLACE;
+		CharsetDecoder decoder = charset.newDecoder();
+		decoder.onMalformedInput(action);
+		decoder.onUnmappableCharacter(action);
+		return decoder.decode(ByteBuffer.wrap(bytes));
 	}
 	
 	abstract HttpHeader getRequestHeader();
