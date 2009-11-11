@@ -53,7 +53,7 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase {
 			} catch (Throwable t) {
 				log.info("Throwable raised while obtaining service providers from ResponseServiceProvider of class '"+plugin.getClass()+"'",t);
 			}
-			if (providers != null)
+			if (providers != null && !providers.isEmpty())
 				addServiceProviders(plugin,providers);
 		}
 	}

@@ -267,6 +267,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 
 		@Override
 		public void setContent(String content) {
+			stringSvcProvider.invoked = true;
 			stringSvcProvider.sb.setLength(0);
 			stringSvcProvider.sb.append(content);
 		}
@@ -446,6 +447,8 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 
 	public void doChanges() {
 		if (lastRtnedSvcProviderIndex != -1) {
+			//changesPropagation = true;
+			// TODO test
 			for (ListIterator<ServiceProvider> backwardIterator = providersList.listIterator(lastRtnedSvcProviderIndex+1); backwardIterator.hasPrevious();) {
 				ServiceProvider serviceProvider = (ServiceProvider) backwardIterator.previous();
 				serviceProvider.doChanges();

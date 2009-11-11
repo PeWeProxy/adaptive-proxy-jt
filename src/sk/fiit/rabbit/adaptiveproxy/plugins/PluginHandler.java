@@ -219,9 +219,9 @@ public class PluginHandler {
 					libsClassLoader = libsClassLoader.getParent();
 				if (sameURLsInCLoader(libsClassLoader, cfgEntry.libsrariesURLSet)) {
 					cfgEntry.classLoader = sharedClassLoader;
-					log.trace("Plugin '"+cfgEntry.name+"' shares already created ClassLoader "+cfgEntry.classLoader);
+					log.debug("Plugin '"+cfgEntry.name+"' shares already created ClassLoader "+cfgEntry.classLoader);
 				} else {
-					log.trace("Plugin '"+cfgEntry.name+"' can not share already created ClassLoader "+sharedClassLoader
+					log.debug("Plugin '"+cfgEntry.name+"' can not share already created ClassLoader "+sharedClassLoader
 						+" because of different library dependencies");
 				}
 			}
@@ -241,7 +241,7 @@ public class PluginHandler {
 				} else
 					cfgEntry.classLoader = parentCLoader;
 				cLoaders.put(classLocURL, cfgEntry.classLoader);
-				log.trace("Plugin '"+cfgEntry.name+"' may be (if such need occurs) loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
+				log.debug("Plugin '"+cfgEntry.name+"' may be (if such need occurs) loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
 						+" with parent ClassLoader set to "+cfgEntry.classLoader.getParent());
 			}
 		}
@@ -253,8 +253,8 @@ public class PluginHandler {
 			retVal = URLClassLoader.newInstance(urls,parent);
 		else
 			retVal = URLClassLoader.newInstance(urls);
-		log.trace("Creating new ClassLoader "+retVal+" with URLs set to "+Arrays.toString(retVal.getURLs())
-				+" with parent ClassLoader set to "+retVal.getParent()+ " for use by plugin '"+cfgEntry.name+"'");
+		log.debug("Creating new ClassLoader "+retVal+" with URLs set to "+Arrays.toString(retVal.getURLs())
+				+" with parent ClassLoader set to "+retVal.getParent()+ " for potential use by plugin '"+cfgEntry.name+"'");
 		return retVal;
 	}
 	
@@ -314,7 +314,7 @@ public class PluginHandler {
 					}
 					try {
 						urls[i++] = lib.toURI().toURL();
-						log.trace("Using shared library "+urls[i-1]);
+						log.debug("Using shared library "+urls[i-1]);
 					} catch (MalformedURLException e) {
 						log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
 								+"' to URL, no shared libraries will be used");
@@ -679,8 +679,10 @@ public class PluginHandler {
 		Class<?> clazz = cLoader.loadClass(className);
 		try {
 			File classFile = getClassFile(clazz);
-			log.trace("File from which the class '"+clazz.getSimpleName()+"' was loaded: "+classFile.toString());
 			checksums4ldClassMap.put(clazz, MD5ChecksumGenerator.createHexChecksum(classFile,null));
+			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
+			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
+				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so proxy server won't be able to reload it on the fly if it changes");
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");
 		} 
