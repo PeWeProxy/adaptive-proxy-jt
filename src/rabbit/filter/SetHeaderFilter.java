@@ -3,7 +3,6 @@ package rabbit.filter;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import rabbit.util.SProperties;
-import rabbit.util.Logger;
 import java.util.Map;
 import java.nio.channels.SocketChannel;
 
@@ -41,7 +40,7 @@ public class SetHeaderFilter implements HttpFilter {
 	return null;
     }
 
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	this.props = properties;
     }
 }

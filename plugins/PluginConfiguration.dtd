@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!ELEMENT plugin (name, classLocation?, className, libraries?, types, parameters?)>
+
+<!--
+	The name of the plugin. This text is used for plugin identification. If there is
+	plugin with the same name already loaded, the name uniqueness check is repeated
+	with new names in format
+		'name#NUM'					(without the quotation marks)
+	where NUM is the integer starting at 0 and increased at each iteration by 1, until
+	the new unique name is found.
+-->
+<!ELEMENT name (#PCDATA)>
+
+<!--
+	Plugin's classes class-path. Can point to either directory or a jar file. If
+	there's no such element, default path pointing to plugin's home directory
+	(configured by pluginsHome parameter in AdaptiveEngine section of proxy conf file)
+	is used. This path is relative to plugins home directory configured by proxy's
+	configuration file.
+-->
+<!ELEMENT classLocation (#PCDATA)>
+
+<!--
+	Name of the plugin's class - class implementing ProxyPlugin interface with zero
+	argument constructor.
+-->
+<!ELEMENT className (#PCDATA)>
+
+<!--
+	Plugin's dependencies class-paths. Each subelement can point to either directory or
+	jar file. ClassLoader loading this plugin's class will also be able to load classes
+	from these paths. This path is relative to plugins home directory configured by proxy's
+	configuration file.
+-->
+<!ELEMENT libraries (lib*)>
+<!ELEMENT lib (#PCDATA)>
+
+<!--
+	Types of the plugin. Subelements text values need to be be one of these:
+		RequestProcessingPlugin
+		ResponseProcessingPlugin
+		RequestServicePlugin
+		ResponseServicePlugin
+		CloseEventPlugin
+		TimeoutEventPlugin
+		FailureEventPlugin
+	or the plugin won't be used by the proxy.
+-->
+<!ELEMENT types (type*)>
+<!ELEMENT type (#PCDATA)>
+
+<!--
+	Configuration parameters. May be omitted. Subelements are in format
+		<param name="KEY">VALUE</param>
+-->
+<!ELEMENT parameters (param*)>
+<!ELEMENT param (#PCDATA)>
+<!ATTLIST param
+  name		CDATA	#REQUIRED
+>

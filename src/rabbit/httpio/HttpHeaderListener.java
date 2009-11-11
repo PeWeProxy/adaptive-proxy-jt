@@ -8,7 +8,7 @@ import rabbit.io.BufferHandle;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public interface HttpHeaderListener extends AsyncListener {
-    /** one http header has been read 
+    /** One http header has been read 
      * @param header the HttpHeader that was read
      * @param bh the BufferHandle that may or may not hold unread data.
      * @param keepalive if the sender want to use keepalive.
@@ -19,8 +19,8 @@ public interface HttpHeaderListener extends AsyncListener {
     void httpHeaderRead (HttpHeader header, BufferHandle bh, 
 			 boolean keepalive, boolean isChunked, long dataSize);
     
-    /** The other end closed the connection. 
-     *  Quite common on persistent connections.
+    /** The socket connection has been closed, either by this end 
+     *  or the other side. Quite common on persistent connections.
      */
     void closed ();
 }

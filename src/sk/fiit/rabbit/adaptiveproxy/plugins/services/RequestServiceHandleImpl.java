@@ -36,15 +36,24 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 	}
 	
 	@Override
+	String getText4Logging(loggingTextTypes type) {
+		if (type == loggingTextTypes.CAPITAL)
+			return "Request";
+		if (type == loggingTextTypes.SHORT)
+			return "RQ";
+		return "request";
+	}
+	
+	@Override
 	void doSpecificServiceDiscovery() {
 		for (RequestServicePlugin plugin : plugins) {
 			List<RequestServiceProvider> providers = null;
 			try {
 				providers = plugin.provideRequestServices(request);
-			} catch (Exception e) {
-				log.debug("Exception thrown while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'");
+			} catch (Throwable t) {
+				log.info("Throwable raised while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'",t);
 			}
-			if (providers != null)
+			if (providers != null && !providers.isEmpty())
 				addServiceProviders(plugin,providers);
 		}
 	}

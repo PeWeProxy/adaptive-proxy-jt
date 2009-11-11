@@ -5,10 +5,11 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.handler.BaseHandler;
@@ -29,8 +30,12 @@ import rabbit.httpio.request.MultiPipeSeparator;
 import rabbit.io.BufferHandle;
 import rabbit.io.BufferHandler;
 import rabbit.io.CacheBufferHandle;
+import rabbit.io.Closer;
+import rabbit.nio.DefaultTaskIdentifier;
+import rabbit.nio.NioHandler;
+import rabbit.nio.TaskIdentifier;
 import rabbit.util.Counter;
-import rabbit.util.Logger;
+import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
 
 /** The base connection class for rabbit.
  *
@@ -43,10 +48,10 @@ import rabbit.util.Logger;
  */
 public class Connection {
     /** The id of this connection. */
-    private ConnectionId id;
+    private final ConnectionId id;
 
     /** The client channel */
-    private SocketChannel channel;
+    private final SocketChannel channel;
 
     /** The client's request headers */
     private HttpHeader clientRequest;
@@ -60,11 +65,8 @@ public class Connection {
     /** The buffer handler. */
     private BufferHandler bufHandler;
 
-    /** The selector to use */
-    private Selector selector;
-
     /** The proxy we are serving */
-    private HttpProxy proxy;
+    private final HttpProxy proxy;
 
     /** The current status of this connection. */
     private String status;
@@ -99,12 +101,12 @@ public class Connection {
 
     private TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
 
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+    
     public Connection (ConnectionId id,	SocketChannel channel,
-		       Selector selector, HttpProxy proxy,
-		       BufferHandler bufHandler) {
+		       HttpProxy proxy, BufferHandler bufHandler) {
 	this.id = id;
 	this.channel = channel;
-	this.selector = selector;
 	this.proxy = proxy;
 	this.requestHandle = new CacheBufferHandle (bufHandler);
 	this.bufHandler = bufHandler;
@@ -126,22 +128,24 @@ public class Connection {
 	try {
 	    channel.socket ().setTcpNoDelay (true);
 	    HttpHeaderListener clientListener = new RequestListener ();
-	    new HttpHeaderReader (channel, requestHandle, selector,
-				  getLogger (), tlh.getClient (), true,
-				  proxy.getStrictHttp (), clientListener);
+	    HttpHeaderReader hr =
+		new HttpHeaderReader (channel, requestHandle, getNioHandler (),
+				      tlh.getClient (), true,
+				      proxy.getStrictHttp (), clientListener);
+	    hr.readRequest ();
 	} catch (Throwable ex) {
 	    handleFailedRequestRead (ex);
 	}
     }
 
     private void handleFailedRequestRead (Throwable t) {
+    proxy.getAdaptiveEngine().getEventsHandler().logRequestReadFailed(this);
 	if (t instanceof RequestLineTooLongException) {
 	    HttpHeader err = getHttpGenerator ().get414 ();
 	    // Send response and close
 	    sendAndClose (err);
 	} else {
-	    getLogger ().logInfo ("Exception when reading request: " +
-				  getStackTrace (t));
+	    logger.log (Level.INFO, "Exception when reading request", t);
 	    closeDown ();
 	}
     }
@@ -170,27 +174,18 @@ public class Connection {
     
     public void readTimeout() {
     	proxy.getAdaptiveEngine().getEventsHandler().logRequestReadTimeout(Connection.this);
-    	getLogger ().logInfo ("Timeout when reading client request");
+    	logger.log(Level.INFO,"Timeout when reading client request");
  	    closeDown ();
     }
     
     public void readFailed(Exception e) {
-    	proxy.getAdaptiveEngine().getEventsHandler().logRequestReadFailed(this);
     	handleFailedRequestRead (e);
-    }
-
-    private String getStackTrace (Throwable t) {
-	StringWriter sw = new StringWriter ();
-	PrintWriter ps = new PrintWriter (sw);
-	t.printStackTrace (ps);
-	return sw.toString ();
     }
 
     private void handleInternalError (Throwable t) {
 	extraInfo =
 	    extraInfo != null ? extraInfo + t.toString () : t.toString ();
-	String message = getStackTrace (t);
-	getLogger ().logError ("Internal Error: " + message);
+	logger.log (Level.WARNING, "Internal Error", t);
 	HttpHeader internalError = getHttpGenerator ().get500 (t);
 	// Send response and close
 	sendAndClose (internalError);
@@ -199,23 +194,24 @@ public class Connection {
     private void requestRead (HttpHeader request, BufferHandle bh,
 			      boolean isChunked, long dataSize) {
 	if (request == null) {
-	    getLogger ().logError ("Got a null request");
+	    logger.warning ("Got a null request");
 	    closeDown ();
 	    return;
 	}
 	status = "Request read, processing";
-	this.clientRequest = request;
+	this.clientRequest= request;
 	proxyRequest = request.clone();
 	this.requestHandle = bh;
 	requestVersion = request.getHTTPVersion ();
 	proxy.getAdaptiveEngine().newRequest(this, isChunked);
 	if (requestVersion == null) {
 	    // TODO: fix http/0.9 handling.
-	    getLogger ().logInfo ("bad header read: " + request);
+	    logger.info ("bad header read: " + request);
 	    closeDown ();
 	    return;
 	}
 	requestVersion = requestVersion.toUpperCase ();
+	// Redeemer: original code = request.addHeader ("Via", requestVersion + " RabbIT");
 	String proxyChain = proxyRequest.getHeader("Via");
 	if (proxyChain == null)
 		proxyChain = "";
@@ -236,18 +232,19 @@ public class Connection {
 	    ContentSeparator separator = null;
 	    // is the request resource chunked?
 	    if (isChunked) {
-			separator = setupChunkedContent ();
+	    	separator = setupChunkedContent ();
 	    } else {
 		// no? then try regular data
 		String ct = null;
 		ct = request.getHeader ("Content-Type");
 		if (hasRegularContent (request, ct, dataSize))
-		    separator = setupClientResourceHandler (dataSize);
+			separator = setupClientResourceHandler (dataSize);
 		else
 		    // still no? then try multipart
 		    if (ct != null)
 		    	separator = readMultiPart (ct);
 	    }
+
 	    filterAndHandleRequest(separator,dataSize,isChunked);
 	} catch (Throwable t) {
 	    handleInternalError (t);
@@ -325,17 +322,20 @@ public class Connection {
 	final RequestHandler rh = new RequestHandler (this);
 	if (proxy.getCache ().getMaxSize () > 0) {
 	    // memory consistency is guarded by the underlying SynchronousQueue
-	    getProxy ().getTaskRunner ().runThreadTask (new Runnable () {
+	    TaskIdentifier ti = 
+		new DefaultTaskIdentifier (getClass ().getSimpleName () + 
+					   ".fillInCacheEntries: ",
+					   proxyRequest.getRequestURI ());
+	    getNioHandler ().runThreadTask (new Runnable () {
 		    public void run () {
 			fillInCacheEntries (rh);
 		    }
-		});
+		}, ti);
 	} else {
 	    handleRequestBottom (rh);
 	}
     }
 
-    //TODO
     private void fillInCacheEntries (final RequestHandler rh) {
 	status = "Handling request - checking cache";
 	Cache<HttpHeader, HttpHeader> cache = proxy.getCache ();
@@ -372,12 +372,7 @@ public class Connection {
 	    mayCache = mc;
 	}
 
-	// memory consistency is guarded by the underlying returnedTasksLock
-	getProxy ().runMainTask (new Runnable () {
-		public void run () {
-		    handleRequestBottom (rh);
-		}
-	    });
+	handleRequestBottom (rh);
     }
 
     private void handleRequestBottom (final RequestHandler rh) {
@@ -394,10 +389,11 @@ public class Connection {
     void webConnectionSetupFailed (RequestHandler rh, Exception cause) {
 	if (cause instanceof UnknownHostException)
 	    // do we really want this in the log?
-	    getLogger ().logWarn (cause.toString ());
+	    logger.warning (cause.toString () + ": " + 
+			    proxyRequest.getRequestURI ());
 	else
-	    getLogger ().logWarn ("strange error setting up web connection: " +
-				  cause.toString ());
+	    logger.warning ("Failed to set up web connection to: " +
+			    proxyRequest.getRequestURI () + ", cause: " + cause);
 	tryStaleEntry (rh, cause);
     }
 
@@ -437,11 +433,12 @@ public class Connection {
 	status = "Handling request - tunneling";
 	try {
 	    TunnelDoneListener tdl = new TDL (rh);
-	    new Tunnel (selector, getLogger (),
-			channel, requestHandle, tlh.getClient (),
-			rh.getWebConnection ().getChannel (),
-			rh.getWebHandle (), tlh.getNetwork (),
-			tdl);
+	    SocketChannel webChannel = rh.getWebConnection ().getChannel ();
+	    Tunnel tunnel =
+		new Tunnel (getNioHandler (), channel, requestHandle,
+			    tlh.getClient (), webChannel,
+			    rh.getWebHandle (), tlh.getNetwork (), tdl);
+	    tunnel.start ();
 	} catch (IOException ex) {
 	    logAndClose (rh);
 	}
@@ -467,13 +464,13 @@ public class Connection {
 
 		CacheChecker cc = new CacheChecker ();
 		cc.removeOtherStaleCaches (proxyRequest, rh.getWebHeader (),
-					   proxy.getCache (), getLogger ());
+					   proxy.getCache ());
 		if (status.equals ("304")) {
 		    NotModifiedHandler nmh = new NotModifiedHandler ();
-		    nmh.updateHeader (rh, getLogger ());
+		    nmh.updateHeader (rh);
 		    if (rh.getEntry () != null) {
 			proxy.getCache ().entryChanged (rh.getEntry (),
-					proxyRequest, rh.getDataHook ());
+							proxyRequest, rh.getDataHook ());
 		    }
 		}
 
@@ -530,7 +527,14 @@ public class Connection {
 		// HTTP/0.9 does not support HEAD, so webheader should be valid.
 		if (clientRequest.isHeadOnlyRequest ()) {
 		    rh.getContent ().release ();
-		    sendAndRestart (rh.getWebHeader ());
+	    	getProxy().getAdaptiveEngine().newResponse(this, rh.getWebHeader(), new Runnable() {
+				@Override
+				public void run() {
+					HttpHeader response = ((HeaderWrapper)getProxy().getAdaptiveEngine()
+						.getResponseForConnection(Connection.this).getProxyResponseHeaders()).getBackedHeader();
+					sendAndRestart (response);
+				}
+			});
 		} else {
 			final Handler hndlr = handler;
 			proxy.getAdaptiveEngine().processResponse(this,new Runnable() {
@@ -549,7 +553,7 @@ public class Connection {
 	    handleInternalError (t);
 	}
     }
-    
+
     private void finalFixesOnWebHeader (RequestHandler rh, Handler handler) {
 	if (chunk) {
 	    if (rh.getSize () < 0 || handler.changesContentSize ()) {
@@ -588,7 +592,7 @@ public class Connection {
 		}
 	    }
 	    if (rh.getHandlerFactory () == null) {              // still null
-		getLogger ().logInfo ("Using BaseHandler for " + ct);
+		logger.fine ("Using BaseHandler for " + ct);
 		rh.setHandlerFactory (new BaseHandler ());   // fallback...
 	    }
 	}
@@ -596,15 +600,16 @@ public class Connection {
 
     private boolean handleConditional (RequestHandler rh) throws IOException {
 	HttpHeader cachedHeader = rh.getDataHook ();
-	proxy.releaseWebConnection (rh.getWebConnection ());
+	rh.getContent ().release ();
+
 	if (addedINM)
-		proxyRequest.removeHeader ("If-None-Match");
+	    proxyRequest.removeHeader ("If-None-Match");
 	if (addedIMS)
 		proxyRequest.removeHeader ("If-Modified-Since");
 
 	if (checkWeakEtag (cachedHeader, rh.getWebHeader ())) {
 	    NotModifiedHandler nmh = new NotModifiedHandler ();
-	    nmh.updateHeader (rh, getLogger ());
+	    nmh.updateHeader (rh);
 	    setMayCache (false);
 	    try {
 		HttpHeader res304 = nmh.is304 (proxyRequest, this, rh);
@@ -612,17 +617,17 @@ public class Connection {
 		    sendAndClose (res304);
 		    return true;
 		}
-		if (rh.getContent () != null)
-		    rh.getContent ().release ();
 		// Try to setup a resource from the cache
 		setupCachedEntry (rh);
 	    } catch (IOException e) {
-		getLogger ().logWarn ("Conditional request: IOException (" +
-				proxyRequest.getRequestURI () + ",: " + e);
+		logger.log (Level.WARNING,
+			    "Conditional request: IOException (" +
+			    proxyRequest.getRequestURI (),
+			    e);
 	    }
 	} else {
 	    // retry...
-	    proxyRequest.removeHeader ("If-None-Match");
+		proxyRequest.removeHeader ("If-None-Match");
 	    proxy.getCache ().remove (proxyRequest);
 	    handleRequest ();
 	    return true;
@@ -671,36 +676,31 @@ public class Connection {
 	HttpHeader ret = swc.establish ();
 	return ret;
     }
-
-    private ContentSeparator setupChunkedContent () throws IOException {
-	status = "Request read, reading chunked data";
-	setMayUseCache (false);
-	setMayCache (false);
-	return new ChunkSeparator(getProxy().getStrictHttp());
-    }
-
-    private ContentSeparator setupClientResourceHandler (long dataSize) {
-	status = "Request read, reading client resource data";
-	setMayUseCache (false);
-	setMayCache (false);
-	return new FixedLengthSeparator(dataSize);
-    }
-
-    private ContentSeparator readMultiPart (String ct) {
-	status = "Request read, reading multipart data";
-	// Content-Type: multipart/byteranges; boundary=B-qpuvxclkeavxeywbqupw
-	if (ct.startsWith ("multipart/byteranges")) {
-	    setMayUseCache (false);
-	    setMayCache (false);
-
-	    return new MultiPipeSeparator(ct);
-	}
-	return null;
-    }
     
-    public void setClientResourceHandler(ClientResourceHandler handler) {
-		
-	}
+    private ContentSeparator setupChunkedContent () throws IOException {
+   	status = "Request read, reading chunked data";
+   	setMayUseCache (false);
+   	setMayCache (false);
+   	return new ChunkSeparator(getProxy().getStrictHttp());
+       }
+        
+    private ContentSeparator setupClientResourceHandler (long dataSize) {
+   	status = "Request read, reading client resource data";
+   	setMayUseCache (false);
+   	setMayCache (false);
+   	return new FixedLengthSeparator(dataSize);
+       }
+        
+    private ContentSeparator readMultiPart (String ct) {
+   	status = "Request read, reading multipart data";
+   	// Content-Type: multipart/byteranges; boundary=B-qpuvxclkeavxeywbqupw
+   	if (ct.startsWith ("multipart/byteranges")) {
+   	    setMayUseCache (false);
+   	    setMayCache (false);
+    	return new MultiPipeSeparator(ct);
+   	}
+   	return null;
+    }
 
     private boolean partialContent (RequestHandler rh) {
 	if (rh.getEntry () == null)
@@ -797,7 +797,7 @@ public class Connection {
 	status = "Handling ssl request";
 	SSLHandler sslh = new SSLHandler (proxy, this, proxyRequest, tlh);
 	if (sslh.isAllowed ()) {
-	    sslh.handle (channel, selector, bh);
+	    sslh.handle (channel, bh);
 	} else {
 	    HttpHeader badresponse = responseHandler.get403 ();
 	    sendAndClose (badresponse);
@@ -808,8 +808,8 @@ public class Connection {
 	return channel;
     }
 
-    public Selector getSelector () {
-	return selector;
+    public NioHandler getNioHandler () {
+	return proxy.getNioHandler ();
     }
 
     public HttpProxy getProxy () {
@@ -823,11 +823,7 @@ public class Connection {
     private void closeDown () {
     proxy.getAdaptiveEngine().getEventsHandler().logProxyClosedCon(this);
     proxy.getAdaptiveEngine().connectionClosed(this);
-	try {
-	    channel.close ();
-	} catch (IOException e) {
-	    getLogger ().logWarn ("Failed to close down connection: " + e);
-	}
+	Closer.close (channel, logger);
 	if (!requestHandle.isEmpty ()) {
 	    // empty the buffer...
 	    ByteBuffer buf = requestHandle.getBuffer ();
@@ -835,10 +831,6 @@ public class Connection {
 	}
 	requestHandle.possiblyFlush ();
 	proxy.removeCurrentConnection (this);
-    }
-
-    public Logger getLogger () {
-	return proxy.getLogger ();
     }
 
     private ConnectionLogger getConnectionLogger () {
@@ -1009,7 +1001,7 @@ public class Connection {
     /** Get the state of this request.
      * @return true if we may use the cache for this request, false otherwise.
      */
-    private boolean getMayUseCache () {
+    public boolean getMayUseCache () {
 	return mayUseCache;
     }
 
@@ -1078,19 +1070,17 @@ public class Connection {
 	if (!keepalive) {
 	    sendAndClose (header);
 	} else {
-		proxy.getAdaptiveEngine().newProxyResponse(this, header, new Runnable() {
-			@Override
-			public void run() {
-				HttpHeaderSentListener sar = new SendAndRestartListener ();
-			    try {
-				new HttpHeaderSender (channel, selector, getLogger (),
-						      tlh.getClient (), header, false, sar);
-			    } catch (IOException e) {
-				getLogger ().logWarn ("IOException when sending header: " + e);
-				closeDown ();
-			    }
-			}
-		});
+		HttpHeaderSentListener sar = new SendAndRestartListener ();
+	    try {
+	    	HttpHeaderSender hhs =
+			    new HttpHeaderSender (channel, getNioHandler (),
+						  tlh.getClient (),
+						  header, false, sar);
+			hhs.sendHeader ();
+	    } catch (IOException e) {
+		logger.log(Level.WARNING, "IOException when sending header", e);
+		closeDown ();
+	    }
 	}
     }
 
@@ -1105,12 +1095,12 @@ public class Connection {
 	}
 
 	public void timeout () {
-	    getLogger ().logInfo ("Timeout when sending http header");
+	    logger.info ("Timeout when sending http header");
 	    logAndClose (null);
 	}
 
 	public void failed (Exception e) {
-	    getLogger ().logInfo ("Exception when sending http header: " + e);
+	    logger.log (Level.INFO, "Exception when sending http header", e);
 	    logAndClose (null);
 	}
     }
@@ -1121,19 +1111,16 @@ public class Connection {
 	// Set status and content length
 	setStatusesFromHeader (header);
 	keepalive = false;
-	final HttpHeaderSentListener scl = new SendAndCloseListener ();
-	proxy.getAdaptiveEngine().newProxyResponse(this, header, new Runnable() {
-		@Override
-		public void run() {
-			try {
-			    new HttpHeaderSender (channel, selector, getLogger (),
-						  tlh.getClient (), header, false, scl);
-			} catch (IOException e) {
-			    getLogger ().logWarn ("IOException when sending header: " + e);
-			    closeDown ();
-			}
-		}
-	});
+	HttpHeaderSentListener scl = new SendAndCloseListener ();
+	try {
+	    HttpHeaderSender hhs =
+			new HttpHeaderSender (channel, getNioHandler (),
+					      tlh.getClient (), header, false, scl);
+		    hhs.sendHeader ();
+	} catch (IOException e) {
+		logger.log (Level.WARNING, "IOException when sending header", e);
+	    closeDown ();
+	}
     }
 
     public void logAndClose (RequestHandler rh) {
@@ -1154,16 +1141,20 @@ public class Connection {
 
     private class SendAndCloseListener implements HttpHeaderSentListener {
 	public void httpHeaderSent () {
+	    status = "Response sent, logging and closing.";
 	    logAndClose (null);
 	}
 
 	public void timeout () {
-	    getLogger ().logInfo ("Timeout when sending http header");
+	    status = "Response sending timed out, logging and closing.";
+	    logger.info ("Timeout when sending http header");
 	    logAndClose (null);
 	}
 
 	public void failed (Exception e) {
-	    getLogger ().logInfo ("Exception when sending http header: " + e);
+	    status = 
+		"Response sending failed: " + e + ", logging and closing.";
+	    logger.log (Level.INFO, "Exception when sending http header", e);
 	    logAndClose (null);
 	}
     }

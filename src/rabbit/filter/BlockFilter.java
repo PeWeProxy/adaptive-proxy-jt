@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.util.PatternHelper;
 
@@ -60,14 +59,13 @@ public class BlockFilter implements HttpFilter {
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger for errors/warnings
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	PatternHelper ph = new PatternHelper ();
 	blockPattern = ph.getPattern (properties, "blockURLmatching", 
-				      "BlockFilter: bad pattern: ", logger);
+				      "BlockFilter: bad pattern: ");
         allowPattern = ph.getPattern (properties, "allowURLmatching", 
-				      "AllowFilter: bad pattern: ", logger);
+				      "AllowFilter: bad pattern: ");
     }
 }

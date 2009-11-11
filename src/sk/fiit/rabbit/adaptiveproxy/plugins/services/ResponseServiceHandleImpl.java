@@ -36,15 +36,24 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase {
 	}
 	
 	@Override
+	String getText4Logging(loggingTextTypes type) {
+		if (type == loggingTextTypes.CAPITAL)
+			return "Response";
+		if (type == loggingTextTypes.SHORT)
+			return "RP";
+		return "response";
+	}
+	
+	@Override
 	void doSpecificServiceDiscovery() {
 		for (ResponseServicePlugin plugin : plugins) {
 			List<ResponseServiceProvider> providers = null;
 			try {
 				providers = plugin.provideResponseServices(response);
-			} catch (Exception e) {
-				log.debug("Exception thrown while obtaining service providers from ResponseServiceProvider of class '"+plugin.getClass()+"'");
+			} catch (Throwable t) {
+				log.info("Throwable raised while obtaining service providers from ResponseServiceProvider of class '"+plugin.getClass()+"'",t);
 			}
-			if (providers != null)
+			if (providers != null && !providers.isEmpty())
 				addServiceProviders(plugin,providers);
 		}
 	}

@@ -11,14 +11,12 @@ import rabbit.io.InetAddressListener;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class ResolvRunner implements Runnable {
-    private final TaskRunner tr;
     private final DNSHandler dnsHandler;
     private final URL url;
     private final InetAddressListener ial;
 
-    public ResolvRunner (TaskRunner tr, DNSHandler dnsHandler, 
+    public ResolvRunner (DNSHandler dnsHandler, 
 			 URL url, InetAddressListener ial) {
-	this.tr = tr;
 	this.dnsHandler = dnsHandler;
 	this.url = url;
 	this.ial = ial;
@@ -29,17 +27,9 @@ public class ResolvRunner implements Runnable {
     public void run () {
 	try {
 	    final InetAddress ia = dnsHandler.getInetAddress (url);
-	    tr.runMainTask (new Runnable () {
-		    public void run () {
-			ial.lookupDone (ia);
-		    }
-		});
+	    ial.lookupDone (ia);
 	} catch (final UnknownHostException e) {
-	    tr.runMainTask (new Runnable () {
-		    public void run () {
-			ial.unknownHost (e);
-		    }
-		});
+	    ial.unknownHost (e);
 	}
     }
 }

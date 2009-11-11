@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.HttpHeaderSender;
@@ -13,6 +15,7 @@ import rabbit.httpio.HttpHeaderSentListener;
 import rabbit.httpio.TransferHandler;
 import rabbit.httpio.TransferListener;
 import rabbit.httpio.Transferable;
+import rabbit.io.Closer;
 import rabbit.proxy.Connection;
 import rabbit.util.MimeTypeMapper;
 import rabbit.util.SProperties;
@@ -29,6 +32,7 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     private FileInputStream fis;
     private FileChannel fc;
     private long length;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     
     public void handle (HttpHeader request, 
 			SProperties htab, 
@@ -92,9 +96,10 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     
     private void sendHeader (HttpHeader header) 
 	throws IOException {
-	new HttpHeaderSender (con.getChannel (), con.getSelector (), 
-			      con.getLogger (), tlClient, header, 
-			      true, this);
+	HttpHeaderSender hhs = 
+	    new HttpHeaderSender (con.getChannel (), con.getNioHandler (), 
+				  tlClient, header, true, this);
+	hhs.sendHeader ();
     }
 
     /** Write the header and the file to the output. 
@@ -102,10 +107,9 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     private void channelTransfer (long length) {
 	TransferListener ftl = new FileTransferListener ();
 	TransferHandler th = 
-	    new TransferHandler (con.getProxy ().getTaskRunner (),
+	    new TransferHandler (con.getNioHandler (),
 				 new FCTransferable (length),
-				 con.getSelector (), con.getChannel (), 
-				 tlProxy, tlClient, ftl, con.getLogger ());
+				 con.getChannel (), tlProxy, tlClient, ftl);
 	th.transfer ();	
     }
 
@@ -140,20 +144,8 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     }
 
     private void closeFile () {
-	if (fc != null) {
-	    try {
-		fc.close ();
-	    } catch (IOException e) {
-		con.getLogger ().logWarn ("Exception closing channel: " + e);
-	    }
-	}
-	if (fis != null) {
-	    try {
-		fis.close ();	
-	    } catch (IOException e) {
-		con.getLogger ().logWarn ("Exception closing file: " + e);
-	    }
-	}
+	Closer.close (fc, logger);
+	Closer.close (fis, logger);
     }
     
     public void httpHeaderSent () {
@@ -167,13 +159,13 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
 
     public void failed (Exception e) {
 	closeFile ();
-	con.getLogger ().logWarn ("Exception when handling meta: " + e);
+	logger.log (Level.WARNING, "Exception when handling meta", e);
 	con.logAndClose (null);
     }
 
     public void timeout () {
 	closeFile ();
-	con.getLogger ().logWarn ("Timeout when handling meta.");
+	logger.warning ("Timeout when handling meta.");
 	con.logAndClose (null);
     }
 }

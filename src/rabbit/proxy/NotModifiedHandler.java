@@ -2,10 +2,10 @@ package rabbit.proxy;
 
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Logger;
 import rabbit.cache.CacheEntry;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
-import rabbit.util.Logger;
 
 class NotModifiedHandler {
     /** Check if the request allows us to use a "304 Not modified" response.
@@ -81,8 +81,9 @@ class NotModifiedHandler {
 	 * Etagmatch and bad(nonexistant/unparsable..) IMS => act on etag
 	 */
 	if (ims == null) {
-	    con.getLogger ().logInfo ("unparseable date: " + sims + 
-				      " for URL: " + in.getRequestURI ());
+	    Logger logger = Logger.getLogger (getClass ().getName ());
+	    logger.info ("unparseable date: " + sims + 
+			 " for URL: " + in.getRequestURI ());
 	    return ematch (con, etagMatch, oldresp);
 	}
 	
@@ -113,7 +114,7 @@ class NotModifiedHandler {
 	    cachedHeader.setHeader (header, h);
     }
     
-    void updateHeader (RequestHandler rh, Logger logger) {
+    void updateHeader (RequestHandler rh) {
 	if (rh.getEntry () == null)
 	    return;
 	HttpHeader cachedHeader = rh.getDataHook ();
@@ -134,7 +135,7 @@ class NotModifiedHandler {
 	}
 	
 	WarningsHandler wh = new WarningsHandler ();
-	wh.removeWarnings (logger, cachedHeader, true); 
+	wh.removeWarnings (cachedHeader, true); 
 	wh.updateWarnings (cachedHeader, rh.getWebHeader ());	
     }   
 }

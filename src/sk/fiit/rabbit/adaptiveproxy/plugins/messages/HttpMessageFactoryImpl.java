@@ -1,6 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
 
 import java.util.Date;
+import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
@@ -9,8 +10,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.headers.RequestHeaders;
 import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
-	private static final org.apache.log4j.Logger log
-	= org.apache.log4j.Logger.getLogger(HttpMessageFactoryImpl.class);
+	private static final Logger log = Logger.getLogger(HttpMessageFactoryImpl.class.getName());
 	
 	private final Connection con;
 	private final ModifiableHttpRequestImpl request;
@@ -62,7 +62,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			header.setHeader("Via", con.getProxy().getProxyIdentity());
 			HttpHeader filteredHeaders =  con.filterConstructedResponse(header);
 			if (filteredHeaders != null)
-				log.trace("If the client was an origin server, it's response would have been blocked");
+				log.debug("If this was a normaly received response, it would have been blocked by header filters");
 				// but now we don't care
 		}
 		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(fromHeaders,request);

@@ -8,9 +8,9 @@ import rabbit.http.Header;
 import rabbit.http.HttpHeader;
 import rabbit.http.MultipartHeader;
 import rabbit.httpio.BlockListener;
-import rabbit.httpio.TaskRunner;
 import rabbit.io.BufferHandler;
 import rabbit.io.Range;
+import rabbit.nio.NioHandler;
 
 /** A resource that gets ranges from the cache.
  *  This resource will read data from disk so it may block.
@@ -31,7 +31,7 @@ public class RandomCacheResourceSource extends CacheResourceSource {
 
     public RandomCacheResourceSource (Cache<HttpHeader, HttpHeader> cache,
 				      RequestHandler rh,
-				      TaskRunner tr, BufferHandler bufHandler,
+				      NioHandler tr, BufferHandler bufHandler,
 				      List<Range> ranges, long totalSize) 
 	throws IOException {
 	super (cache, rh.getEntry (), tr, bufHandler);

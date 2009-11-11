@@ -2,6 +2,7 @@ package rabbit.proxy;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.logging.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.HttpHeaderListener;
@@ -11,6 +12,7 @@ import rabbit.httpio.HttpHeaderSentListener;
 import rabbit.httpio.WebConnectionResourceSource;
 import rabbit.httpio.request.ClientResourceHandler;
 import rabbit.io.BufferHandle;
+import rabbit.io.Closer;
 import rabbit.io.ConnectionHandler;
 import rabbit.io.WebConnection;
 import rabbit.io.WebConnectionListener;
@@ -22,11 +24,11 @@ import rabbit.io.WebConnectionListener;
  */
 public class SWC implements HttpHeaderSentListener, 
                             HttpHeaderListener, WebConnectionListener {
-    private Connection con;
-    private HttpHeader header; 
-    private TrafficLoggerHandler tlh;
-    private ClientResourceHandler crh;
-    private RequestHandler rh;
+    private final Connection con;
+    private final HttpHeader header; 
+    private final TrafficLoggerHandler tlh;
+    private final ClientResourceHandler crh;
+    private final RequestHandler rh;
     
     private int attempts = 0;
     private String method;
@@ -35,7 +37,10 @@ public class SWC implements HttpHeaderSentListener,
     private char status = '0';
 
     private Exception lastException;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+    
     private boolean wasReadingFromWeb = false;
+    private boolean wasTimeout = true;
 
     public SWC (Connection con, HttpHeader header, 
 		TrafficLoggerHandler tlh, ClientResourceHandler crh,
@@ -55,16 +60,23 @@ public class SWC implements HttpHeaderSentListener,
 	
 	// if we cant get a connection in five cancel..
 	if (!safe || attempts > 5) {
-		if (wasReadingFromWeb)
-			con.getProxy().getAdaptiveEngine().getEventsHandler().logResponseReadFailed(con);
-		else
-			con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestDeliveryFailed(con);
+		if (wasTimeout) {
+			if (wasReadingFromWeb)
+		   		con.getProxy().getAdaptiveEngine().getEventsHandler().logResponseReadTimeout(con);
+		   	else
+		   		con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestDeliveryTimeout(con);
+		} else {
+			if (wasReadingFromWeb)
+				con.getProxy().getAdaptiveEngine().getEventsHandler().logResponseReadFailed(con);
+			else
+				con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestDeliveryFailed(con);
+		}
 	    con.webConnectionSetupFailed (rh, lastException);
 	} else {
 		wasReadingFromWeb = false;
 	    con.getProxy ().getWebConnection (header, this);
 	}
-    } 
+    }
 
     public void connectionEstablished (WebConnection wc) {
 	con.getCounter ().inc ("WebConnection established: " + 
@@ -84,9 +96,11 @@ public class SWC implements HttpHeaderSentListener,
 	    if (crh != null)
 		crh.modifyRequest (header);
 	    
-	    new HttpHeaderSender (wc.getChannel (), con.getSelector (), 
-				  con.getLogger (), tlh.getNetwork (), 
-				  header, con.useFullURI (), this);
+	    HttpHeaderSender hhs = 
+		new HttpHeaderSender (wc.getChannel (), con.getNioHandler (), 
+				      tlh.getNetwork (), header, 
+				      con.useFullURI (), this);
+	    hhs.sendHeader ();
 	} catch (IOException e) {
 	    failed (e);
 	}
@@ -97,7 +111,7 @@ public class SWC implements HttpHeaderSentListener,
 	    crh.transfer (rh.getWebConnection (), new ResourceTransferListener());
 	else
 	    httpHeaderSentTransferDone ();
-    }
+    }	
     
     class ResourceTransferListener implements ClientResourceTransferredListener {
 
@@ -125,33 +139,37 @@ public class SWC implements HttpHeaderSentListener,
 
 		public void timeout () {
 	   		con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestReadTimeout(con);
+	   		closeDownWebConnection ();
 	    }
 	    
 	    public void failed (Exception e) {
 	    	con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestReadFailed(con);
+	    	closeDownWebConnection ();
 	    }
     }
     
     private void httpHeaderSentTransferDone () {
 	if (!header.isDot9Request ()) {
-	    readRequest ();
+	    readResponse ();
 	} else {
 	    // HTTP/0.9 close after resource..
 	    rh.getWebConnection ().setKeepalive (false);
 	    con.webConnectionEstablished (rh);
 	}
     }
-
-    private void readRequest () {
+    
+    // zmenene z "readRequest" na "readResponse"
+    private void readResponse () {
     wasReadingFromWeb = true;
 	con.getCounter ().inc ("Trying read response from WebConnection: " + 
 			       attempts);
 	try {
-	    new HttpHeaderReader (rh.getWebConnection ().getChannel (), 
-				  rh.getWebHandle (), 
-				  con.getSelector (), con.getLogger (), 
-				  tlh.getNetwork (), false, 
-				  con.getProxy ().getStrictHttp (), this);
+	    HttpHeaderReader hhr = 
+		new HttpHeaderReader (rh.getWebConnection ().getChannel (), 
+				      rh.getWebHandle (), con.getNioHandler (),
+				      tlh.getNetwork (), false, 
+				      con.getProxy ().getStrictHttp (), this);
+	    hhr.readRequest ();
 	} catch (IOException e) {
 	    failed (e);
 	}
@@ -175,11 +193,11 @@ public class SWC implements HttpHeaderSentListener,
 	    con.getCounter ().inc ("WebConnection got 1xx reply " + 
 				   attempts);
 	    try {
-		new HttpHeaderSender (con.getChannel (), 
-				      con.getSelector (), 
-				      con.getLogger (), 
-				      tlh.getClient (),
-				      header, false, l);
+		HttpHeaderSender hhs = 
+		    new HttpHeaderSender (con.getChannel (), 
+					  con.getNioHandler (),
+					  tlh.getClient (), header, false, l);
+		hhs.sendHeader ();
 		return;
 	    } catch (IOException e) {
 		failed (e);
@@ -189,25 +207,23 @@ public class SWC implements HttpHeaderSentListener,
 	// since we have posted the full request we 
 	// loop while we get 100 (continue) response.
 	if (status == '1') {
-	    readRequest ();
+	    readResponse ();
 	} else {
 	    String responseVersion = rh.getWebHeader ().getResponseHTTPVersion ();
 	    setAge (rh);
 	    WarningsHandler wh = new WarningsHandler ();
-	    wh.removeWarnings (con.getLogger (), rh.getWebHeader (), false);
+	    wh.removeWarnings (rh.getWebHeader (), false);
 	    HttpHeader webHeader = rh.getWebHeader ();
 	    String proxyChain = header.getHeader("Via");
-		if (proxyChain == null)
-			proxyChain = "";
-		webHeader.setHeader ("Via", proxyChain + " " + con.getProxy().getProxyIdentity());
+		webHeader.setHeader ("Via", (proxyChain != null)? proxyChain+", " : "" + con.getProxy().getProxyIdentity());
+	    //original code: rh.getWebHeader ().addHeader ("Via", responseVersion + " RabbIT");
 	    HttpProxy proxy = con.getProxy ();
 	    rh.setSize (dataSize);
 	    ConnectionHandler ch = con.getProxy ().getConnectionHandler ();
 	    WebConnectionResourceSource rs = 
-		new WebConnectionResourceSource (ch, con.getSelector (),
+		new WebConnectionResourceSource (ch, con.getNioHandler (),
 						 rh.getWebConnection (),
-						 wbh, con.getLogger (),
-						 tlh.getNetwork (),
+						 wbh, tlh.getNetwork (),
 						 isChunked, dataSize,
 						 proxy.getStrictHttp ());
 	    rh.setContent (rs);
@@ -216,8 +232,11 @@ public class SWC implements HttpHeaderSentListener,
     }
 
     public void closed () {
-	lastException = new IOException ("closed");
-	establish ();
+	if (rh.getWebConnection () != null) {
+	    closeDownWebConnection ();
+	    lastException = new IOException ("closed");
+	    establish ();
+	}
     }
     
     /** Calculate the age of the resource, needs ntp to be accurate. 
@@ -244,7 +263,7 @@ public class SWC implements HttpHeaderSentListener,
 	    }
 	} catch (NumberFormatException e) {
 	    // if we cant parse it, we leave the Age header..
-	    con.getLogger ().logWarn ("Bad age: " + age);
+	    logger.warning ("Bad age: " + age);
 	}
     }
 
@@ -252,7 +271,7 @@ public class SWC implements HttpHeaderSentListener,
 	
 	public void httpHeaderSent () {
 	    // read the next request...
-	    readRequest ();
+	    readResponse ();
 	}
 	
 	public void timeout () {
@@ -263,34 +282,31 @@ public class SWC implements HttpHeaderSentListener,
 	    SWC.this.failed (e);	    
 	}
     }
-    
-    @Override
-    public void timeout() {
-    	if (wasReadingFromWeb)
-    		con.getProxy().getAdaptiveEngine().getEventsHandler().logResponseReadTimeout(con);
-    	else
-    		con.getProxy().getAdaptiveEngine().getEventsHandler().logRequestDeliveryTimeout(con);
-    	// retry
-    	lastException = new IOException ("timeout");
-    	establish ();
-    }
-    
-    @Override
-    public void failed(Exception e) {
-    	lastException = e;
-    	con.getCounter ().inc ("WebConnections failed: " + 
-    			       attempts + ": " + e);
-    	if (rh.getWebConnection () != null) {
-    	    try {
-    		rh.getWebConnection ().close ();
-    	    } catch (IOException ioe) {
-    		con.getLogger ().logWarn ("Unable to close WebConnection" + 
-    					  ioe);
-    	    }
-    	}
-    	rh.setWebConnection (null);
 
-    	// retry
-    	establish ();
+    private void closeDownWebConnection () {
+	WebConnection wc = rh.getWebConnection ();
+	rh.setWebConnection (null);
+	if (wc != null) {
+	    con.getNioHandler ().close (wc.getChannel ());
+	    Closer.close (wc, logger);
+	}
+    }
+
+    public void timeout () {
+   	wasTimeout = true;
+   	// retry
+	lastException = new IOException ("timeout");
+	closeDownWebConnection ();
+	establish ();
+    }
+
+    public void failed (Exception e) {
+    wasTimeout = false;
+	lastException = e;
+	con.getCounter ().inc ("WebConnections failed: " + 
+			       attempts + ": " + e);
+	closeDownWebConnection ();
+	// retry
+	establish ();
     }
 }

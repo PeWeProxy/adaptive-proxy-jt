@@ -2,11 +2,9 @@ package rabbit.httpio.request;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import rabbit.io.BufferHandle;
-import rabbit.io.SelectorRegistrator;
 import rabbit.io.SimpleBufferHandle;
-import rabbit.io.SocketHandler;
+import rabbit.nio.ReadHandler;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
 
@@ -37,17 +35,55 @@ public class DirectContentSource extends ContentSource {
 	
 	private void waitForRead () {
 		bufHandle.possiblyFlush ();
-		SocketHandler sh = new Reader ();
-		try {
-		    SelectorRegistrator.register (con.getLogger (), 
-						  con.getChannel (), 
-						  con.getSelector (), 
-						  SelectionKey.OP_READ, sh);
-		} catch (IOException e) {
-		    listener.failed (e);
-		}
+		ReadHandler sh = new Reader ();
+		con.getNioHandler ().waitForRead (con.getChannel (), sh);
 	}
 	
+	private class Reader implements ReadHandler {
+	private Long timeout = con.getNioHandler ().getDefaultTimeout ();
+	
+	public void read () {
+	    try {
+		ByteBuffer buffer = bufHandle.getBuffer ();
+		buffer.limit (buffer.capacity ());
+		int read = con.getChannel ().read (buffer);
+		if (read == 0) {
+		    waitForRead ();
+		} else if (read == -1) {
+		    failed (new IOException ("Failed to read request"));
+		} else {
+		    tlh.getClient ().read (read);
+		    buffer.flip ();
+		    separateData();
+		}
+	    } catch (IOException e) {
+		listener.failed (e);
+	    }
+	}
+	
+	public void closed () {
+	    bufHandle.possiblyFlush ();
+	    listener.failed (new IOException ("Connection closed"));
+	}
+	
+	public void timeout () {
+	    bufHandle.possiblyFlush ();
+	    listener.timeout ();
+	}
+	
+	public boolean useSeparateThread () {
+	    return false;
+	}
+	
+	public String getDescription () {
+	    return toString ();
+	}
+	
+	public Long getTimeout () {
+	    return timeout;
+	}
+	}
+
 	private void separateData() {
 		ByteBuffer buffer = bufHandle.getBuffer();
 		int limit = buffer.limit();
@@ -73,40 +109,6 @@ public class DirectContentSource extends ContentSource {
 			throw new IllegalStateException("Content separator returned unspecified value");
 	}
 
-	private class Reader implements SocketHandler {
-		public void run () {
-			try {
-				ByteBuffer buffer = bufHandle.getBuffer();
-				buffer.limit (buffer.capacity());
-				int read = con.getChannel().read(buffer);
-				if (read == 0) {
-				    waitForRead();
-				} else if (read == -1) {
-				    failed(new IOException ("Failed to read request"));
-				} else {
-				    tlh.getClient().read(read);
-				    buffer.flip();
-				    separateData();
-				}
-			} catch (IOException e) {
-				listener.failed (e);
-			}
-		}
-
-		public void timeout () {
-			bufHandle.possiblyFlush ();
-			listener.timeout();
-		}
-
-		public boolean useSeparateThread () {
-			return false;
-		}
-
-		public String getDescription () {
-		    return toString ();
-		}
-	}
-	
 	private void failed (Exception e) {
 		bufHandle.possiblyFlush ();
 		listener.failed(e);

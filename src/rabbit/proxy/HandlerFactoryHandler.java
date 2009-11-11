@@ -2,9 +2,10 @@ package rabbit.proxy;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.handler.HandlerFactory;
 import rabbit.util.Config;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** A class to handle mime type handler factories.
@@ -12,17 +13,17 @@ import rabbit.util.SProperties;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 class HandlerFactoryHandler {
-    private Map<String, HandlerFactory> handlers;
-    private Map<String, HandlerFactory> cacheHandlers;
+    private final Map<String, HandlerFactory> handlers;
+    private final Map<String, HandlerFactory> cacheHandlers;
     private Map<String, HandlerFactory> handlersForNames;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     
     public HandlerFactoryHandler (SProperties handlersProps, 
 				  SProperties cacheHandlersProps, 
-				  Config config,
-				  Logger log) {
-    handlersForNames = new HashMap<String, HandlerFactory>();
-	handlers = loadHandlers (handlersProps, config, log);
-	cacheHandlers = loadHandlers (cacheHandlersProps, config, log);
+				  Config config) {
+	handlersForNames = new HashMap<String, HandlerFactory>();
+	handlers = loadHandlers (handlersProps, config);
+	cacheHandlers = loadHandlers (cacheHandlersProps, config);
     }
 
     /** load a set of handlers.
@@ -31,38 +32,38 @@ class HandlerFactoryHandler {
      * @return a Map with mimetypes as keys and Handlers as values.
      */
     protected Map<String, HandlerFactory> 
-	loadHandlers (SProperties handlersProps, Config config, Logger log) {
+	loadHandlers (SProperties handlersProps, Config config) {
 	Map<String, HandlerFactory> hhandlers = 
 	    new HashMap<String, HandlerFactory> ();
 	if (handlersProps == null)
 	    return hhandlers;
-	for (String mime : handlersProps.keySet ()) {
+	for (String handler : handlersProps.keySet ()) {
 	    HandlerFactory hf;
-	    String id = handlersProps.getProperty (mime).trim ();
+	    String id = handlersProps.getProperty (handler).trim ();
 	    // simple regexp like expansion,
 	    // first '?' char indicates optional prev char
-	    int i = mime.indexOf ('?');
+	    int i = handler.indexOf ('?');
 	    if (i <= 0) {
 		// no '?' found, or it is the first char
-		hf = setupHandler (id, config, log, mime);
-		hhandlers.put (mime, hf);
+		hf = setupHandler (id, config, handler);
+		hhandlers.put (handler, hf);
 	    } else {
 		// remove '?'
-		mime = mime.substring (0, i) + mime.substring (i + 1);
-		hf = setupHandler (id, config, log, mime);
-		hhandlers.put (mime, hf);
+		handler = handler.substring (0, i) + handler.substring (i + 1);
+		hf = setupHandler (id, config, handler);
+		hhandlers.put (handler, hf);
 		// remove the optional char
-		String mime2 = 
-		    mime.substring (0, i - 1) + mime.substring (i);
-		hf = setupHandler (id, config, log, mime2);
-		hhandlers.put (mime2, hf);
+		String handler2 = 
+		    handler.substring (0, i - 1) + handler.substring (i);
+		hf = setupHandler (id, config, handler2);
+		hhandlers.put (handler2, hf);
 	    }
 	}
 	return hhandlers;
     }
 
     private HandlerFactory setupHandler (String id, Config config, 
-					 Logger log, String mime) {
+					 String handler) {
 	String className = id;
 	HandlerFactory hf = handlersForNames.get(id);
     if (hf != null) {
@@ -75,20 +76,23 @@ class HandlerFactoryHandler {
 	    Class<? extends HandlerFactory> cls = 
 		Class.forName (className).asSubclass (HandlerFactory.class);
 	    hf = cls.newInstance ();
-	    hf.setup (log, config.getProperties (id));
+	    hf.setup (config.getProperties (id));
 	} catch (ClassNotFoundException ex) {
-	    log.logError ("Could not load class: '" + className
-			  + "' for handlerfactory '" + mime + "'");
+	    logger.log (Level.WARNING, 
+		       "Could not load class: '" + className
+		       + "' for handlerfactory '" + handler + "'", 
+		       ex);
 	} catch (InstantiationException ie) {
-	    log.logError ("Could not instanciate factory class: '" + 
-			  className + "' for handler '" + 
-			  mime + "' :" + ie);
+	    logger.log (Level.WARNING, 
+			"Could not instanciate factory class: '" + 
+			className + "' for handler '" + handler + "'",
+			ie);
 	} catch (IllegalAccessException iae) {
-	    log.logError ("Could not instanciate factory class: '" + 
-			  className + "' for handler '" + 
-			  mime + "' :" + iae);
+	    logger.log (Level.WARNING, 
+			"Could not instanciate factory class: '" + 
+			className + "' for handler '" + handler + "'",
+			iae);
 	}
-	handlersForNames.put(id, hf);
 	return hf;
     }
 

@@ -1,69 +1,68 @@
 package rabbit.httpio;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SocketChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
+import java.util.logging.Logger;
 import rabbit.io.BufferHandle;
-import rabbit.io.SelectorRegistrator;
-import rabbit.io.SocketHandler;
-import rabbit.util.Logger;
+import rabbit.nio.NioHandler;
+import rabbit.nio.ReadHandler;
+import rabbit.nio.SocketChannelHandler;
+import rabbit.nio.WriteHandler;
 
 /** A base class for socket handlers.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public abstract class BaseSocketHandler implements SocketHandler {
+public abstract class BaseSocketHandler implements SocketChannelHandler {
     /** The client channel. */
-    protected SocketChannel channel; 
+    private final SocketChannel channel; 
     
-    /** The selector we are using. */
-    protected Selector selector;
-
-    /** The selection key we are using. */
-    protected SelectionKey sk;
+    /** The nio handler we are using. */
+    private final NioHandler nioHandler;
 
     /** The logger to use. */
-    protected Logger logger;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     
     /** The buffer handle. */
-    protected BufferHandle bh;
+    private final BufferHandle bh;
     
+    /** The timeout value set by the previous channel registration */
+    private Long timeout;
+
     public BaseSocketHandler (SocketChannel channel, BufferHandle bh, 
-			      Selector selector, Logger logger) 
-	throws IOException {
+			      NioHandler nioHandler) {
 	this.channel = channel;
 	this.bh = bh;
-	this.selector = selector;
-	this.logger = logger;
-	register ();
+	this.nioHandler = nioHandler;
     }
 
-    protected void register () throws ClosedChannelException {
-	int ops = getSocketOperations ();
-	if (ops != 0)
-	    sk = SelectorRegistrator.register (logger, channel, 
-					       selector, ops, this);
-    }
-    
     protected ByteBuffer getBuffer () {
 	return bh.getBuffer ();
-    }
-
-    protected void growBuffer () {
-	bh.growBuffer ();
     }
 
     protected void releaseBuffer () {
 	bh.possiblyFlush ();
     }
 
-    protected abstract int getSocketOperations ();
-    
+    /** Does nothing by default */
+    public void closed () {
+    }
+
+    /** Does nothing by default */
+    public void timeout () {
+    }
+
+    /** Runs on the selector thread by default */
     public boolean useSeparateThread () {
 	return false;
+    }
+
+    public String getDescription () {
+	return getClass ().getName () + ":" + channel;
+    }
+
+    public Long getTimeout () {
+	return timeout;
     }
 
     protected Logger getLogger () {
@@ -71,25 +70,25 @@ public abstract class BaseSocketHandler implements SocketHandler {
     }
 
     protected void closeDown () {
-	try {
-	    releaseBuffer ();
-	    sk.attach ("BaseSocketHandler.closeDown");
-	    sk.cancel ();
-	    channel.close ();
-	    clear ();
-	} catch (IOException e) {
-	    getLogger ().logWarn ("Failed to close down connection: " + e);
-	}	
+	releaseBuffer ();
+	nioHandler.close (channel);
     }
 
-    protected void unregister () {
-	clear ();
+    public SocketChannel getChannel () {
+	return channel;
     }
-    
-    private void clear () {
-	sk = null;
-	logger = null;
-	selector = null;
-	channel = null;
+
+    public BufferHandle getBufferHandle () {
+	return bh;
+    }
+
+    public void waitForRead (ReadHandler rh) {
+	this.timeout = nioHandler.getDefaultTimeout ();
+	nioHandler.waitForRead (channel, rh);
+    }
+
+    public void waitForWrite (WriteHandler rh) {
+	this.timeout = nioHandler.getDefaultTimeout ();
+	nioHandler.waitForWrite (channel, rh);
     }
 }

@@ -5,7 +5,8 @@ import rabbit.dns.DNSHandler;
 import rabbit.dns.DNSJavaHandler;
 import rabbit.io.InetAddressListener;
 import rabbit.io.Resolver;
-import rabbit.util.Logger;
+import rabbit.nio.DefaultTaskIdentifier;
+import rabbit.nio.NioHandler;
 
 /** A simple resolver that uses the dnsjava resolver. 
  *
@@ -13,17 +14,19 @@ import rabbit.util.Logger;
  */
 public class SimpleResolver implements Resolver {
     private final DNSHandler dnsHandler;
-    private final TaskRunner tr;
+    private final NioHandler tr;
 
-    public SimpleResolver (Logger logger, TaskRunner tr) {
+    public SimpleResolver (NioHandler tr) {
 	DNSJavaHandler jh = new DNSJavaHandler ();
-	jh.setup (null, logger);
+	jh.setup (null);
 	dnsHandler = jh;
 	this.tr = tr;
     }
 
     public void getInetAddress (URL url, InetAddressListener listener) {
-	tr.runThreadTask (new ResolvRunner (tr, dnsHandler, url, listener));
+	String groupId = getClass ().getSimpleName ();
+	tr.runThreadTask (new ResolvRunner (dnsHandler, url, listener), 
+			  new DefaultTaskIdentifier (groupId, url.toString ()));
     }
 
     public int getConnectPort (int port) {
@@ -33,6 +36,7 @@ public class SimpleResolver implements Resolver {
     public boolean isProxyConnected () {
 	return false;
     }
+
     public String getProxyAuthString () {
 	return null;
     }

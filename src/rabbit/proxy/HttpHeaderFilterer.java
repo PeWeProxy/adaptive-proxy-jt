@@ -3,10 +3,11 @@ package rabbit.proxy;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.filter.HttpFilter;
 import rabbit.http.HttpHeader;
 import rabbit.util.Config;
-import rabbit.util.Logger;
 
 /** A class to load and run the HttpFilters.
  *
@@ -68,23 +69,26 @@ class HttpHeaderFilterer {
 	String[] filterArray = filters.split (",");
 	for (int i = 0; i < filterArray.length; i++) {
 	    String className = filterArray[i];
-	    Logger log = proxy.getLogger ();
+	    Logger log = Logger.getLogger (getClass ().getName ());
 	    try {
 		className = className.trim ();
 		Class<? extends HttpFilter> cls = 
 		    Class.forName (className).asSubclass (HttpFilter.class);
 		HttpFilter hf = cls.newInstance ();
-		hf.setup (log, config.getProperties (className));
+		hf.setup (config.getProperties (className));
 		ls.add (hf);
 	    } catch (ClassNotFoundException ex) {
-		log.logError ("Could not load http filter class: '" + 
-			      className + "' " + ex);
+		log.log (Level.WARNING, 
+			 "Could not load http filter class: '" + 
+			 className + "'", ex);
 	    } catch (InstantiationException ex) {
-		log.logError ("Could not instansiate http filter: '" + 
-			      className + "' " + ex);
+		log.log (Level.WARNING, 
+			 "Could not instansiate http filter: '" + 
+			 className + "'", ex);
 	    } catch (IllegalAccessException ex) {
-		log.logError ("Could not access http filter: '" + 
-			      className + "' " + ex);
+		log.log (Level.WARNING, 
+			 "Could not access http filter: '" + 
+			 className + "'", ex);
 	    }
 	}
     }

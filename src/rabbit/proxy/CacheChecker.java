@@ -5,11 +5,13 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
-import rabbit.util.Logger;
+import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
 
 /** A class to verify if a cache entry can be used.
  *
@@ -84,14 +86,23 @@ class CacheChecker {
 	    resp = nmh.is304 (header, con, rh);
 	}
 	if (resp != null) {
-	    con.sendAndRestart (resp);
+		con.sendAndRestart (resp);
 	    return true;
 	}		
 	con.setMayCache (false);
 	try {		    
 	    resp = con.setupCachedEntry (rh); 
-	    if (resp != null) {
-		con.sendAndClose (resp);
+	    if (resp != null) { {
+	    	final Connection conn = con;
+	    	con.getProxy().getAdaptiveEngine().newResponse(conn, resp, new Runnable() {
+				@Override
+				public void run() {
+					HttpHeader response = ((HeaderWrapper)conn.getProxy().getAdaptiveEngine()
+						.getResponseForConnection(conn).getProxyResponseHeaders()).getBackedHeader();
+					conn.sendAndClose (response);
+				}
+			});
+	    }
 		return true;
 	    }
 	} catch (FileNotFoundException e) {
@@ -156,8 +167,7 @@ class CacheChecker {
 
     private void removeCaches (HttpHeader request, 
 			       HttpHeader webHeader, String type, 
-			       Cache<HttpHeader, HttpHeader> cache, 
-			       Logger logger) {
+			       Cache<HttpHeader, HttpHeader> cache) {
 	String loc = webHeader.getHeader (type);
 	if (loc == null)
 	    return;
@@ -180,29 +190,29 @@ class CacheChecker {
 	    h.setRequestURI (u2.toString ());
 	    cache.remove (h);
 	} catch (MalformedURLException e) {
-	    logger.logWarn ("removeCaches got bad url: " +
-				  request.getRequestURI () + ", " + 
-				  loc + ": " + e);
+	    Logger logger = Logger.getLogger (getClass ().getName ());
+	    logger.log (Level.WARNING,
+			"RemoveCaches got bad url: " +
+			request.getRequestURI () + ", " + loc, 
+			e);
 	}
     }
 
     private void removeCaches (HttpHeader request, HttpHeader webHeader,
-			       Cache<HttpHeader, HttpHeader> cache, 
-			       Logger logger) {
-	removeCaches (request, webHeader, "Location", cache, logger);
-	removeCaches (request, webHeader, "Content-Location", cache, logger);
+			       Cache<HttpHeader, HttpHeader> cache) {
+	removeCaches (request, webHeader, "Location", cache);
+	removeCaches (request, webHeader, "Content-Location", cache);
     }
 
     void removeOtherStaleCaches (HttpHeader request, HttpHeader webHeader, 
-				 Cache<HttpHeader, HttpHeader> cache, 
-				 Logger logger) {
+				 Cache<HttpHeader, HttpHeader> cache) {
 	String method = request.getMethod ();
 	String status = webHeader.getStatusCode ();
 	if ((method.equals ("PUT") || method.equals ("POST")) 
 	    && status.equals ("201")) {
-	    removeCaches (request, webHeader, cache, logger);
+	    removeCaches (request, webHeader, cache);
 	} else if (method.equals ("DELETE") && status.equals ("200")) {
-	    removeCaches (request, webHeader, cache, logger);
+	    removeCaches (request, webHeader, cache);
 	}
     }
 }

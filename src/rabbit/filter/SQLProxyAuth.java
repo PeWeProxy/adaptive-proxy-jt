@@ -7,10 +7,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpGenerator;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** This is a filter that requires users to use 
@@ -36,6 +37,7 @@ public class SQLProxyAuth implements HttpFilter {
 	"select password from users where username = ?";
 
     private java.sql.Connection db = null;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     private synchronized void initConnection () throws SQLException {
 	db = DriverManager.getConnection (url, dbuser, dbpwd);
@@ -62,10 +64,9 @@ public class SQLProxyAuth implements HttpFilter {
 	    return getError (con, header);
 	String rpwd = null;
 	try { 
-	    rpwd = getBackendPassword (con.getProxy ().getLogger (), username);
+	    rpwd = getBackendPassword (username);
 	} catch (SQLException e) {
-	    Logger log = con.getProxy ().getLogger ();
-	    log.logWarn ("Exception when trying to get user: " + e);
+	    logger.log (Level.WARNING, "Exception when trying to get user: " + e);
 	    closeDB (con);
 	}
 	if (rpwd == null || !rpwd.equals (pwd))
@@ -89,7 +90,7 @@ public class SQLProxyAuth implements HttpFilter {
 	try {
 	    return hg.get407 ("internet", new URL (header.getRequestURI ()));
 	} catch (MalformedURLException e) {
-	    con.getProxy ().getLogger ().logWarn ("Bad url: " + e);
+	    logger.warning ("Bad url: " + e);
 	    return hg.get407 ("internet", null);
 	}
     }
@@ -100,13 +101,12 @@ public class SQLProxyAuth implements HttpFilter {
 	try {
 	    db.close ();
 	} catch (SQLException e) {
-	    Logger log = con.getProxy ().getLogger ();
-	    log.logWarn ("failed to close database: " + e);
+	    logger.log (Level.WARNING, "failed to close database", e);
 	}
 	db = null;
     } 
 
-    private String getBackendPassword (Logger logger, String username) 
+    private String getBackendPassword (String username) 
 	throws SQLException {
 	synchronized (this) {
 	    if (db == null)
@@ -129,29 +129,28 @@ public class SQLProxyAuth implements HttpFilter {
 		try {
 		    rs.close ();
 		} catch (SQLException e) {
-		    logger.logError ("failed to close resultset: " + e);
+		    logger.log (Level.WARNING, "Failed to close resultset", e);
 		}
 	    }
 	    if (ps != null) {
 		try {
 		    ps.close ();
 		} catch (SQLException e) {
-		    logger.logError ("failed to close statement: " + e);
+		    logger.log (Level.WARNING, "Failed to close statement", e);
 		}		
 	    }
 	} 
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger to output errors/warnings on.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String driver = properties.getProperty ("driver");
 	try {
 	    Class.forName (driver);
 	} catch (ClassNotFoundException e) {
-	    logger.logError ("Failed to load driver");
+	    logger.log (Level.WARNING, "Failed to load driver: " + driver, e);
 	}
 	synchronized (this) {
 	    url = properties.getProperty ("url");

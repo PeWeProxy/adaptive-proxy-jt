@@ -1,11 +1,19 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
+import info.monitorenter.cpdetector.io.ASCIIDetector;
+import info.monitorenter.cpdetector.io.ByteOrderMarkDetector;
+import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
+import info.monitorenter.cpdetector.io.JChardetFacade;
+import info.monitorenter.cpdetector.io.ParsingDetector;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -25,10 +33,11 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ByteContentService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableBytesService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableStringService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.StringContentService;
-import sk.fiit.rabbit.adaptiveproxy.utils.MemoryUsageInspector;
 
 public abstract class ServicesHandleBase implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
+	static final Charset defaultCharset;
+	static final CodepageDetectorProxy cpDetector;
 			
 	final HttpMessageImpl httpMessage;
 	final List<ServiceProvider> providersList;
@@ -38,6 +47,15 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	boolean servicesDiscovered = false;
 	int lastRtnedSvcProviderIndex = -1;
 	boolean changesPropagation = false;
+	
+	static {
+		defaultCharset = Charset.forName("ISO-8859-1");
+		cpDetector = CodepageDetectorProxy.getInstance();
+		cpDetector.add(new ByteOrderMarkDetector());
+		cpDetector.add(new ParsingDetector(true));
+		cpDetector.add(JChardetFacade.getInstance());
+		cpDetector.add(ASCIIDetector.getInstance());
+	}
 	
 	static class ServicePluginsComparator implements Comparator<ServicePlugin> {
 		Map<ServicePlugin, Set<Class<? extends ProxyService>>> dependencies =
@@ -159,14 +177,17 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	class ContentServicesProvider extends GenericServiceProvider implements StringContentService {
 		byte[] lastByteData = null;
 		StringBuilder sb;
-		
+		Charset charset = defaultCharset;
 		private boolean invoked = false;
 		
-		public ContentServicesProvider(String content) {
+		public ContentServicesProvider(String content, Charset charset) {
 			if (httpMessage.getData() == null)
 				throw new IllegalStateException("Associated HTTP message does not contain any data");
-			// try to load bytes into StringBuilder, this can cause HeapOverflow
-			//sb = new StringBuilder(content);
+			if (charset == null)
+				throw new IllegalStateException("Charset can not be hull");
+			this.charset = charset;
+			lastByteData = httpMessage.getData();
+			sb = new StringBuilder(content);
 		}
 		
 		@Override
@@ -181,23 +202,35 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		@Override
 		public String getContent() {
 			this.invoked = true;
-			
 			if (underlyingBytesChanged()) {
 				byte[] data = httpMessage.getData();
-				MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
-				sb = new StringBuilder(new String(data,CharsetDetector.detectCharset(getProxyHeader())));
-				MemoryUsageInspector.printMemoryUsage(log, "After StringBuilder creation");
+				//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
+				inspectCharset();
+				CharBuffer charBuf = null;
+				try {
+					charBuf = decodeBytes(data, charset,true);
+				} catch (CharacterCodingException e) {
+					log.debug(getLogTextHead()+"Data of this message has changed and cant be decoded");
+				}
+				sb = new StringBuilder(charBuf);
+				//MemoryUsageInspector.printMemoryUsage(log, "After StringBuilder creation");
 				lastByteData = data;
 			}
 			return sb.toString();
 		}
 		
+		private void inspectCharset() {
+			Charset newCharset = CharsetDetector.detectCharset(getProxyHeader());
+			if (newCharset != null)
+				charset = newCharset;
+		}
+		
 		@Override
 		public void doChanges() {
 			if(invoked) {
-				HttpHeader headers = getProxyHeader();
+				inspectCharset();
 				String s = sb.toString();
-				httpMessage.setData(s.getBytes(CharsetDetector.detectCharset(headers)));
+				httpMessage.setData(s.getBytes(charset));
 				lastByteData = httpMessage.getData();
 			}
 		}
@@ -234,6 +267,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 
 		@Override
 		public void setContent(String content) {
+			stringSvcProvider.invoked = true;
 			stringSvcProvider.sb.setLength(0);
 			stringSvcProvider.sb.append(content);
 		}
@@ -275,23 +309,23 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		for (T plugin : plugins) {
 			if (discoverContentNeed(plugin)) {
 					wantContent = true;
+					if (log.isDebugEnabled())
+						log.debug(getLogTextHead()+"Service plugin "+plugin+" wants "
+								+getText4Logging(loggingTextTypes.NORMAL)+" content");
 					break;
 			}
-			//discoverContentNeed(pluginDependencies);
 		}
 	}
 	
 	abstract <T extends ServicePlugin> boolean discoverContentNeed(T plugin);
 	
-	/*protected void discoverContentNeed(Set<Class<ProxyService>> dependencies) {
-		for (Class<ProxyService> serviceClass : dependencies) {
-			if (serviceClass.equals(StringContentService.class) ||
-					serviceClass.equals(ModifiableContentService.class)) {
-				wantContent = true;
-				return;
-			}
-		}
-	}*/
+	protected enum loggingTextTypes {NORMAL,CAPITAL,SHORT};
+	
+	private String getLogTextHead() {
+		return getText4Logging(loggingTextTypes.SHORT)+": "+toString()+" | ";
+	}
+	
+	abstract String getText4Logging(loggingTextTypes type);
 	
 	public boolean wantContent() {
 		return wantContent;
@@ -310,30 +344,53 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			HttpHeader header = getOriginalHeader();
 			String contentType = header.getHeader("Content-Type");
 			if (contentType != null && contentType.startsWith("text")) {
-				Charset charset = CharsetDetector.detectCharset(header);
-				CharsetDecoder decoder = charset.newDecoder();
-				decoder.onMalformedInput(CodingErrorAction.REPORT);
-				decoder.onUnmappableCharacter(CodingErrorAction.REPORT);
+				Charset charset = null;
+				boolean detected = false;
+				try {
+					charset = CharsetDetector.detectCharset(header);
+				} catch (UnsupportedCharsetException e) {
+					log.warn(getLogTextHead()+getText4Logging(loggingTextTypes.CAPITAL)
+							+" header denotes unsupported charset "+e.getCharsetName());
+					detected = true;
+				}
+				if (charset == null && !detected) {
+					InputStream inStream = new ByteArrayInputStream(data);
+					try {
+						charset = cpDetector.detectCodepage(inStream, data.length);
+					} catch (Exception e) {
+						log.warn(getLogTextHead()+"Exception raised while trying to detect charset by cpDetector");
+					}
+				}
+				if (charset == null)
+					charset = defaultCharset;
 				CharBuffer charbuf = null;
 				try {
-					charbuf = decoder.decode(ByteBuffer.wrap(data));
+					charbuf = decodeBytes(data, charset, false);
 				} catch (CharacterCodingException e) {
-					log.debug("Data of this message is not valid text data [requested: "+
+					log.debug(getLogTextHead()+"Data of this message is not valid text data [requested: "+
 							getRequestHeader().getRequestLine()+" | message entity type: "+contentType+"]");
 				}
 				if (charbuf != null) {
 					// message has some valid text content so we add StringContentService provider
 					try {
-						ContentServicesProvider contentSvcProvider = new ContentServicesProvider(new String(charbuf.array()));
+						ContentServicesProvider contentSvcProvider = new ContentServicesProvider(charbuf.toString(),charset);
 						addServiceProvider(contentSvcProvider, contentSvcProvider, StringContentService.class);
 					} catch (OutOfMemoryError e) {
-						log.warn("Java heap space saturated, unable to provide StringContentService",e);
+						log.warn(getLogTextHead()+"Java heap space saturated, unable to provide StringContentService \n"+e.toString());
 					}
 				}
 			}
 		}
 		doSpecificServiceDiscovery();
 		setServicesContext();
+	}
+	
+	private CharBuffer decodeBytes(byte[] bytes, Charset charset, boolean report) throws CharacterCodingException {
+		CodingErrorAction action = (report)? CodingErrorAction.REPORT : CodingErrorAction.REPLACE;
+		CharsetDecoder decoder = charset.newDecoder();
+		decoder.onMalformedInput(action);
+		decoder.onUnmappableCharacter(action);
+		return decoder.decode(ByteBuffer.wrap(bytes));
 	}
 	
 	abstract HttpHeader getRequestHeader();
@@ -349,7 +406,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			ProxyService service = serviceProvider.getService();
 			Class<? extends ProxyService> implementedService = serviceProvider.getServiceClass();
 			if (!implementedService.isInstance(service)) {
-				log.warn("Provided service "+service+" is not of claimed type "+implementedService+" ("+
+				log.info(getLogTextHead()+"Provided service "+service+" is not of claimed type "+implementedService+" ("+
 						"service provided by "+serviceProvider+" obtained from plugin "+plugin+")");
 				continue;
 			}
@@ -390,6 +447,8 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 
 	public void doChanges() {
 		if (lastRtnedSvcProviderIndex != -1) {
+			//changesPropagation = true;
+			// TODO test
 			for (ListIterator<ServiceProvider> backwardIterator = providersList.listIterator(lastRtnedSvcProviderIndex+1); backwardIterator.hasPrevious();) {
 				ServiceProvider serviceProvider = (ServiceProvider) backwardIterator.previous();
 				serviceProvider.doChanges();
@@ -436,5 +495,10 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			changesPropagation = false;
 		}
 		return retVal;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
 }

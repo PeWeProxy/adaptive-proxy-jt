@@ -1,12 +1,13 @@
 package rabbit.filter;
 
-import java.net.URL;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.channels.SocketChannel;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpGenerator;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.util.SimpleUserHandler;
 
@@ -16,6 +17,7 @@ import rabbit.util.SimpleUserHandler;
  */
 public class ProxyAuth implements HttpFilter {
     private SimpleUserHandler userHandler;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     
     /** test if a socket/header combination is valid or return a new HttpHeader.
      *  Check that the user has been authenticate..
@@ -41,7 +43,7 @@ public class ProxyAuth implements HttpFilter {
 	try {
 	    return hg.get407 ("internet", new URL (header.getRequestURI ()));
 	} catch (MalformedURLException e) {
-	    con.getProxy ().getLogger ().logWarn ("Bad url: " + e);
+	    logger.log (Level.WARNING, "Bad url: " + header.getRequestURI (), e);
 	    return hg.get407 ("internet", null);
 	}
     }
@@ -59,12 +61,11 @@ public class ProxyAuth implements HttpFilter {
     }    
 
     /** Setup this class with the given properties.
-     * @param logger the Logger to output errors/warnings on.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	String userFile = properties.getProperty ("userfile", "conf/allowed");
 	userHandler = new SimpleUserHandler ();
-	userHandler.setFile (userFile, logger);
+	userHandler.setFile (userFile);
     }
 }

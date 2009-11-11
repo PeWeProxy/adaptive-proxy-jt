@@ -5,8 +5,8 @@ import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.FileResourceSource;
-import rabbit.httpio.TaskRunner;
 import rabbit.io.BufferHandler;
+import rabbit.nio.NioHandler;
 
 /** A resource that comes from the cache.
  * 
@@ -15,7 +15,7 @@ import rabbit.io.BufferHandler;
 public class CacheResourceSource extends FileResourceSource {
     public CacheResourceSource (Cache<HttpHeader, HttpHeader> cache,
 				CacheEntry<HttpHeader, HttpHeader> entry, 
-				TaskRunner tr, BufferHandler bufHandler) 
+				NioHandler tr, BufferHandler bufHandler) 
 	throws IOException {
 	super (cache.getEntryName (entry.getId (), true, null), tr, bufHandler);
     }

@@ -1,7 +1,10 @@
 package sk.fiit.rabbit.adaptiveproxy;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,11 +12,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Scanner;
 import java.util.Set;
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
+import org.apache.log4j.xml.DOMConfigurator;
 import rabbit.handler.AdaptiveHandler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
@@ -24,11 +28,11 @@ import rabbit.httpio.request.DirectContentSource;
 import rabbit.httpio.request.PrefetchedContentSource;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
+import rabbit.nio.DefaultTaskIdentifier;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.SProperties;
-import rabbit.util.SimpleUserHandler;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.events.EventsHandler;
@@ -44,10 +48,14 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.R
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.utils.XMLFileParser;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
+	
+	private static final File homeDir = new File(System.getProperty("user.dir"));
+	private static final String ORDERING_REQUEST_TEXT = "[request]";
+	private static final String ORDERING_RESPONSE_TEXT = "[response]";
+	
 	/*private static AdaptiveEngine instance;
 	
 	public static void setup(HttpProxy proxy) {
@@ -64,7 +72,7 @@ public class AdaptiveEngine  {
 	private final HttpProxy proxy;
 	private PluginHandler pluginHandler;
 	private final EventsHandler loggingHandler;
-	private final SimpleUserHandler userHandler;
+	//private final SimpleUserHandler userHandler;
 	private final List<RequestProcessingPlugin> requestPlugins;
 	private final List<ResponseProcessingPlugin> responsePlugins;
 	private File pluginsOrderFile = null; 
@@ -78,10 +86,16 @@ public class AdaptiveEngine  {
 		private boolean requestChunking = false;
 		private boolean adaptiveHandling = false;
 		private final long requestTime;
+		private long responseTime;
 
 		public ConnectionHandle(Connection con) {
 			this.con = con;
 			requestTime = System.currentTimeMillis();
+		}
+		
+		@Override
+		public String toString() {
+			return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 		}
 	}
 	
@@ -89,24 +103,21 @@ public class AdaptiveEngine  {
 		requestHandles = new HashMap<Connection, ConnectionHandle>();
 		this.proxy = proxy;
 		loggingHandler = new EventsHandler(this);
-		userHandler = new SimpleUserHandler();
-		userHandler.setFile("./conf/users", new Log4jLogger(log));
+		//userHandler = new SimpleUserHandler();
+		//userHandler.setFile("./conf/users");
 		pluginHandler = new PluginHandler();
 		requestPlugins = new LinkedList<RequestProcessingPlugin>();
 		responsePlugins = new LinkedList<ResponseProcessingPlugin>();
 	}
 	
-	public HttpProxy getProxy() {
-		return proxy;
-	}
-	
 	public ModifiableHttpRequest getRequestForConnection(Connection con) {
 		if (con == null) {
-			log.debug("Trying to get request for null connection");
+			log.warn("Trying to get request for null connection");
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			log.debug("No handle for connection, can't return request");
+			//stackTraceWatcher.printStackTrace(con);
+			log.warn("No handle for connection, can't return request");
 			return null;
 		}
 		return requestHandles.get(con).request;
@@ -114,26 +125,29 @@ public class AdaptiveEngine  {
 	
 	public ModifiableHttpResponse getResponseForConnection(Connection con) {
 		if (con == null) {
-			log.debug("Trying to get response for null connection");
+			log.warn("Trying to get response for null connection");
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			log.debug("No handle for connection, can't return response");
+			//stackTraceWatcher.printStackTrace(con);
+			log.warn("No handle for connection, can't return response");
 			return null;
 		}
 		return requestHandles.get(con).response;
 	}
 	
 	public void newRequestAttempt(Connection con) {
+		ConnectionHandle newHandle = new ConnectionHandle(con);
+		requestHandles.put(con, newHandle);
 		if (log.isTraceEnabled())
-			log.trace("Registering new ConnectionHandle for connection "+con);
-		requestHandles.put(con, new ConnectionHandle(con));
+			log.trace("RQ: Registering new connection handle "+newHandle+" for connection "+con);
 	}
 	
 	public void connectionClosed(Connection con) {
+		//stackTraceWatcher.addStackTrace(con);
+		ConnectionHandle conHandle = requestHandles.remove(con);
 		if (log.isTraceEnabled())
-			log.trace("Removing ConnectionHandle for connection "+con);
-		requestHandles.remove(con);
+			log.trace("Removing connection handle "+conHandle+" for connection "+con);
 	}
 	
 	public void newRequest(Connection con, boolean chunking) {
@@ -143,6 +157,8 @@ public class AdaptiveEngine  {
 		conHandle.messageFactory = new HttpMessageFactoryImpl(con,conHandle.request);
 		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getProxyRequestHeaders().getBackedHeader());
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | New request received");
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -156,6 +172,8 @@ public class AdaptiveEngine  {
 			if (!prefetch) {
 				for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 					if (requestPlugin.wantRequestContent(conHandle.request.getClientRequestHeaders())) {
+						if (log.isDebugEnabled())
+							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants request content");
 						prefetch = true;
 						break;
 					}
@@ -166,32 +184,27 @@ public class AdaptiveEngine  {
 				new ContentFetcher(con,bufHandle,tlh,separator,contentCachedListener,dataSize);
 				return;
 			} else {
+				if (log.isDebugEnabled())
+					log.debug("RQ: "+conHandle+" | No plugin wants request content");
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator);
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
 		}
 		final ClientResourceHandler handler = resourceHandler;
-		proxy.getTaskRunner().runThreadTask(new Runnable() {
+		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
 				if (runRequestAdapters(conHandle))
-					processWithRequest(con, handler);
+					proceedWithRequest(conHandle, handler);
 			}
-		});
-	}
-	
-	void processWithRequest(final Connection con, final ClientResourceHandler resourceHandler) {
-		proxy.getTaskRunner().runMainTask(new Runnable() {
-			@Override
-			public void run() {
-				con.processRequest(resourceHandler);
-			}
-		});
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
 	public void requestContentCached(final Connection con, final byte[] requestContent, final Queue<Integer> dataIncrements) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
-		proxy.getTaskRunner().runThreadTask(new Runnable() {
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached");
+		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
 				conHandle.request.setData(requestContent);
@@ -202,36 +215,15 @@ public class AdaptiveEngine  {
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent,dataIncrements);
 						resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,conHandle.requestChunking);
 					}
-					processWithRequest(conHandle.con, resourceHandler);
+					proceedWithRequest(conHandle, resourceHandler);
 				}
 			}
-		});
-	}
-	
-	private void sendResponse(final ConnectionHandle conHandle, boolean processResponse) {
-		if (processResponse) {
-			runResponseAdapters(conHandle);
-		} else {
-			conHandle.response.getServiceHandle().doChanges();
-		}
-		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
-		BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(new byte[4096]));
-		Connection con = conHandle.con;
-		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
-		HttpHeader requestHeaders = conHandle.request.getProxyRequestHeaders().getBackedHeader();
-		final HttpHeader responseHeaders = conHandle.response.getProxyResponseHeaders().getBackedHeader();
-		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
-		handlerFactory.nextInstanceWillNotCache();
-		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, bufHandle, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
-		proxy.getTaskRunner().runMainTask(new Runnable() {
-			@Override
-			public void run() {
-				sendingHandler.sendResponse(responseHeaders, conHandle.response.getData());
-			}
-		});
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
 	private boolean runRequestAdapters(ConnectionHandle conHandle) {
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | Running request adapters");
 		RequestServiceHandleImpl serviceHandle = conHandle.request.getServiceHandle();
 		serviceHandle.doServiceDiscovery();
 		boolean again = false;
@@ -259,8 +251,8 @@ public class AdaptiveEngine  {
 						conHandle.response = (ModifiableHttpResponseImpl)requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
 						sendResponse = true;
 					}
-				} catch (Exception e) {
-					log.debug("Exception thrown while processing request with RequestProcessingPlugin '"+requestPlugin+"'",e);
+				} catch (Throwable t) {
+					log.info("RQ: "+conHandle+" | Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
@@ -271,33 +263,33 @@ public class AdaptiveEngine  {
 		conHandle.request.getServiceHandle().doChanges();
 		return true;
 	}
+
+	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
+		proxy.getNioHandler().runThreadTask(new Runnable() {
+			@Override
+			public void run() {
+				if (log.isTraceEnabled()) {
+					log.trace("RQ: "+conHandle+" | Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in processing request");
+				}
+				conHandle.con.processRequest(resourceHandler);
+			}
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestAdvancing", requestSendingTaskInfo(conHandle)));
+	}
 	
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
+		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | New response received");
 	}
 	
-	public void processResponse(final Connection con, final Runnable proceedTask) {
-		final ConnectionHandle conHandle = requestHandles.get(con);
-		if (!conHandle.adaptiveHandling && !proxyDying) {
-			proxy.getTaskRunner().runThreadTask(new Runnable() {
-				@Override
-				public void run() {
-					runResponseAdapters(conHandle);	
-					proxy.getTaskRunner().runMainTask(new Runnable() {
-						@Override
-						public void run() {
-							log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
-							proceedTask.run();
-						}
-					});
-				}
-			});
-		} else {
-			proceedTask.run();
-		}
+	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
+		newResponse(con, header);
+		processResponse(con, proceedTask);
 	}
-	
+
 	public boolean cacheResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
@@ -307,23 +299,49 @@ public class AdaptiveEngine  {
 		if (conHandle.response.getServiceHandle().wantContent())
 			return true;
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
-			if (responsePlugin.wantResponseContent(conHandle.response.getWebResponseHeaders()))
+			if (responsePlugin.wantResponseContent(conHandle.response.getWebResponseHeaders())) {
+				if (log.isDebugEnabled())
+					log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants request content");
 				return true;
+			}
 		}
+		if (log.isDebugEnabled())
+			log.debug("RP: "+conHandle+" | No plugin wants response");
 		return false;
+	}
+
+	public void processResponse(final Connection con, final Runnable proceedTask) {
+		final ConnectionHandle conHandle = requestHandles.get(con);
+		if (!conHandle.adaptiveHandling && !proxyDying) {
+			proxy.getNioHandler().runThreadTask(new Runnable() {
+				@Override
+				public void run() {
+					runResponseAdapters(conHandle);
+					proceedWithResponse(conHandle, new Runnable() {
+						@Override
+						public void run() {
+							proceedTask.run();
+						}
+					});
+				}
+			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
+		} else {
+			if (log.isTraceEnabled())
+				log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
+			proceedTask.run();
+		}
 	}
 	
 	public void responseContentCached(Connection con, final byte[] responseContent, final AdaptiveHandler handler) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
-		if (proxy.getTaskRunner().isRunningInMainThread()) {
-			proxy.getTaskRunner().runThreadTask(new Runnable() {
-				@Override
-				public void run() {
-					processCachedResponse(conHandle, responseContent, handler);
-				}
-			});
-		} else
-			processCachedResponse(conHandle, responseContent, handler);
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached");
+		proxy.getNioHandler().runThreadTask(new Runnable() {
+			@Override
+			public void run() {
+				processCachedResponse(conHandle, responseContent, handler);
+			}
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 	}
 	
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
@@ -331,16 +349,17 @@ public class AdaptiveEngine  {
 		runResponseAdapters(conHandle);
 		final ModifiableHttpResponseImpl response = conHandle.response;
 		final byte[] modifiedContent = conHandle.response.getData();
-		proxy.getTaskRunner().runMainTask(new Runnable() {
+		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {
-				log.trace("Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 				handler.sendResponse(response.getProxyResponseHeaders().getBackedHeader(),modifiedContent);
 			}
 		});
 	}
 	
 	private void runResponseAdapters(ConnectionHandle conHandle) {
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | Running response adapters");
 		ResponseServiceHandleImpl serviceHandle = conHandle.response.getServiceHandle();
 		serviceHandle.doServiceDiscovery();
 		boolean again = false;
@@ -361,95 +380,215 @@ public class AdaptiveEngine  {
 						}
 						break;
 					}
-				} catch (Exception e) {
-					log.debug("Exception thrown while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",e);
+				} catch (Throwable t) {
+					log.info("RP: "+conHandle+" | Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
 				}
 			}
 		} while (again);
 		conHandle.response.getServiceHandle().doChanges();
 	}
 	
-	public void newProxyResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
-		newResponse(con, header);
-		processResponse(con, proceedTask);
+	private void proceedWithResponse(final ConnectionHandle conHandle, final Runnable proceedTask) {
+		proxy.getNioHandler().runThreadTask(new Runnable() {
+			@Override
+			public void run() {
+				if (log.isTraceEnabled()) {
+					log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in processing response");
+				}
+				proceedTask.run();
+			}
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseAdvancing", responseSendingTaskInfo(conHandle)));
+	}
+
+	
+	private void sendResponse(final ConnectionHandle conHandle, boolean processResponse) {
+		if (processResponse) {
+			runResponseAdapters(conHandle);
+		} else {
+			conHandle.response.getServiceHandle().doChanges();
+		}
+		if (log.isTraceEnabled())
+			log.trace("RQ: "+conHandle+" | Sending response");
+		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
+		BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(new byte[4096]));
+		Connection con = conHandle.con;
+		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
+		HttpHeader requestHeaders = conHandle.request.getProxyRequestHeaders().getBackedHeader();
+		final HttpHeader responseHeaders = conHandle.response.getProxyResponseHeaders().getBackedHeader();
+		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
+		handlerFactory.nextInstanceWillNotCache();
+		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, bufHandle, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
+		proceedWithResponse(conHandle, new Runnable() {
+			@Override
+			public void run() {
+				sendingHandler.sendResponse(responseHeaders, conHandle.response.getData());
+			}
+		});
 	}
 	
+	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
+		return "Running plugins processing on request \""
+			+ conHandle.request.getClientRequestHeaders().getRequestLine()
+			+ "\" from " + conHandle.request.getClientSocketAddress();
+	}
+
+	private String responseProcessingTaskInfo (ConnectionHandle conHandle) {
+		return "Running plugins processing on response \""
+			+ conHandle.response.getWebResponseHeaders().getStatusLine()
+			+ "\" for request \"" + conHandle.request.getProxyRequestHeaders().getRequestLine()
+			+ "\" from " + conHandle.request.getClientSocketAddress();
+	}
+
+	private String requestSendingTaskInfo(ConnectionHandle conHandle) {
+		return "Proceeding in handling request \""
+			+ conHandle.request.getProxyRequestHeaders().getRequestLine()
+			+ "\" (orig: \""+ conHandle.request.getClientRequestHeaders().getRequestLine()
+			+ "\") from " + conHandle.request.getClientSocketAddress();
+	}
+
+	private String responseSendingTaskInfo (ConnectionHandle conHandle) {
+		return "Proceeding in handling response \""
+			+ conHandle.response.getProxyResponseHeaders().getStatusLine()
+			+ "\" (orig: \""+ conHandle.response.getWebResponseHeaders().getStatusLine()
+			+ "\") for request \"" + conHandle.request.getProxyRequestHeaders().getRequestLine()
+			+ "\" from " + conHandle.request.getClientSocketAddress();
+	}
+
+	public HttpProxy getProxy() {
+		return proxy;
+	}
+
 	public PluginHandler getPluginHandler() {
 		return pluginHandler;
 	}
-	
+
 	public EventsHandler getEventsHandler() {
 		return loggingHandler;
 	}
-	
+
 	public void setup(SProperties prop) {
-		String pluginsHomeProp = prop.getProperty("pluginsHome","plugins");
-		File pluginsHomeDir = new File(new File(System.getProperty("user.dir")),pluginsHomeProp);
-		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
-			log.warn("pluginsHome property does not point to readable directory");
+		if (prop == null)
+			prop = new SProperties();
+		String log4jConfFile = prop.getProperty("logging_conf");
+		File loggingConfFile = null;
+		if (log4jConfFile != null) {
+			loggingConfFile = new File(homeDir,log4jConfFile); 
+			if (!loggingConfFile.canRead())
+				log4jConfFile = null;
+		}
+		if (loggingConfFile != null) {
+			try {
+				DOMConfigurator.configure(loggingConfFile.toURI().toURL());
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+			}
 		} else {
-			String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering.xml");
-			pluginsOrderFile = new File(pluginsHomeDir,pluginsOrderFileName);
+			String loggingLvL = prop.getProperty("logging_level");
+			if (loggingLvL == null)
+				loggingLvL = System.getProperty("sk.fiit.adaptiveproxy.logging_level", "INFO").trim();
+			Level lvl = Level.toLevel(loggingLvL);
+			Logger.getRootLogger().setLevel(lvl);
+			Logger.getLogger("org.apache").setLevel(Level.WARN);
+			log.setLevel(lvl);
+			BasicConfigurator.configure();
+			log.info("No Log4j configuration file specified, using default configuration");
+		}
+		String pluginsHomeProp = prop.getProperty("pluginsHome");
+		boolean homeDirConfigPresent = pluginsHomeProp != null;
+		if (pluginsHomeProp == null) pluginsHomeProp = "plugins"; 
+		File pluginsHomeDir = new File(homeDir,pluginsHomeProp);
+		String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering");
+		pluginsOrderFile = new File(pluginsHomeDir,pluginsOrderFileName);
+		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
+			log.info("Unable to find or access "+((!homeDirConfigPresent)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
+		} else {
+			File sharedLibDir = null;
+			String sharedLibDirName = prop.getProperty("shared_libs_folder","shared_libs");
+			if (!sharedLibDirName.trim().isEmpty())
+				sharedLibDir = new File(pluginsHomeDir,sharedLibDirName);
 			Set<String> excludeFiles = new HashSet<String>();
 			excludeFiles.add(pluginsOrderFileName);
-			pluginHandler.setPluginRepository(pluginsHomeDir,excludeFiles);
+			pluginHandler.setPluginRepository(pluginsHomeDir,sharedLibDir,excludeFiles);
 		}
 		reloadPlugins();
+		log.info("AdaptiveProxy set up and ready for action");
 	}
 	
 	public void reloadPlugins() {
+		log.info("Reloading plugins");
 		pluginHandler.reloadPlugins();
 		loggingHandler.setup();
+		log.info("Loading request service plugins");
 		RequestServiceHandleImpl.initPlugins(pluginHandler);
+		log.info("Loading response service plugins");
 		ResponseServiceHandleImpl.initPlugins(pluginHandler);
 		requestPlugins.clear();
 		responsePlugins.clear();
+		log.info("Loading request processing plugins");
 		Set<RequestProcessingPlugin> requestPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
+		log.info("Loading response processing plugins");
 		Set<ResponseProcessingPlugin> responsePluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
 		boolean pluginsOrderingSuccess;
 		if (pluginsOrderFile != null && pluginsOrderFile.canRead()) {
-			pluginsOrderingSuccess = loadProcessingPlugins(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
+			pluginsOrderingSuccess = addProcessingPluginsInOrder(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
 		} else {
-			log.warn("Unable to find or read plugins ordering file "+pluginsOrderFile.getAbsolutePath());
+			log.info("Unable to find or read plugins ordering file "+pluginsOrderFile.getAbsolutePath());
 			pluginsOrderingSuccess = false;
 		}
 		if (!pluginsOrderingSuccess) {
-			log.warn("Loading of configuration of plugin ordering failed for some reason. "+
+			log.info("Loading of configuration of plugin ordering failed for some reason. "+
 					"Processing plugins will not be called in some desired fashion");
 		}
 		requestPlugins.addAll(requestPluginsSet);
 		responsePlugins.addAll(responsePluginsSet);
 	}
 	
-	private boolean loadProcessingPlugins(File pluginsOrderFile, Set<RequestProcessingPlugin> requestPluginsSet,
+	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, Set<RequestProcessingPlugin> requestPluginsSet,
 			Set<ResponseProcessingPlugin> responsePluginsSet) {
-		Document pluginsOrderDoc = XMLFileParser.parseFile(pluginsOrderFile);
-		if (pluginsOrderDoc != null) {
-			Element docRoot = pluginsOrderDoc.getDocumentElement();
-			Element requestPluginsElement = (Element)docRoot.getElementsByTagName("request").item(0);
-			loadPluginsOrder(requestPluginsElement, this.requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
-			Element responsePluginsElement = (Element)docRoot.getElementsByTagName("response").item(0);
-			loadPluginsOrder(responsePluginsElement, this.responsePlugins, responsePluginsSet, ResponseProcessingPlugin.class);
-			return true;
-			
-		} else {
-			log.warn("Corrupted plugins ordering file "+pluginsOrderFile.getAbsolutePath());
-			return false;
+		Scanner sc = null;
+		try {
+			sc = new Scanner(new FileInputStream(pluginsOrderFile), "UTF-8");
+		} catch (FileNotFoundException e) {
+			log.info("Unable to locate plugins ordering file at "+pluginsOrderFile.getPath());
 		}
-	}
-	
-	private <T extends ProxyPlugin> void loadPluginsOrder(Element pluginsElement, List<T> pluginsList,
-			Set<T> pluginsSet, Class<T> pluginsClass) {
-		NodeList plugins = pluginsElement.getElementsByTagName("plugin");
-		for (int i = 0; i < plugins.getLength(); i++) {
-			Element pluginElement = (Element)plugins.item(i);
-			String pluginName = pluginElement.getTextContent();
-			T plugin = pluginHandler.getPlugin(pluginName, pluginsClass);
-			if (plugin != null) {
-				pluginsList.add(plugin);
-				pluginsSet.remove(plugin);
+		if (sc == null)
+			return false;
+		boolean wasRequestMark = false;
+		boolean wasResponseMark = false;
+		while (sc.hasNextLine()) {
+			String line = sc.nextLine().trim();
+			if (line.startsWith("#") || line.isEmpty())
+				continue;
+			if (!wasRequestMark && ORDERING_REQUEST_TEXT.equals(line)) {
+				wasRequestMark = true;
+				continue;
+			}
+			if (!wasResponseMark && ORDERING_RESPONSE_TEXT.equals(line)) {
+				wasResponseMark = true;
+				continue;
+			}
+			if (wasRequestMark) {
+				boolean sucess = false;
+				if (wasResponseMark)
+					sucess = loadPlugin(line, responsePlugins, responsePluginsSet, ResponseProcessingPlugin.class);
+				else
+					sucess = loadPlugin(line, requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
+				if (!sucess)
+					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order, because such plugin is not present");
 			}
 		}
+		return true;
+	}
+	
+	private <T extends ProxyPlugin> boolean loadPlugin(String pluginName, List<T> pluginsList,
+		Set<T> pluginsSet, Class<T> pluginsClass) {
+		T plugin = pluginHandler.getPlugin(pluginName, pluginsClass);
+		if (plugin == null)
+			return false;
+		pluginsList.add(plugin);
+		pluginsSet.remove(plugin);
+		return true;
 	}
 	
 	public List<RequestProcessingPlugin> getLoadedRequestPlugins() {

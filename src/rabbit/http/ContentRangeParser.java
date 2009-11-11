@@ -1,7 +1,8 @@
 package rabbit.http;
 
 import java.util.StringTokenizer;
-import rabbit.util.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** A class that parses content range headers.
  * 
@@ -13,11 +14,13 @@ public class ContentRangeParser {
     private long total;
     private boolean valid = false;
 
+    private final Logger logger = 
+	Logger.getLogger (getClass ().getName ());
+
     /** Try to parse the given content range.
      * @param cr the Content-Range header.
-     * @param logger the logger to use for warnings.
      */
-    public ContentRangeParser (String cr, Logger logger) {
+    public ContentRangeParser (String cr) {
 	if (cr != null) {
 	    if (cr.startsWith ("bytes "))
 		cr = cr.substring (6);
@@ -33,8 +36,10 @@ public class ContentRangeParser {
 			total = Long.parseLong (length);
 		    valid = true;
 		} catch (NumberFormatException e) {
-		    logger.logWarn ("bad content range: " + e + 
-				    " for string: '" + cr + "'");
+		    logger.log (Level.WARNING, 
+				"bad content range: " + e + 
+				" for string: '" + cr + "'", 
+				e);
 		}
 	    }
 	}

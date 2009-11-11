@@ -13,7 +13,6 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.zip.GZipPackListener;
 import rabbit.zip.GZipPacker;
@@ -29,7 +28,7 @@ public class GZipHandler extends BaseHandler {
     private boolean compressedDataFinished = false;
     private GZipPacker packer = null;
     private GZipPackListener pl = null;
-
+    
     private static final NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
 
     /** For creating the factory.
@@ -82,14 +81,19 @@ public class GZipHandler extends BaseHandler {
     	 * Accept-Encoding: compress;q=0.5, gzip;q=1.0
     	 * Accept-Encoding: gzip;q=1.0, identity; q=0.5, *;q=0
     	 */
-    	boolean rejectOther = false;
+    	boolean undirectAccept = false;
     	Iterator<String> iter = con.getClientRHeader().getHeaders("Accept-Encoding").iterator();
     	if (!iter.hasNext()) {
     		/* RFC 2616:
     		 * "If no Accept-Encoding field is present in a request, the server MAY
     		 * assume that the client will accept any content coding."
     		 */
-			return true;
+			//return true;
+    		
+    		/* FireFox corrupts responses when it's Accept-Encoding config value is cleared
+    		 * and it does not include any Accept-Encoding field in request
+    		 */
+    		return false;
 		}
     	while(iter.hasNext()) {
     		String prefs = iter.next();
@@ -98,10 +102,10 @@ public class GZipHandler extends BaseHandler {
     			return gzipAccept.booleanValue();
     		Boolean otherAccept = isEncAccepted(prefs, "*");
     		if (otherAccept != null) {
-    			rejectOther = !otherAccept;
+    			undirectAccept = !otherAccept;
     		}
     	}
-    	return !rejectOther;
+    	return undirectAccept;
     }
     
     private Boolean isEncAccepted(String prefs, String enc) {
@@ -123,14 +127,14 @@ public class GZipHandler extends BaseHandler {
 	    		following = following.substring(0, end);
 	    		try {
 	    			return nf.parse(following).doubleValue() > 0;
-				} catch (ParseException ignorede) {}
+				} catch (ParseException ignored) {}
 			}
     	}
     	return null;
     }
     
     protected boolean willCompress () {
-	String ce = request.getHeader ("Content-Encoding");
+	String ce = response.getHeader ("Content-Encoding");
 	if (ce == null)
 	    return true;
 	ce = ce.toLowerCase ();
@@ -250,7 +254,7 @@ public class GZipHandler extends BaseHandler {
     }
     
     protected void waitForData () {
-	con.getProxy ().runMainTask (new MainBlockListener ());
+	requestMoreData();
     }
     
     /** Write the current block of data to the gzipper.
@@ -321,7 +325,8 @@ public class GZipHandler extends BaseHandler {
     }
 
     @Override 
-    public void setup (Logger logger, SProperties prop) {
+    public void setup (SProperties prop) {
+	super.setup (prop);
 	if (prop != null) {
 	    String comp = prop.getProperty ("compress", "true");
 	    if (comp.equalsIgnoreCase ("false"))

@@ -2,12 +2,11 @@ package rabbit.proxy;
 
 import java.util.Date;
 import java.util.List;
-
+import java.util.logging.Logger;
 import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
-import rabbit.util.Logger;
 
 /** A class used to check for conditional requests. 
  *
@@ -15,12 +14,6 @@ import rabbit.util.Logger;
  */
 class ConditionalChecker {
     
-    private Logger logger;
-
-    public ConditionalChecker (Logger logger) {
-	this.logger = logger;
-    }
-
     boolean checkConditional (Connection con, HttpHeader header, 
 			      RequestHandler rh, 
 			      boolean mustRevalidate) {
@@ -97,8 +90,9 @@ class ConditionalChecker {
 		if (ad > l)
 		    return true;
 	    } catch (NumberFormatException e) {
-		logger.logWarn ("Bad number for max-age: '" + 
-				cached.substring (8) + "'");		    
+		Logger log = Logger.getLogger (getClass ().getName ());
+		log.warning ("Bad number for max-age: '" + 
+			     cached.substring (8) + "'");		    
 	    }
 	}
 	return false;

@@ -2,14 +2,11 @@ package rabbit.util;
 
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
-import org.apache.log4j.Logger;
 import rabbit.http.HttpHeader;
 
 public abstract class CharsetDetector {
-	private static final Logger log = Logger.getLogger(CharsetDetector.class);
-	private static final String defaultCharset = "ISO-8859-1";
 	
-	public static final String detectCharsetString(HttpHeader headers) {
+	public static String detectCharsetString(HttpHeader headers) {
 		String cs = null;
 		String ct = headers.getHeader("Content-Type");
 		if (ct != null) {
@@ -30,18 +27,10 @@ public abstract class CharsetDetector {
 		return cs;
 	}
 	
-	public static final Charset detectCharset(HttpHeader headers) {
+	public static Charset detectCharset(HttpHeader headers) throws UnsupportedCharsetException {
 		String cs = detectCharsetString(headers);
 		if (cs == null)
-			cs = defaultCharset;
-		Charset charSet = null;
-	    try {
-			charSet = Charset.forName(cs);
-			log.trace("charset detected for string: "+cs);
-		    } catch (UnsupportedCharsetException e) {
-		    	log.error("Bad CharSet: " + cs);
-			charSet = Charset.forName(defaultCharset);
-	    }
-		return charSet;
+			return null;
+		return Charset.forName(cs);
 	}
 }

@@ -4,38 +4,40 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
+import rabbit.nio.NioHandler;
+import rabbit.nio.ReadHandler;
 import rabbit.util.Counter;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
-/** A class to handle the connections to the net. 
+/** A class to handle the connections to the net.
  *  Tries to reuse connections whenever possible.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class ConnectionHandler {
     // The logger to use
-    private Logger logger;
-    
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+
     // The counter to use.
-    private Counter counter;
-    
+    private final Counter counter;
+
     // The resolver to use
-    private Resolver resolver;
+    private final Resolver resolver;
 
     // The available connections.
-    private Map<Address, List<WebConnection>> activeConnections;
+    private final Map<Address, List<WebConnection>> activeConnections;
 
     // The channels waiting for closing
-    private Map<WebConnection, CloseListener> wc2closer;
+    private final Map<WebConnection, CloseListener> wc2closer;
 
     // the keepalivetime.
     private long keepaliveTime = 1000;
@@ -43,18 +45,20 @@ public class ConnectionHandler {
     // should we use pipelining...
     private boolean usePipelining = true;
 
-    // the selector for keepalive connections...
-    private Selector selector = null;
+    // the nio handler
+    private final NioHandler nioHandler;
 
-    public ConnectionHandler (Logger logger, Counter counter, 
-			      Resolver resolver, Selector selector) {
-	this.logger = logger;
+    // the socket binder
+    private SocketBinder socketBinder = new DefaultBinder ();
+
+    public ConnectionHandler (Counter counter, Resolver resolver,
+			      NioHandler nioHandler) {
 	this.counter = counter;
 	this.resolver = resolver;
-	this.selector = selector;
+	this.nioHandler = nioHandler;
 
 	activeConnections = new HashMap<Address, List<WebConnection>> ();
-	wc2closer = new HashMap<WebConnection, CloseListener> ();
+	wc2closer = new ConcurrentHashMap<WebConnection, CloseListener> ();
     }
 
     /** Set the keep alive time for this handler.
@@ -63,7 +67,7 @@ public class ConnectionHandler {
     public void setKeepaliveTime (long milis) {
 	keepaliveTime = milis;
     }
-    
+
     /** Get the current keep alive time.
      * @return the keep alive time in miliseconds.
      */
@@ -79,8 +83,8 @@ public class ConnectionHandler {
      * @param header the HttpHeader containing the URL to connect to.
      * @param wcl the Listener that wants the connection.
      */
-    public void getConnection (final HttpHeader header, 
-			       final WebConnectionListener wcl) {	
+    public void getConnection (final HttpHeader header,
+			       final WebConnectionListener wcl) {
 	// TODO: should we use the Host: header if its available? probably...
 	String requri = header.getRequestURI ();
 	URL url = null;
@@ -92,7 +96,7 @@ public class ConnectionHandler {
 	}
 	int port = url.getPort () > 0 ? url.getPort () : 80;
 	final int rport = resolver.getConnectPort (port);
-	
+
 	resolver.getInetAddress (url, new InetAddressListener () {
 		public void lookupDone (InetAddress ia) {
 		    Address a = new Address (ia, rport);
@@ -101,76 +105,75 @@ public class ConnectionHandler {
 
 		public void unknownHost (Exception e) {
 		    wcl.failed (e);
-		}		
+		}
 	    });
     }
-    
-    private void getConnection (HttpHeader header, 
-				WebConnectionListener wcl, 
+
+    private SocketBinder getSocketBinder () {
+	return socketBinder;
+    }
+
+    private void getConnection (HttpHeader header,
+				WebConnectionListener wcl,
 				Address a) {
 	WebConnection wc = null;
 	counter.inc ("WebConnections used");
 	String method = header.getMethod ();
-	
+
 	if (method != null) {
-	    // since we should not retry POST (and other) we 
+	    // since we should not retry POST (and other) we
 	    // have to get a fresh connection for them..
 	    method = method.trim ();
 	    if (!(method.equals ("GET") || method.equals ("HEAD"))) {
-		wc = new WebConnection (a, counter, logger);
-	    } else {	
+		wc = new WebConnection (a, getSocketBinder (), counter);
+	    } else {
 		wc = getPooledConnection (a, activeConnections);
 		if (wc == null)
-		    wc = new WebConnection (a, counter, logger);
+		    wc = new WebConnection (a, getSocketBinder (), counter);
 	    }
 	    try {
-		wc.connect (selector, wcl);
+		wc.connect (nioHandler, wcl);
 	    } catch (IOException e) {
 		wcl.failed (e);
 	    }
 	} else {
-	    wcl.failed (new IllegalArgumentException ("No method specified: " +
-						      header));
+	    String err = "No method specified: " + header;
+	    wcl.failed (new IllegalArgumentException (err));
 	}
     }
-    
-    private WebConnection 
+
+    private WebConnection
     getPooledConnection (Address a, Map<Address, List<WebConnection>> conns) {
 	synchronized (conns) {
 	    List<WebConnection> pool = conns.get (a);
 	    if (pool != null) {
-		synchronized (pool) {
-		    if (pool.size () > 0) 
-			return unregister (pool.remove (pool.size () - 1));
+		if (pool.size () > 0) {
+		    WebConnection wc = pool.remove (pool.size () - 1);
+		    if (pool.isEmpty ())
+			conns.remove (a);
+		    return unregister (wc);
 		}
 	    }
 	}
 	return null;
     }
 
-    private WebConnection
-    unregister (WebConnection wc) {
-	SelectionKey sk = wc.getChannel ().keyFor (selector);	
-	String r = "ConnectionHandler un-pooled connection";
-	SocketHandler closer;
-	synchronized (wc2closer) {
-	    closer = wc2closer.remove (wc);
-	}
-	if (closer != null)	   
-	    SelectorRegistrator.unregister (selector, sk, closer, r);
+    private WebConnection unregister (WebConnection wc) {
+	CloseListener closer = null;
+	closer = wc2closer.remove (wc);
+	if (closer != null)
+	    nioHandler.cancel (wc.getChannel (), closer);
 	return wc;
     }
-    
-    private void removeFromPool (WebConnection wc, 
+
+    private void removeFromPool (WebConnection wc,
 				 Map<Address, List<WebConnection>> conns) {
 	synchronized (conns) {
 	    List<WebConnection> pool = conns.get (wc.getAddress ());
 	    if (pool != null) {
-		synchronized (pool) {
-		    pool.remove (wc);
-		    if (pool.size () == 0)
-			conns.remove (wc.getAddress ());
-		}
+		pool.remove (wc);
+		if (pool.isEmpty ())
+		    conns.remove (wc.getAddress ());
 	    }
 	}
     }
@@ -183,7 +186,7 @@ public class ConnectionHandler {
 	if (!wc.getChannel ().isOpen ()) {
 	    return;
 	}
-	
+
 	Address a = wc.getAddress ();
 	if (!wc.getKeepalive ()) {
 	    closeWebConnection (wc);
@@ -194,24 +197,29 @@ public class ConnectionHandler {
 	    wc.setReleased ();
 	}
 	synchronized (activeConnections) {
-	    List<WebConnection> pool = 
-		activeConnections.get (a);
+	    List<WebConnection> pool = activeConnections.get (a);
 	    if (pool == null) {
 		pool = new ArrayList<WebConnection> ();
 		activeConnections.put (a, pool);
+	    } else {
+		if (pool.contains (wc)) {
+		    String err =
+			"web connection already added to pool: " + wc;
+		    throw new IllegalStateException (err);
+		}
 	    }
 	    try {
-		CloseListener cl = new CloseListener (wc);
-		synchronized (wc2closer) {
-		    wc2closer.put (wc, cl);
-		}
 		pool.add (wc);
+		CloseListener cl = new CloseListener (wc);
+		wc2closer.put (wc, cl);
+		cl.register ();
 	    } catch (IOException e) {
-		logger.logWarn ("Get IOException when setting up a " + 
-				"CloseListener: " + e);
+		logger.log (Level.WARNING,
+			    "Get IOException when setting up a CloseListener: ",
+			    e);
 		closeWebConnection (wc);
 	    }
-	}	
+	}
     }
 
     private void closeWebConnection (WebConnection wc) {
@@ -222,41 +230,48 @@ public class ConnectionHandler {
 	try {
 	    wc.close ();
 	} catch (IOException e) {
-	    logger.logWarn ("Failed to close WebConnection: " + wc);
+	    logger.warning ("Failed to close WebConnection: " + wc);
 	}
     }
-    
-    private class CloseListener implements SocketHandler {
+
+    private class CloseListener implements ReadHandler {
 	private WebConnection wc;
-	private SelectionKey sk;
+	private Long timeout;
 
 	public CloseListener (WebConnection wc) throws IOException {
 	    this.wc = wc;
-	    sk = SelectorRegistrator.register (logger, 
-					       wc.getChannel (), selector, 
-					       SelectionKey.OP_READ, this);
 	}
 
-	public void run () {
+	public void register () {
+	    timeout = nioHandler.getDefaultTimeout ();
+	    nioHandler.waitForRead (wc.getChannel (), this);
+	}
+
+	public void read () {
 	    closeChannel ();
 	}
-	
+
+	public void closed () {
+	    closeChannel ();
+	}
+
 	public void timeout () {
 	    closeChannel ();
 	}
 
+	public Long getTimeout () {
+	    return timeout;
+	}
+
 	private void closeChannel () {
 	    try {
-		sk.cancel ();
-		synchronized (wc2closer) {
-		    wc2closer.remove (wc);
-		}
+		wc2closer.remove (wc);
 		removeFromPool (wc, activeConnections);
 		wc.close ();
 	    } catch (IOException e) {
-		String err = 
+		String err =
 		    "CloseListener: Failed to close web connection: " + e;
-		logger.logWarn (err);
+		logger.warning (err);
 	    }
 	}
 
@@ -265,7 +280,13 @@ public class ConnectionHandler {
 	}
 
 	public String getDescription () {
-	    return "ConnectionHandler$CloseListener: address: " + wc.getAddress ();
+	    return "ConnectionHandler$CloseListener: address: " +
+		wc.getAddress ();
+	}
+
+	@Override public String toString () {
+	    return getClass ().getSimpleName () + "{wc: " + wc + "}@" +
+		Integer.toString (hashCode (), 16);
 	}
     }
 
@@ -276,26 +297,41 @@ public class ConnectionHandler {
 	if (!usePipelining)
 	    return;
 	synchronized (wc) {
-	    if (!wc.getKeepalive ())
-		return;
-	    wc.setMayPipeline (true);
+	    if (wc.getKeepalive ())
+		wc.setMayPipeline (true);
 	}
     }
-    
-    public void setup (Logger logger, SProperties config) {
+
+    public void setup (SProperties config) {
 	if (config == null)
 	    return;
-	String kat = config.getProperty ("keepalivetime", "1000"); 
+	String kat = config.getProperty ("keepalivetime", "1000");
 	try {
-	    setKeepaliveTime (Long.parseLong (kat)); 
-	} catch (NumberFormatException e) { 
-	    String err = 
+	    setKeepaliveTime (Long.parseLong (kat));
+	} catch (NumberFormatException e) {
+	    String err =
 		"Bad number for ConnectionHandler keepalivetime: '" + kat + "'";
-	    logger.logWarn (err);
+	    logger.warning (err);
 	}
 	String up = config.get ("usepipelining");
 	if (up == null)
 	    up = "true";
 	usePipelining = up.equalsIgnoreCase ("true");
+
+	String bindIP = config.getProperty ("bind_ip");
+	if (bindIP != null) {
+	    try {
+		InetAddress ia = InetAddress.getByName (bindIP);
+		if (ia != null) {
+		    logger.info ("Will bind to: " + ia + 
+				 " for outgoing traffic");
+		    socketBinder = new BoundBinder (ia);
+		}
+	    } catch (IOException e) {
+		logger.log (Level.SEVERE, 
+			    "Failed to find inet address for: " + bindIP,
+			    e);
+	    }
+	}
     }
 }

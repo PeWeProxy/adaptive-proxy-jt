@@ -2,15 +2,12 @@ package rabbit.httpio;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.WritableByteChannel;
 import rabbit.io.BufferHandle;
 import rabbit.io.ConnectionHandler;
-import rabbit.io.SelectorRegistrator;
-import rabbit.io.SocketHandler;
 import rabbit.io.WebConnection;
-import rabbit.util.Logger;
+import rabbit.nio.NioHandler;
+import rabbit.nio.ReadHandler;
 import rabbit.util.TrafficLogger;
 
 /** A resource source that gets the data from a WebConnection
@@ -18,12 +15,11 @@ import rabbit.util.TrafficLogger;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class WebConnectionResourceSource 
-    implements ResourceSource, SocketHandler, ChunkDataFeeder {
+    implements ResourceSource, ReadHandler, ChunkDataFeeder {
     private final ConnectionHandler con;
-    private final Selector selector;
+    private final NioHandler nioHandler;
     private final WebConnection wc;
     private final BufferHandle bufHandle;
-    private final Logger logger;
     private final TrafficLogger tl;
     private BlockListener listener;
     private final boolean isChunked;
@@ -31,17 +27,18 @@ public class WebConnectionResourceSource
     private long totalRead = 0;    
     private int currentMark = 0;
     private ChunkHandler chunkHandler;
+    private Long timeout;
+    private int fullReads = 0;
     
     public WebConnectionResourceSource (ConnectionHandler con, 
-					Selector selector, WebConnection wc, 
-					BufferHandle bufHandle, Logger logger,
+					NioHandler nioHandler, WebConnection wc, 
+					BufferHandle bufHandle, 
 					TrafficLogger tl, boolean isChunked, 
 					long dataSize, boolean strictHttp) {
 	this.con = con;
-	this.selector = selector;
+	this.nioHandler = nioHandler;
 	this.wc = wc;
 	this.bufHandle = bufHandle;
-	this.logger = logger;
 	this.tl = tl;
 	this.isChunked = isChunked;
 	if (isChunked)
@@ -94,13 +91,8 @@ public class WebConnectionResourceSource
     }
 
     public void register () {
-	try {
-	    SelectorRegistrator.register (logger, wc.getChannel (), 
-					  selector, SelectionKey.OP_READ, 
-					  this);
-	} catch (IOException e) {
-	    listener.failed (e);
-	}
+	timeout = nioHandler.getDefaultTimeout ();
+	nioHandler.waitForRead (wc.getChannel (), this);
     }
 
     private void handleBlock () {
@@ -124,8 +116,11 @@ public class WebConnectionResourceSource
 	register ();
     }
 
-    public void run () {
-	ByteBuffer buffer = bufHandle.getBuffer ();
+    public void read () {
+	boolean useBig = fullReads > 4;
+	ByteBuffer buffer = 
+	    useBig ? bufHandle.getLargeBuffer () : bufHandle.getBuffer ();
+
 	buffer.position (currentMark); // keep our saved data.
 	int limit = buffer.capacity ();
 	if (dataSize > 0  && !isChunked) {
@@ -144,6 +139,8 @@ public class WebConnectionResourceSource
 		cleanupAndFinish ();
 	    } else {
 		tl.read (read);
+		if (read == buffer.capacity ())
+		    fullReads++;
 		buffer.flip ();
 		handleBlock ();
 	    }
@@ -156,8 +153,16 @@ public class WebConnectionResourceSource
 	return false;
     }
 
+    public void closed () {
+	listener.failed (new IOException ("channel closed"));
+    }
+
     public void timeout () {
 	listener.timeout ();
+    }
+
+    public Long getTimeout () {
+	return timeout;
     }
 
     public void release () {

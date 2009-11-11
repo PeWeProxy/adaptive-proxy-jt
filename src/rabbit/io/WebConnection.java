@@ -4,46 +4,51 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import rabbit.nio.ConnectHandler;
+import rabbit.nio.NioHandler;
 import rabbit.util.Counter;
-import rabbit.util.Logger;
 
 /** A class to handle a connection to the Internet.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class WebConnection implements Closeable {
-    private int id;
-    private Address address;
-    private Counter counter;
-    private Logger logger;
+    private final int id;
+    private final Address address;
+    private final SocketBinder binder;
+    private final Counter counter;
     private SocketChannel channel;
     private long releasedAt = -1;
     private boolean keepalive = true;
     private boolean mayPipeline = false;
-    
-    private static int idCounter;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+
+    private static AtomicInteger idCounter = new AtomicInteger (0);
 
     /** Create a new WebConnection to the given InetAddress and port.
      * @param address the computer to connect to.
      * @param counter the Counter to used to collect statistics
-     * @param logger the Logger to use.
      */
-    public WebConnection (Address address, Counter counter, Logger logger) {
-	this.id = idCounter++;
+    public WebConnection (Address address, SocketBinder binder, 
+			  Counter counter) {
+	this.id = idCounter.getAndIncrement ();
 	this.address = address;
+	this.binder = binder;
 	this.counter = counter;
-	this.logger = logger;
 	counter.inc ("WebConnections created");
     }
 
     @Override public String toString () {
-	return "WebConnection(id: " + id + 
-	    ", address: "  + address + 
-	    ", keepalive: " + keepalive + 
-	    ", releasedAt: " + releasedAt + ")";
+	int port = channel != null ? channel.socket ().getLocalPort () : -1;
+	return "WebConnection(id: " + id +
+	    ", address: "  + address +
+	    ", keepalive: " + keepalive +
+	    ", releasedAt: " + releasedAt + 
+	    ", local port: " + port + ")";
     }
 
     public Address getAddress () {
@@ -59,7 +64,7 @@ public class WebConnection implements Closeable {
 	channel.close ();
     }
 
-    public void connect (Selector selector, WebConnectionListener wcl) 
+    public void connect (NioHandler nioHandler, WebConnectionListener wcl)
 	throws IOException {
 	// if we are a keepalive connection then just say so..
 	if (channel != null && channel.isConnected ()) {
@@ -67,8 +72,10 @@ public class WebConnection implements Closeable {
 	} else {
 	    // ok, open the connection....
 	    channel = SocketChannel.open ();
+	    channel.socket ().bind (new InetSocketAddress (binder.getInetAddress (), 
+							   binder.getPort ()));
 	    channel.configureBlocking (false);
-	    SocketAddress addr = 
+	    SocketAddress addr =
 		new InetSocketAddress (address.getInetAddress (),
 				       address.getPort ());
 	    boolean connected = channel.connect (addr);
@@ -76,48 +83,78 @@ public class WebConnection implements Closeable {
 		channel.socket ().setTcpNoDelay (true);
 		wcl.connectionEstablished (this);
 	    } else {
-		new ConnectListener (wcl).waitForConnection (selector);
+		new ConnectListener (wcl).waitForConnection (nioHandler);
 	    }
 	}
     }
 
-    private class ConnectListener implements SocketHandler {
+    private class ConnectListener implements ConnectHandler {
+	private NioHandler nioHandler;
 	private WebConnectionListener wcl;
+	private Long timeout;
 
 	public ConnectListener (WebConnectionListener wcl) {
 	    this.wcl = wcl;
 	}
 
-	public void waitForConnection (Selector selector) throws IOException {
-	    SelectorRegistrator.register (logger, channel, selector, 
-					  SelectionKey.OP_CONNECT, this);
+	public void waitForConnection (NioHandler nioHandler) 
+	    throws IOException {
+	    this.nioHandler = nioHandler;
+	    timeout = nioHandler.getDefaultTimeout ();
+	    nioHandler.waitForConnect (channel, this);
 	}
-	
-	public void run () {
-	    try {
-		channel.finishConnect ();
-		channel.socket ().setTcpNoDelay (true);
-		wcl.connectionEstablished (WebConnection.this);
-	    } catch (IOException e) {
-		wcl.failed (e);
-	    }
+
+	public void closed () {
+	    wcl.failed (new IOException ("channel closed before connect"));
 	}
-	
+
 	public void timeout () {
+	    closeDown ();
 	    wcl.timeout ();
 	}
 
 	public boolean useSeparateThread () {
 	    return false;
 	}
-	
+
 	public String getDescription () {
 	    return "WebConnection$ConnectListener: address: " + address;
 	}
+
+	public Long getTimeout () {
+	    return timeout;
+	}
+
+	public void connect () {
+	    try {
+		channel.finishConnect ();
+		channel.socket ().setTcpNoDelay (true);
+		wcl.connectionEstablished (WebConnection.this);
+	    } catch (IOException e) {
+		closeDown ();
+		wcl.failed (e);
+	    }
+	}
+
+	private void closeDown () {
+	    try {
+		close ();
+		nioHandler.close (channel);
+	    } catch (IOException e) {
+		logger.log (Level.WARNING, 
+			    "Failed to close down WebConnection", 
+			    e);
+	    }
+	}
+
+	@Override public String toString () {
+	    return getClass ().getSimpleName () + "{" + address + "}@" +
+		Integer.toString (hashCode (), 16);
+	}
     }
-    
-    /** Set the keepalive value for this WebConnection, 
-     *  Can only be turned off. 
+
+    /** Set the keepalive value for this WebConnection,
+     *  Can only be turned off.
      * @param b the new keepalive value.
      */
     public void setKeepalive (boolean b) {

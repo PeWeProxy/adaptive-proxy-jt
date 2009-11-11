@@ -2,6 +2,8 @@ package rabbit.meta;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.BlockSender;
 import rabbit.httpio.BlockSentListener;
@@ -28,6 +30,7 @@ public abstract class BaseMetaHandler
     protected TrafficLogger tlProxy;
     protected TrafficLogger tlClient;
     private boolean first = true;
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
     
     private static enum Mode { SEND_HEADER, SEND_DATA, CLEANUP };
     private Mode mode = Mode.SEND_HEADER;
@@ -49,8 +52,10 @@ public abstract class BaseMetaHandler
 	byte[] b2 = response.toString ().getBytes ("ASCII");
 	ByteBuffer buffer = ByteBuffer.wrap (b2);
 	BufferHandle bh = new SimpleBufferHandle (buffer);
-	new BlockSender (con.getChannel (), con.getSelector (), 
-			 con.getLogger (), tlClient, bh, false, this);
+	BlockSender bs = 
+	    new BlockSender (con.getChannel (), con.getNioHandler (), 
+			     tlClient, bh, false, this);
+	bs.write ();
     }
 
     public void blockSent () {
@@ -80,8 +85,8 @@ public abstract class BaseMetaHandler
     protected void endChunking () throws IOException {
 	mode = Mode.CLEANUP;
 	ChunkEnder ce = new ChunkEnder ();
-	ce.sendChunkEnding (con.getChannel (), con.getSelector (), 
-			    con.getLogger (), tlClient, this);
+	ce.sendChunkEnding (con.getChannel (), con.getNioHandler (), 
+			    tlClient, this);
     }
 
     protected void buildAndSendData () throws IOException {
@@ -97,8 +102,10 @@ public abstract class BaseMetaHandler
 	byte[] b1 = sb.toString ().getBytes ("ASCII");
 	ByteBuffer data = ByteBuffer.wrap (b1);
 	BufferHandle bh = new SimpleBufferHandle (data);
-	new BlockSender (con.getChannel (), con.getSelector (), 
-			 con.getLogger (), tlClient, bh, true, this);
+	BlockSender bs = 
+	    new BlockSender (con.getChannel (), con.getNioHandler (), 
+			     tlClient, bh, true, this);
+	bs.write ();
     }
     
     /** Get the page header name
@@ -112,12 +119,12 @@ public abstract class BaseMetaHandler
     protected abstract PageCompletion addPageInformation (StringBuilder sb);
   
     public void failed (Exception e) {
-	con.getLogger ().logWarn ("Exception when handling meta: " + e);
+	logger.log (Level.WARNING, "Exception when handling meta", e);
 	con.logAndClose (null);
     }
     
     public void timeout () {
-	con.getLogger ().logWarn ("Timeout when handling meta.");
+	logger.warning ("Timeout when handling meta.");
 	con.logAndClose (null);	
     }
 }

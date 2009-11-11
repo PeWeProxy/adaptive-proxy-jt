@@ -2,9 +2,9 @@ package rabbit.proxy;
 
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
-import rabbit.util.Logger;
 
 /** A class that handles warning headers. 
  *
@@ -29,8 +29,7 @@ class WarningsHandler {
 	return start;
     }
 
-    public void removeWarnings (Logger logger, 
-				HttpHeader header, boolean remove1xx) {
+    public void removeWarnings (HttpHeader header, boolean remove1xx) {
 	String rdate = header.getHeader ("Date");
 	List<String> ws = header.getHeaders ("Warning");
 	int wl = ws.size ();
@@ -90,7 +89,8 @@ class WarningsHandler {
 		else 
 		    header.removeValue (val);
 	    } catch (StringIndexOutOfBoundsException e) {
-		logger.logWarn ("bad warning header: '" + val + "'");
+		Logger logger = Logger.getLogger (getClass ().getName ());
+		logger.warning ("bad warning header: '" + val + "'");
 	    }
 	}
     }

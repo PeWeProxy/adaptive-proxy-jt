@@ -59,22 +59,23 @@ public class AdaptiveHandler extends FilterHandler {
 		if (!askForCaching)
 			h.notCaching = false;
 		askForCaching = true;
+		if (log.isDebugEnabled())
+			log.debug(h+" is handling connection "+con);
 		return h;
 	}
 	
-	private void setHTMLprasing() {
+	private void setHTMLparsing() {
 		String ct = response.getHeader("Content-Type");
-		if (ct != null && ct.startsWith("text/html")) {
+		if (ct != null && ct.startsWith("text/html"))
 			doHTMLparsing = true;
-			log.trace("Setting to parse HTML");
-		} else
-			log.trace("Setting not to parse HTML");
+		if (log.isDebugEnabled())
+			log.debug(this+ " setting"+((doHTMLparsing)? "":" not")+" to parse HTML");
 	}
 	
 	@Override
 	public void handle() {
 		if (notCaching) {
-			setHTMLprasing();
+			setHTMLparsing();
 			super.handle();
 		} else 
 			// start receiving content data
@@ -108,17 +109,22 @@ public class AdaptiveHandler extends FilterHandler {
 		if (notCaching || sendingPhase)
 			super.finishData();
 		else {
-			if (log.isTraceEnabled())
-				log.trace("Cached data length = "+memStore.getBytes().length);
+			if (log.isDebugEnabled())
+				log.debug(this+" cached data length = "+memStore.getBytes().length);
 			con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes(), this);
 		}
 	}
 	
 	public void sendResponse(HttpHeader responseHeaders, byte[] content) {
+		if (sendingPhase) {
+			log.warn("sendResponse() method was called second time, closing down connection");
+			finish(false);
+			return;
+		}
 		response = responseHeaders;
 		if (content != null) {
-			if (log.isTraceEnabled())
-				log.trace("Sending response with data of length = "+content.length);
+			if (log.isDebugEnabled())
+				log.debug(this+" sending response with data of length = "+content.length);
 			/*if (con.getChunking() && size > 0) {
 					log.debug("Rozdiel je "+(content.length - memStore.getSize()));
 					size += content.length - memStore.getSize();
@@ -129,7 +135,8 @@ public class AdaptiveHandler extends FilterHandler {
 			buffer = ByteBuffer.wrap(content);
 			if (con.getChunking()) {
 				String contentEncoding = response.getHeader("Transfer-Encoding");
-				log.trace("contentEncoding: "+contentEncoding);
+				if (log.isDebugEnabled())
+					log.debug(this+" contentEncoding: "+contentEncoding);
 				if (contentEncoding == null)
 					contentEncoding = "";
 				if (!contentEncoding.endsWith("chunked"))
@@ -137,21 +144,21 @@ public class AdaptiveHandler extends FilterHandler {
 				response.setHeader("Transfer-Encoding", contentEncoding);
 			}
 		} else {
-			if (log.isTraceEnabled())
-				log.trace("Sending response with no data");
+			if (log.isDebugEnabled())
+				log.debug("Sending response with no data");
 			ContentHeadersRemover.removeContentHeaders(response);
 			isCompressing = false;
-			gzu = null;
 			if (this.content != null) {
 				this.content.release();
 				this.content = null;
 			}
 			emptyChunkSent = true;
 		}
+		gzu = null;
 		memStore = null;
 		sendingPhase = true;
 		ignoreDataRequest = false;
-		setHTMLprasing();
+		setHTMLparsing();
 		sendHeader();
 	}
 	
@@ -166,12 +173,13 @@ public class AdaptiveHandler extends FilterHandler {
 	@Override
 	protected void waitForData() {
 		if (notCaching || !sendingPhase) {
-			if (ignoreDataRequest)
+			if (ignoreDataRequest) {
 				// data already requested (by passing MainBlockListener to SelectorRunner)
 				// once in this data-processing cycle, so we ignore the request and clear
 				// the flag
+				log.debug("Ignoring waitForData() call because data was already requested");
 				ignoreDataRequest = false;
-			else
+			} else
 				super.waitForData();
 		} else {
 			if (buffer == null)
@@ -198,12 +206,19 @@ public class AdaptiveHandler extends FilterHandler {
 	protected void setupHandler() {
 		super.setupHandler();
 		if (askForCaching) {
-			if (super.willCompress())
+			if (isCompressing || (!compress && super.willCompress())) {
 				// [ignore the method name !]
 				// if this condition is true, this handler will have an access to
 				// not-compressed or uncompressed data passing through it
 				notCaching = !con.getProxy().getAdaptiveEngine().cacheResponse(con, response);
-			log.trace("Caching response data: "+!notCaching);
+				if (log.isDebugEnabled())
+					log.debug(this+" caching response data: "+!notCaching);
+			}
 		}
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
 }

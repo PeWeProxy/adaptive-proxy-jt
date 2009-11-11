@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.util.PatternHelper;
 
@@ -65,15 +64,13 @@ public class DontFilterFilter implements HttpFilter {
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger for errors/warnings.
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	PatternHelper ph = new PatternHelper ();
 	pattern = ph.getPattern (properties, "dontFilterURLmatching", 
-				 "DontFilterFilter: bad pattern: ", logger);
+				 "DontFilterFilter: bad pattern: ");
 	uap = ph.getPattern (properties, "dontFilterAgentsMatching", 
-			     "DontFilterFilter: bad user agent pattern: ", 
-			     logger);
+			     "DontFilterFilter: bad user agent pattern: ");
     }
 }

@@ -5,7 +5,6 @@ import rabbit.httpio.ResourceSource;
 import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 
 /** The methods needed to create a new Handler.
@@ -37,5 +36,5 @@ public interface HandlerFactory {
     
     /** setup the handler factory. 
      */
-    void setup (Logger logger, SProperties properties);
+    void setup (SProperties properties);
 }

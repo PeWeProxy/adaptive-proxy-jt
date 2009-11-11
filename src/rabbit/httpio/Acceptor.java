@@ -1,41 +1,35 @@
 package rabbit.httpio;
 
 import java.io.IOException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import rabbit.io.SelectorRegistrator;
-import rabbit.io.SocketHandler;
-import rabbit.util.Logger;
+import java.util.logging.Logger;
+import rabbit.io.Closer;
+import rabbit.nio.AcceptHandler;
+import rabbit.nio.NioHandler;
 
 /** A standard acceptor.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class Acceptor implements SocketHandler {
+public class Acceptor implements AcceptHandler {
     private ServerSocketChannel ssc;
-    private SelectorRunner selectorRunner;
-    private Logger logger;
+    private NioHandler nioHandler;
     private AcceptorListener listener;
 
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+
     public Acceptor (ServerSocketChannel ssc, 
-		     SelectorRunner selectorRunner,
-		     Logger logger,
+		     NioHandler nioHandler,
 		     AcceptorListener listener) {
 	this.ssc = ssc;
-	this.selectorRunner = selectorRunner;
-	this.logger = logger;
+	this.nioHandler = nioHandler;
 	this.listener = listener;
     }
-	
-    public String getDescription () {
-	return "Acceptor: ssc: " + ssc;
-    }
 
-    /** Acceptor runs in the selector thread.
-     */ 
-    public boolean useSeparateThread () {
-	return false;
+    public void closed () {
+	if (ssc.isOpen ())
+	    Closer.close (ssc, logger);
     }
 
     /** Handle timeout, since an acceptor should not get timeouts an 
@@ -44,14 +38,28 @@ public class Acceptor implements SocketHandler {
     public void timeout () {
 	throw new IllegalStateException ("Acceptor should not get timeout");
     }
+    
+    /** Acceptor runs in the selector thread.
+     */ 
+    public boolean useSeparateThread () {
+	return false;
+    }
+
+    public String getDescription () {
+	return "Acceptor: ssc: " + ssc;
+    }
+
+    public Long getTimeout () {
+	return null;
+    }
 
     /** Accept a SocketChannel.
      */ 
-    public void run () {
+    public void accept () {
 	try {
 	    SocketChannel sc = ssc.accept ();
 	    sc.configureBlocking (false);
-	    listener.connectionAccepted (sc, selectorRunner.getSelector ());
+	    listener.connectionAccepted (sc);
 	    register ();
 	} catch (IOException e) {
 	    throw new RuntimeException ("Got some IOException", e);
@@ -61,10 +69,6 @@ public class Acceptor implements SocketHandler {
     /** Register OP_ACCEPT with the selector. 
      */ 
     public void register () throws IOException {
-	SelectorRegistrator.register (logger, ssc, 
-				      selectorRunner.getSelector (),
-				      SelectionKey.OP_ACCEPT, 
-				      this, Long.MAX_VALUE);
-
+	nioHandler.waitForAccept (ssc, this);
     }
 }

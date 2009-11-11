@@ -60,7 +60,7 @@ public class MultiPartHandler extends BaseHandler {
 
     @Override 
     protected void send () {
-		requestMoreData();	
+	content.addBlockListener (this);	
     }
 
     /* A Typical case: 
@@ -97,9 +97,11 @@ public class MultiPartHandler extends BaseHandler {
 	try {
 	    ByteBuffer buf = bufHandle.getBuffer ();
 	    mpp.parseBuffer (buf);
-	    new BlockSender (con.getChannel (), con.getSelector (), 
-			     getLogger (), tlh.getClient (), 
-			     bufHandle, con.getChunking (), this);	
+	    BlockSender bs = 
+		new BlockSender (con.getChannel (), con.getNioHandler (),
+				 tlh.getClient (), bufHandle, 
+				 con.getChunking (), this);
+	    bs.write ();
 	} catch (IOException e) {
 	    failed (e);	    
 	}

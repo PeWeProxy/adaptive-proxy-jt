@@ -5,10 +5,13 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import rabbit.io.Closer;
 
 /** This is a class that handles users authentication using a simple text file.
  *
@@ -17,6 +20,8 @@ import java.util.Map;
 public class SimpleUserHandler {  // TODO: implements interface.
     private String userFile = null;
     private Map<String, String> users = new HashMap<String, String> ();
+    private final Logger logger = 
+	Logger.getLogger (getClass ().getName ());
 
     public SimpleUserHandler () {
     }
@@ -24,9 +29,8 @@ public class SimpleUserHandler {  // TODO: implements interface.
     /** Set the file to use for users, will read the files. 
      *  Will discard any previous loaded users.
      * @param userFile the filename to read the users from.
-     * @param logger the logger to write errors to.
      */
-    public void setFile (String userFile, Logger logger) {
+    public void setFile (String userFile) {
 	this.userFile = userFile;
 
 	FileReader fr = null;
@@ -34,17 +38,13 @@ public class SimpleUserHandler {  // TODO: implements interface.
 	    fr = new FileReader (userFile);
 	    users = loadUsers (fr);
 	} catch (FileNotFoundException e) {
-	    logger.logWarn ("could not load the users file: '" + userFile + "'. " + e);
+	    logger.log (Level.WARNING, 
+			"could not load the users file: '" + userFile, e);
 	} catch (IOException e) {
-	    logger.logWarn ("Error while loading the users file: '" + userFile + "'. " + e);	    
+	    logger.log (Level.WARNING, 
+			"Error while loading the users file: '" + userFile, e);
 	} finally {
-	    if (fr != null) {
-		try {
-		    fr.close ();
-		} catch (IOException e) {
-		    logger.logWarn ("Error when closing file: " + e);
-		}
-	    }
+	    Closer.close (fr, logger);
 	}
     }
 

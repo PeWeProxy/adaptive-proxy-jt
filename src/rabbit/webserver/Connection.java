@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.nio.channels.SocketChannel;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.http.HttpDateParser;
 import rabbit.httpio.FileResourceSource;
@@ -13,11 +15,12 @@ import rabbit.httpio.HttpHeaderReader;
 import rabbit.httpio.HttpHeaderSender;
 import rabbit.httpio.HttpHeaderSentListener;
 import rabbit.httpio.ResourceSource;
-import rabbit.httpio.SelectorRunner;
 import rabbit.httpio.TransferHandler;
 import rabbit.httpio.TransferListener;
 import rabbit.io.BufferHandle;
 import rabbit.io.CacheBufferHandle;
+import rabbit.nio.NioHandler;
+import rabbit.io.Closer;
 import rabbit.util.MimeTypeMapper;
 import rabbit.util.TrafficLogger;
 
@@ -32,6 +35,8 @@ public class Connection {
     private boolean timeToClose = false;
     private ResourceSource resourceSource = null;
 
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
+
     /** Create a new Connection for the given web server and socket channel. */
     public Connection (SimpleWebServer sws, SocketChannel sc) {
 	this.sws = sws;
@@ -44,19 +49,15 @@ public class Connection {
 	    clientBufferHandle = 
 		new CacheBufferHandle (sws.getBufferHandler ());
 	HttpHeaderListener requestListener = new RequestListener ();
-	new HttpHeaderReader (sc, clientBufferHandle, 
-			      sws.getSelectorRunner ().getSelector (),
-			      sws.getLogger (), 
-			      sws.getTrafficLogger (), true,
-			      true, requestListener);
+	HttpHeaderReader requestReader = 
+	    new HttpHeaderReader (sc, clientBufferHandle, sws.getNioHandler (),
+				  sws.getTrafficLogger (), true, true, 
+				  requestListener);
+	requestReader.readRequest ();
     }
 
     private void shutdown () {
-	try {
-	    sc.close ();
-	} catch (IOException e) {
-	    sws.getLogger ().logWarn ("Failed to close down connection: " + e);
-	}
+	Closer.close (sc, logger);
     }
 	
     private void handleRequest (HttpHeader header) {
@@ -89,9 +90,13 @@ public class Connection {
 				    HttpDateParser.getDateString (d));
 		    if ("HTTP/1.0".equals (header.getHTTPVersion ()))
 			resp.setHeader ("Connection", "Keep-Alive");
+
+		    if (logger.isLoggable (Level.FINEST))
+			logger.finest ("Connection; http response: " + resp);
+		    
 		    if ("GET".equals (method))
 			resourceSource = 
-			    new FileResourceSource (f, sws.getSelectorRunner (),
+			    new FileResourceSource (f, sws.getNioHandler (),
 						    sws.getBufferHandler ());
 		    sendResponse (resp);
 		} else {
@@ -139,10 +144,11 @@ public class Connection {
 	try {
 	    ResponseSentListener sentListener = 
 		new ResponseSentListener ();
-	    new HttpHeaderSender (sc, sws.getSelectorRunner ().getSelector (),
-				  sws.getLogger (), 
-				  sws.getTrafficLogger (), response, 
-				  false, sentListener);
+	    HttpHeaderSender sender = 
+		new HttpHeaderSender (sc, sws.getNioHandler (),
+				      sws.getTrafficLogger (), response, 
+				      false, sentListener);
+	    sender.sendHeader ();
 	} catch (IOException e) {
 	    shutdown ();
 	}
@@ -152,11 +158,10 @@ public class Connection {
 	TransferListener transferDoneListener = 
 	    new TransferDoneListener ();
 	TrafficLogger tl = sws.getTrafficLogger ();
-	SelectorRunner sr = sws.getSelectorRunner ();
+	NioHandler nh = sws.getNioHandler ();
 	TransferHandler th = 
-	    new TransferHandler (sr, resourceSource, sr.getSelector (), 
-				 sc, tl, tl, transferDoneListener, 
-				 sws.getLogger ());
+	    new TransferHandler (nh, resourceSource, sc, 
+				 tl, tl, transferDoneListener);
 	th.transfer ();
     }
 
@@ -193,9 +198,10 @@ public class Connection {
 	
     private class RequestListener extends AsyncBaseListener 
 	implements HttpHeaderListener {
-	public void httpHeaderRead (HttpHeader header, BufferHandle bh, 
+	public void httpHeaderRead (final HttpHeader header, BufferHandle bh, 
 				    boolean keepalive, boolean isChunked, 
 				    long dataSize) {
+	    System.out.println ("read a reaquest: " + header);
 	    bh.possiblyFlush ();
 	    if (isChunked || dataSize > 0)
 		notImplemented ();

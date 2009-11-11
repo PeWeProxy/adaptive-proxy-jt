@@ -7,7 +7,6 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 import rabbit.http.HttpHeader;
 import rabbit.http.ContentRangeParser;
-import rabbit.util.Logger;
 
 /** An updater that writes an updated range to a cache file.
  * 
@@ -17,12 +16,12 @@ public class PartialCacher {
     private ContentRangeParser crp;
     private FileWriter fw;
 
-    public PartialCacher (Logger logger, String fileName, HttpHeader response) 
+    public PartialCacher (String fileName, HttpHeader response) 
 	throws IOException {
 	//Content-Range: 0-4/25\r\n
 	String cr = response.getHeader ("Content-Range");
 	if (cr != null) 
-	    crp = new ContentRangeParser (cr, logger);
+	    crp = new ContentRangeParser (cr);
 	if (!crp.isValid ())
 	    throw new IllegalArgumentException ("bad range: " + cr);
 	RandomAccessFile raf = new RandomAccessFile (fileName, "rw");

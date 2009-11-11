@@ -7,12 +7,12 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.logging.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.util.Coder;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.util.SimpleUserHandler;
 
@@ -30,6 +30,7 @@ public class HttpBaseFilter implements HttpFilter {
     private final List<String> removes = new ArrayList<String> ();
     private boolean cookieId = false;
     private final SimpleUserHandler userHandler = new SimpleUserHandler ();
+    private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     /** We got a proxy authentication, handle it...
      * @param uap the authentication string.
@@ -242,9 +243,7 @@ public class HttpBaseFilter implements HttpFilter {
 	    BigInteger b3 = bi.subtract (ONE);
 	    header.setHeader ("Max-Forwards", b3.toString ());
 	} catch (NumberFormatException e) {
-	    HttpProxy proxy = con.getProxy ();
-	    proxy.getLogger ().logWarn ("Bad number for Max-Forwards: '" +
-					val + "'");
+	    logger.warning ("Bad number for Max-Forwards: '" + val + "'");
 	}
 	return null;
     }
@@ -473,14 +472,14 @@ public class HttpBaseFilter implements HttpFilter {
 	return null;
     }
 
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	removes.clear ();
 	String rs = properties.getProperty ("remove", "");
 	String[] sts = rs.split (",");
 	for (String r : sts)
 	    removes.add (r.trim ());
 	String userFile = properties.getProperty ("userfile", "conf/users");
-	userHandler.setFile (userFile, logger);
+	userHandler.setFile (userFile);
 	String cid = properties.getProperty ("cookieid", "false");
 	cookieId = cid.equals ("true");
     }

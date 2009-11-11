@@ -7,5 +7,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpRequest;
 public interface CloseEventPlugin extends ProxyPlugin {
 	void clientClosedConnection(InetSocketAddress clientSocket);
 	
-	void proxyClosedConnection(InetSocketAddress clientSocket, HttpRequest request);
+	void proxyClosedConnection(InetSocketAddress clientSocket);
+	
+	void proxyClosedConnection(HttpRequest request);
 }

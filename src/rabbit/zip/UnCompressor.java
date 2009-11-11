@@ -50,17 +50,22 @@ class UnCompressor implements GZipUnpackState {
 	    if (inf.finished () || inf.needsDictionary ()) {
 		GZipUnpackState tr = null;
 		int remaining = inf.getRemaining ();
+		boolean finished = false;
 		if (gzip) {
 		    long length = inf.getBytesWritten ();
 		    long cs = crc.getValue ();
 		    tr = new TrailReader (listener, length, cs);
 		} else {
 		    tr = new AfterEndState ();
+		    finished = true;
 		}
 		inf.end ();
 		unpacker.setState (tr);
 		if (remaining > 0)
 		    tr.handleBuffer (unpacker, buf, off + len - remaining, remaining);
+		// Added by Redeemer
+	    if (finished)
+	    	listener.finished();
 	    }
 	}
     }

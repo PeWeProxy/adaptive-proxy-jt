@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import rabbit.util.Logger;
 import rabbit.util.SProperties;
 import rabbit.util.PatternHelper;
 
@@ -106,22 +105,21 @@ public class DontCacheFilter implements HttpFilter {
     }
 
     /** Setup this class with the given properties.
-     * @param logger the Logger for errors/warnings
      * @param properties the new configuration of this class.
      */
-    public void setup (Logger logger, SProperties properties) {
+    public void setup (SProperties properties) {
 	PatternHelper ph = new PatternHelper ();
 	dontCacheUrls = 
 	    ph.getPattern (properties, "dontCacheURLmatching", 
-			   "DontCacheFilter bad url match: ", logger);
+			   "DontCacheFilter bad url match: ");
 	onlyCacheUrls = 
 	    ph.getPattern (properties, "onlyCacheURLmatching", 
-			   "DontCacheFilter bad url match: ", logger);
+			   "DontCacheFilter bad url match: ");
 	dontCacheMime = 
 	    ph.getPattern (properties, "dontCacheMimematching", 
-			   "DontCacheFilter bad mime match: ", logger);
+			   "DontCacheFilter bad mime match: ");
 	onlyCacheMime = 
 	    ph.getPattern (properties, "onlyCacheMimematching", 
-			   "DontCacheFilter bad mime match: ", logger);
+			   "DontCacheFilter bad mime match: ");
     }
 }
