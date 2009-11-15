@@ -184,7 +184,7 @@ public class PluginHandler {
 				cfgEntry.libsrariesURLSet.add(url);
 			}
 			if (!libsOK) {
-				// something went wrong with creating URLClassLoader for this library entry
+				// something went wrong with computing checksums for libraries
 				iterator.remove();
 				continue;
 			}
@@ -231,18 +231,23 @@ public class PluginHandler {
 				URL[] urls = new URL[] {classLocURL};
 				if (!cfgEntry.libsrariesURLSet.isEmpty()) {
 					URL[] libsURLs = cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]);
-					parentCLoader = createClassLoader(libsURLs, null, cfgEntry); 
-					parentCLoader = createClassLoader(urls, parentCLoader, cfgEntry); 
-				} else {
-					parentCLoader = createClassLoader(urls, null, cfgEntry);
+					// MAIN <- LIBS
+					parentCLoader = createClassLoader(libsURLs, null, cfgEntry);
 				}
 				if (sharedLibsURLs != null) {
-					cfgEntry.classLoader = parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, cfgEntry);
-				} else
-					cfgEntry.classLoader = parentCLoader;
+					// MAIN <- ?LIBS? <- SHD
+					parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, cfgEntry);
+				}
+				// MAIN <- ?LIBS? <- ?SHD? <- PLG
+				cfgEntry.classLoader = createClassLoader(urls, parentCLoader, cfgEntry);
 				cLoaders.put(classLocURL, cfgEntry.classLoader);
-				log.debug("Plugin '"+cfgEntry.name+"' may be (if such need occurs) loaded by new ClassLoader "+cfgEntry.classLoader+" with URLs set to "+Arrays.toString(urls)
-						+" with parent ClassLoader set to "+cfgEntry.classLoader.getParent());
+				if (log.isDebugEnabled()) {
+					String hierarchy = "";
+					for (ClassLoader cLoader = cfgEntry.classLoader; cLoader.getParent() != null; cLoader = cLoader.getParent()) {
+						hierarchy = cLoader+" <- "+hierarchy;
+					}
+					log.debug("Plugin's '"+cfgEntry.name+"' classloader hierarchy: "+hierarchy);
+				}
 			}
 		}
 	}
@@ -285,50 +290,53 @@ public class PluginHandler {
 	}
 	
 	private void createSharedLibsURLs(Map<URL, String> newLibChecksums) {
-		if (sharedLibsDir != null && sharedLibsDir.isDirectory() && sharedLibsDir.canRead()) {
-			URL sharedDirURL = null;
-			try {
-				sharedDirURL = sharedLibsDir.toURI().toURL();
-			} catch (MalformedURLException e) {
-				log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
-						+"' to URL, no shared libraries will be used");
-			}
-			if (sharedDirURL != null) {
-				String path = sharedLibsDir.getAbsolutePath();
+		if (sharedLibsDir != null) {
+			if (sharedLibsDir != null && sharedLibsDir.isDirectory() && sharedLibsDir.canRead()) {
+				URL sharedDirURL = null;
 				try {
-					path = sharedLibsDir.getCanonicalPath();
-				} catch (IOException e) {
-					log.info("Error when converting shared libraries directory file '"+path+"' to cannonical form");
+					sharedDirURL = sharedLibsDir.toURI().toURL();
+				} catch (MalformedURLException e) {
+					log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
+							+"' to URL, no shared libraries will be used");
 				}
-				log.info("Using shared libraries directory "+path);
-				File[] jarFiles = getNestedFiles(sharedLibsDir, jarFilter);
-				URL[] urls = new URL[jarFiles.length+1];
-				urls[0] = sharedDirURL;
-				int i = 1;
-				for (File lib : jarFiles) {
+				if (sharedDirURL != null) {
+					String path = sharedLibsDir.getAbsolutePath();
 					try {
-						lib = lib.getCanonicalFile();
-					} catch (IOException e1) {
-						log.info("Error when converting shared library file '"+lib.getAbsolutePath()+"' to cannonical form");
-						return;
+						path = sharedLibsDir.getCanonicalPath();
+					} catch (IOException e) {
+						log.info("Error when converting shared libraries directory file '"+path+"' to cannonical form");
+					}
+					log.info("Using shared libraries directory "+path);
+					File[] jarFiles = getNestedFiles(sharedLibsDir, jarFilter);
+					URL[] urls = new URL[jarFiles.length+1];
+					urls[0] = sharedDirURL;
+					int i = 1;
+					for (File lib : jarFiles) {
+						try {
+							lib = lib.getCanonicalFile();
+						} catch (IOException e1) {
+							log.info("Error when converting shared library file '"+lib.getAbsolutePath()+"' to cannonical form");
+							return;
+						}
+						try {
+							urls[i++] = lib.toURI().toURL();
+							log.debug("Using shared library "+urls[i-1]);
+						} catch (MalformedURLException e) {
+							log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
+									+"' to URL, no shared libraries will be used");
+						}
 					}
 					try {
-						urls[i++] = lib.toURI().toURL();
-						log.debug("Using shared library "+urls[i-1]);
-					} catch (MalformedURLException e) {
-						log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
-								+"' to URL, no shared libraries will be used");
+						newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(sharedLibsDir,loadableFilter));
+					} catch (IOException e) {
+						log.info("Error when reading shared libraries direcotry '"+sharedLibsDir.getAbsolutePath()+"' for MD5 checksum computing");
 					}
+					sharedLibsURLs = urls;
 				}
-				try {
-					newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(sharedLibsDir,loadableFilter));
-				} catch (IOException e) {
-					log.info("Error when reading shared libraries direcotry '"+sharedLibsDir.getAbsolutePath()+"' for MD5 checksum computing");
-				}
-				sharedLibsURLs = urls;
-			}
+			} else
+				log.info("Can not access shared libraries directory "+sharedLibsDir.getAbsolutePath()+", no shared libraries will be used");
 		} else
-			log.info("Can not access shared libraries directory "+sharedLibsDir.getAbsolutePath()+", no shared libraries will be used");
+			log.info("Configured not to use shared libraries directory");
 	}
 	
 	public synchronized void reloadPlugins() {
@@ -340,22 +348,24 @@ public class PluginHandler {
 		Map<URL, String> newLibChecksums = new HashMap<URL, String>();
 		createSharedLibsURLs(newLibChecksums);
 		createClassLoaders(newLibChecksums);
-		
-		URL sharedDirURL = null;
-		try {
-			sharedDirURL = sharedLibsDir.toURI().toURL();
-		} catch (MalformedURLException e) {
-			log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
-					+"' to URL, no shared libraries will be used");
-		}
 		boolean sharedLibsDirSame = false;
-		if (sharedDirURL != null) { 
-			String newChecksum = newLibChecksums.get(sharedDirURL);
-			if (newChecksum != null)
-				sharedLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(sharedDirURL));
-		}
-		if (sharedLibsDirSame)
-			log.debug("Shared libraries directory hasn not been changed");
+		if (sharedLibsDir != null) {
+			URL sharedDirURL = null;
+			try {
+				sharedDirURL = sharedLibsDir.toURI().toURL();
+			} catch (MalformedURLException e) {
+				log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
+						+"' to URL, no shared libraries will be used");
+			}
+			if (sharedDirURL != null) { 
+				String newChecksum = newLibChecksums.get(sharedDirURL);
+				if (newChecksum != null)
+					sharedLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(sharedDirURL));
+			}
+			if (sharedLibsDirSame)
+				log.debug("Shared libraries directory hasn not been changed");
+		} else
+			sharedLibsDirSame = true;
 		Map<PluginConfigEntry, ProxyPlugin> tmpPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
 		for (PluginConfigEntry oldCfgEntry : ldPlugin4EntryMap.keySet()) {
 			ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(oldCfgEntry);
@@ -424,8 +434,7 @@ public class PluginHandler {
 					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed so it'll be reloaded");
 				}
 			} else {
-				if (sharedLibsDirSame)
-					log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
+				log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
 			}
 			checksums4ldClassMap.remove(loadedPlugin.getClass());
 			stopPlugin(loadedPlugin);
