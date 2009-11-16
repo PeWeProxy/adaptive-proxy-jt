@@ -503,13 +503,14 @@ public class AdaptiveEngine  {
 		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
 			log.info("Unable to find or access "+((!homeDirConfigPresent)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
 		} else {
+			File svcsDir = new File(pluginsHomeDir,prop.getProperty("services_folder","services"));
 			File sharedLibDir = null;
 			String sharedLibDirName = prop.getProperty("shared_libs_folder","shared_libs");
 			if (!sharedLibDirName.trim().isEmpty())
 				sharedLibDir = new File(pluginsHomeDir,sharedLibDirName);
 			Set<String> excludeFiles = new HashSet<String>();
 			excludeFiles.add(pluginsOrderFileName);
-			pluginHandler.setPluginRepository(pluginsHomeDir,sharedLibDir,excludeFiles);
+			pluginHandler.setPluginRepository(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles);
 		}
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");

@@ -48,6 +48,8 @@ public class PluginHandler {
 	private static final FilenameFilter loadableFilter;
 	
 	private File pluginRepositoryDir;
+	private File servicesDir;
+	private URL[] servicesLibsURLs;
 	private File sharedLibsDir;
 	private URL[] sharedLibsURLs;
 	private Set<String> excludeFileNames;
@@ -92,11 +94,12 @@ public class PluginHandler {
 		comparator = new AbcPluginsComparator();
 	}
 	
-	public void setPluginRepository(File pluginRepositoryDir, File sharedLibsDir, Set<String> excludeFileNames) {
+	public void setPluginRepository(File pluginRepositoryDir, File servicesDir, File sharedLibsDir, Set<String> excludeFileNames) {
 		if (!pluginRepositoryDir.isDirectory()) {
 			throw new IllegalArgumentException("Argument does not denote a directory");
 		}
 		this.sharedLibsDir = sharedLibsDir;
+		this.servicesDir = servicesDir;
 		this.pluginRepositoryDir = pluginRepositoryDir;
 		this.excludeFileNames = excludeFileNames;
 		String path = pluginRepositoryDir.getAbsolutePath();
@@ -147,6 +150,9 @@ public class PluginHandler {
 
 	private void createClassLoaders(Map<URL, String> newLibChecksums) {
 		Map<URL, ClassLoader> cLoaders = new HashMap<URL, ClassLoader>();
+		URLClassLoader servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
+		log.debug("Creating new services definitions ClassLoader "+servicesCLoader+" with URLs set to "+Arrays.toString(servicesLibsURLs)
+				+" with parent ClassLoader set to "+servicesCLoader.getParent());
 		for (Iterator<PluginConfigEntry> iterator = configEntries.iterator(); iterator.hasNext();) {
 			PluginConfigEntry cfgEntry =  iterator.next();
 			boolean libsOK = true;
@@ -227,18 +233,18 @@ public class PluginHandler {
 			}
 			if (cfgEntry.classLoader == null) {
 				// plugin can not share existing ClassLoader
-				URLClassLoader parentCLoader = null;
+				URLClassLoader parentCLoader = servicesCLoader;
 				URL[] urls = new URL[] {classLocURL};
 				if (!cfgEntry.libsrariesURLSet.isEmpty()) {
 					URL[] libsURLs = cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]);
-					// MAIN <- LIBS
-					parentCLoader = createClassLoader(libsURLs, null, cfgEntry);
+					// MAIN <- SVCS <- LIBS
+					parentCLoader = createClassLoader(libsURLs, parentCLoader, cfgEntry);
 				}
 				if (sharedLibsURLs != null) {
-					// MAIN <- ?LIBS? <- SHD
+					// MAIN <- SVCS <- ?LIBS? <- SHD
 					parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, cfgEntry);
 				}
-				// MAIN <- ?LIBS? <- ?SHD? <- PLG
+				// MAIN <- SVCS <- ?LIBS? <- ?SHD? <- PLG
 				cfgEntry.classLoader = createClassLoader(urls, parentCLoader, cfgEntry);
 				cLoaders.put(classLocURL, cfgEntry.classLoader);
 				if (log.isDebugEnabled()) {
@@ -289,65 +295,100 @@ public class PluginHandler {
 		return retVal;
 	}
 	
+	private URL[] createLibsURLs(File dir, Map<URL, String> newLibChecksums
+			, String logDirDescr, String logEntryDescr) {
+		if (dir != null && dir.isDirectory() && dir.canRead()) {
+			URL sharedDirURL = null;
+			try {
+				sharedDirURL = dir.toURI().toURL();
+			} catch (MalformedURLException e) {
+				log.warn("Error when converting valid "+logDirDescr+" directory path '"+dir.getAbsolutePath()
+						+"' to URL, no "+logDirDescr+" will be used");
+			}
+			if (sharedDirURL != null) {
+				String path = dir.getAbsolutePath();
+				try {
+					path = dir.getCanonicalPath();
+				} catch (IOException e) {
+					log.info("Error when converting "+logDirDescr+" directory file '"+path+"' to cannonical form");
+				}
+				log.info("Using "+logDirDescr+" directory "+path);
+				File[] jarFiles = getNestedFiles(dir, jarFilter);
+				URL[] urls = new URL[jarFiles.length+1];
+				urls[0] = sharedDirURL;
+				log.debug("Using "+logEntryDescr+" resource "+sharedDirURL);
+				int i = 1;
+				for (File lib : jarFiles) {
+					try {
+						lib = lib.getCanonicalFile();
+					} catch (IOException e1) {
+						log.info("Error when converting "+logEntryDescr+" file '"+lib.getAbsolutePath()+"' to cannonical form");
+						return null;
+					}
+					try {
+						urls[i++] = lib.toURI().toURL();
+						log.debug("Using "+logEntryDescr+" resource "+urls[i-1]);
+					} catch (MalformedURLException e) {
+						log.warn("Error when converting valid "+logEntryDescr+" file path '"+lib.getAbsolutePath()
+								+"' to URL, no shared libraries will be used");
+					}
+				}
+				try {
+					newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(dir,loadableFilter));
+				} catch (IOException e) {
+					log.info("Error when reading "+logDirDescr+" direcotry '"+dir.getAbsolutePath()+"' for MD5 checksum computing");
+				}
+				return urls;
+			}
+		} else
+			log.info("Can not access "+logDirDescr+" directory "+dir.getAbsolutePath()+", no "+logDirDescr+" will be used");
+		return null;
+	}
+	
+	private void createServicesLibsURLs(Map<URL, String> newLibChecksums) {
+		if (servicesDir != null) {
+			servicesLibsURLs = createLibsURLs(servicesDir, newLibChecksums, "services definitions", "service definition");
+		} else
+			log.info("No services definitions directory set, no services will be available to processing plugins");
+	}
+	
 	private void createSharedLibsURLs(Map<URL, String> newLibChecksums) {
 		if (sharedLibsDir != null) {
-			if (sharedLibsDir != null && sharedLibsDir.isDirectory() && sharedLibsDir.canRead()) {
-				URL sharedDirURL = null;
-				try {
-					sharedDirURL = sharedLibsDir.toURI().toURL();
-				} catch (MalformedURLException e) {
-					log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
-							+"' to URL, no shared libraries will be used");
-				}
-				if (sharedDirURL != null) {
-					String path = sharedLibsDir.getAbsolutePath();
-					try {
-						path = sharedLibsDir.getCanonicalPath();
-					} catch (IOException e) {
-						log.info("Error when converting shared libraries directory file '"+path+"' to cannonical form");
-					}
-					log.info("Using shared libraries directory "+path);
-					File[] jarFiles = getNestedFiles(sharedLibsDir, jarFilter);
-					URL[] urls = new URL[jarFiles.length+1];
-					urls[0] = sharedDirURL;
-					int i = 1;
-					for (File lib : jarFiles) {
-						try {
-							lib = lib.getCanonicalFile();
-						} catch (IOException e1) {
-							log.info("Error when converting shared library file '"+lib.getAbsolutePath()+"' to cannonical form");
-							return;
-						}
-						try {
-							urls[i++] = lib.toURI().toURL();
-							log.debug("Using shared library "+urls[i-1]);
-						} catch (MalformedURLException e) {
-							log.warn("Error when converting valid shared library file path '"+lib.getAbsolutePath()
-									+"' to URL, no shared libraries will be used");
-						}
-					}
-					try {
-						newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(sharedLibsDir,loadableFilter));
-					} catch (IOException e) {
-						log.info("Error when reading shared libraries direcotry '"+sharedLibsDir.getAbsolutePath()+"' for MD5 checksum computing");
-					}
-					sharedLibsURLs = urls;
-				}
-			} else
-				log.info("Can not access shared libraries directory "+sharedLibsDir.getAbsolutePath()+", no shared libraries will be used");
+			sharedLibsURLs = createLibsURLs(sharedLibsDir, newLibChecksums, "shared libraries", "shared library");
 		} else
 			log.info("Configured not to use shared libraries directory");
 	}
 	
 	public synchronized void reloadPlugins() {
-		if (pluginRepositoryDir == null)
+		if (pluginRepositoryDir == null) {
+			log.info("Plugins home repository not set");
 			return;
+		}
 		ldPlugins4TypeMap.clear();
 		entry4ldPluginMap.clear();
 		loadPluginsConfigs();
 		Map<URL, String> newLibChecksums = new HashMap<URL, String>();
+		createServicesLibsURLs(newLibChecksums);
 		createSharedLibsURLs(newLibChecksums);
 		createClassLoaders(newLibChecksums);
+		boolean servicesLibsDirSame = false;
+		if (servicesDir != null) {
+			URL servicesDirURL = null;
+			try {
+				servicesDirURL = servicesDir.toURI().toURL();
+			} catch (MalformedURLException e) {
+				log.warn("Error when converting valid services definitions directory path '"+servicesDir.getAbsolutePath()
+						+"' to URL, no services will be available to processing plugins");
+			}
+			if (servicesDirURL != null) { 
+				String newChecksum = newLibChecksums.get(servicesDirURL);
+				if (newChecksum != null)
+					servicesLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(servicesDirURL));
+			}
+			if (servicesLibsDirSame)
+				log.debug("Services definitions directory hasn not been changed");
+		} else
+			log.info("No services definitions directory set, no services will be available to processing plugins");
 		boolean sharedLibsDirSame = false;
 		if (sharedLibsDir != null) {
 			URL sharedDirURL = null;
@@ -370,17 +411,20 @@ public class PluginHandler {
 		for (PluginConfigEntry oldCfgEntry : ldPlugin4EntryMap.keySet()) {
 			ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(oldCfgEntry);
 			PluginConfigEntry newCfgEntry = null;
-			if (sharedLibsDirSame) {
-				// try to find matching oldCfgEntry
-				for (PluginConfigEntry cfgEntry : configEntries) {
-					if (cfgEntry.className.equals(oldCfgEntry.className) &&
-							cfgEntry.classLocation.equals(oldCfgEntry.classLocation)) {
-						newCfgEntry = cfgEntry;
-						break;
-					}
-				};
+			if (servicesLibsDirSame) {
+				if (sharedLibsDirSame) {
+					// try to find matching oldCfgEntry
+					for (PluginConfigEntry cfgEntry : configEntries) {
+						if (cfgEntry.className.equals(oldCfgEntry.className) &&
+								cfgEntry.classLocation.equals(oldCfgEntry.classLocation)) {
+							newCfgEntry = cfgEntry;
+							break;
+						}
+					};
+				} else
+					log.debug("Shared libraries directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
 			} else
-				log.debug("Shared libraries directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
+				log.debug("Services definitions directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
 			if (newCfgEntry != null && oldCfgEntry.libsrariesURLSet.equals(newCfgEntry.libsrariesURLSet)) {
 				boolean libsChanged = false;
 				for (URL libURL : newCfgEntry.libsrariesURLSet) {
