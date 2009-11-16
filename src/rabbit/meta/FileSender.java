@@ -49,7 +49,7 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
 	if (file.indexOf ("..") >= 0)    // file is un-url-escaped 
 	    throw (new IllegalArgumentException ("Bad filename given"));
 	
-	String filename = "htdocs/" + file;
+	String filename = con.getProxy().getHtdocsDir()+"/" + file;
 	if (filename.endsWith ("/"))
 	    filename = filename + "index.html";
 	filename = filename.replace ('/', File.separatorChar);

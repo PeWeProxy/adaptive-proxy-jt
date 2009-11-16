@@ -1,5 +1,6 @@
 package rabbit.proxy;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -132,6 +133,8 @@ public class HttpProxy implements Resolver {
     private TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
     
     private AdaptiveEngine adaptiveEngineClass;
+    
+    private String htdocsDir;
 
     public HttpProxy () throws UnknownHostException {
 	localhost = InetAddress.getLocalHost ();
@@ -141,6 +144,12 @@ public class HttpProxy implements Resolver {
      * @param conf the name of the file to use for proxy configuration.
      */
     public void setConfig (String conf) throws IOException {
+    File cfgFile = new File(conf); 
+    String path = cfgFile.getAbsolutePath();
+    try {
+    	path = cfgFile.getCanonicalPath();
+    } catch (IOException ignored) {}
+    System.out.println("Proxy is using configuration file "+path);	
 	setConfig (new Config (conf));
     }
 
@@ -282,6 +291,7 @@ public class HttpProxy implements Resolver {
 	String cn = getClass ().getName ();
 	serverIdentity = config.getProperty (cn, "serverIdentity", VERSION); 
 	proxyIdentity = "HTTP/1.1 "+config.getProperty (cn, "proxyIdentity", serverIdentity);
+	htdocsDir = config.getProperty(cn, "htdocs_dir", "htdocs");
 	String strictHttp = config.getProperty (cn, "StrictHTTP", "true");
 	setStrictHttp (strictHttp.equals ("true"));
 	setupMaxConnections ();
@@ -636,4 +646,8 @@ public class HttpProxy implements Resolver {
     public AdaptiveEngine getAdaptiveEngine() {
 		return adaptiveEngineClass;
 	}
+    
+    public String getHtdocsDir() {
+    	return htdocsDir;
+    }
 }
