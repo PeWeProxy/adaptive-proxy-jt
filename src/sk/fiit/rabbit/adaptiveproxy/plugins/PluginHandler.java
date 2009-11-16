@@ -150,9 +150,12 @@ public class PluginHandler {
 
 	private void createClassLoaders(Map<URL, String> newLibChecksums) {
 		Map<URL, ClassLoader> cLoaders = new HashMap<URL, ClassLoader>();
-		URLClassLoader servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
-		log.debug("Creating new services definitions ClassLoader "+servicesCLoader+" with URLs set to "+Arrays.toString(servicesLibsURLs)
-				+" with parent ClassLoader set to "+servicesCLoader.getParent());
+		URLClassLoader servicesCLoader = null;
+		if (servicesLibsURLs != null) {
+			servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
+			log.debug("Creating new services definitions ClassLoader "+servicesCLoader+" with URLs set to "+Arrays.toString(servicesLibsURLs)
+					+" with parent ClassLoader set to "+servicesCLoader.getParent());
+		}
 		for (Iterator<PluginConfigEntry> iterator = configEntries.iterator(); iterator.hasNext();) {
 			PluginConfigEntry cfgEntry =  iterator.next();
 			boolean libsOK = true;
