@@ -172,13 +172,17 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		public String getServiceIdentification() {
 			return "AdaptiveProxy.ModifiableBytesService";
 		}
+
+		@Override
+		public byte[] getData() {
+			return httpMessage.getData();
+		}
 	}
 	
 	class ContentServicesProvider extends GenericServiceProvider implements StringContentService {
 		byte[] lastByteData = null;
 		StringBuilder sb;
 		Charset charset = defaultCharset;
-		private boolean invoked = false;
 		
 		public ContentServicesProvider(String content, Charset charset) {
 			if (httpMessage.getData() == null)
@@ -201,7 +205,6 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		
 		@Override
 		public String getContent() {
-			this.invoked = true;
 			if (underlyingBytesChanged()) {
 				byte[] data = httpMessage.getData();
 				//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
@@ -227,7 +230,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		
 		@Override
 		public void doChanges() {
-			if(invoked) {
+			if(!underlyingBytesChanged()) {
 				inspectCharset();
 				String s = sb.toString();
 				httpMessage.setData(s.getBytes(charset));
@@ -267,7 +270,6 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 
 		@Override
 		public void setContent(String content) {
-			stringSvcProvider.invoked = true;
 			stringSvcProvider.sb.setLength(0);
 			stringSvcProvider.sb.append(content);
 		}
@@ -295,6 +297,11 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			sbTmp.append(charset.toString());
 			sbTmp.append(trailing);
 			headers.setHeader("Content-Type", sbTmp.toString());
+		}
+
+		@Override
+		public String getContent() {
+			return stringSvcProvider.getContent();
 		}
 	}
 	

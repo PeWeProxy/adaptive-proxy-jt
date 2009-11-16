@@ -2,9 +2,7 @@ package sk.fiit.rabbit.adaptiveproxy.plugins.services.content;
 
 import java.nio.charset.Charset;
 
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ProxyService;
-
-public interface ModifiableStringService extends ProxyService {
+public interface ModifiableStringService extends StringContentService {
 	StringBuilder getModifiableContent();
 
 	void setContent(String content);
