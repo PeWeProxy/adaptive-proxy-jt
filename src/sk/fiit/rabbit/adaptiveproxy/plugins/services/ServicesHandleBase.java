@@ -489,15 +489,13 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 			for (S service : retVal) {
 				ServiceProvider thisServiceProvider = serviceProviders.get(service);
 				int indexOfThisProvider = providersList.indexOf(thisServiceProvider); 
-				if (indexOfThisProvider < lastRtnedSvcProviderIndex) {
+				if (indexOfThisProvider != lastRtnedSvcProviderIndex) {
 					for (ListIterator<ServiceProvider> listIterator = providersList.listIterator(lastRtnedSvcProviderIndex+1); listIterator.hasPrevious();) {
 						listIterator.previous().doChanges();
 						lastRtnedSvcProviderIndex--;
-						if (indexOfThisProvider == lastRtnedSvcProviderIndex)
-							break;
 					}
-				} else
-					lastRtnedSvcProviderIndex = indexOfThisProvider;
+				}
+				lastRtnedSvcProviderIndex = indexOfThisProvider;
 			}
 			changesPropagation = false;
 		}
