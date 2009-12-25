@@ -34,12 +34,12 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableBytesServ
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableStringService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.StringContentService;
 
-public abstract class ServicesHandleBase implements ServicesHandle {
+public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
 	static final Charset defaultCharset;
 	static final CodepageDetectorProxy cpDetector;
 			
-	final HttpMessageImpl httpMessage;
+	final MessageType httpMessage;
 	final List<ServiceProvider> providersList;
 	final Map<ProxyService, ServiceProvider> serviceProviders;
 	final Map<Class<? extends ProxyService>, List<ProxyService>> services;
@@ -119,7 +119,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		}
 	}
 	
-	class BytesServiceProvider extends GenericServiceProvider implements ByteContentService , RequestServiceProvider, ResponseServiceProvider {
+	class BytesServiceProvider extends GenericServiceProvider implements ByteContentService {
 		
 		public BytesServiceProvider() {
 			if (httpMessage.getData() == null)
@@ -153,7 +153,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	
 	class ModifiableBytesServiceProvider extends GenericServiceProvider implements ModifiableBytesService {
 		
-		public ModifiableBytesServiceProvider(BytesServiceProvider byteSvcprovider) {
+		public ModifiableBytesServiceProvider() {
 			if (httpMessage.getData() == null)
 				throw new IllegalStateException("Associated HTTP message does not contain any data");;
 		}
@@ -248,7 +248,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		final ContentServicesProvider stringSvcProvider;
 		
 		public ModifiableContentServiceProvider(ContentServicesProvider stringSvcProvider) {
-			this.stringSvcProvider = stringSvcProvider;;
+			this.stringSvcProvider = stringSvcProvider;
 		}
 		
 		@Override
@@ -305,7 +305,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 		}
 	}
 	
-	public ServicesHandleBase(HttpMessageImpl httpMessage) {
+	public ServicesHandleBase(MessageType httpMessage) {
 		this.httpMessage = httpMessage;
 		providersList = new LinkedList<ServiceProvider>();
 		serviceProviders = new HashMap<ProxyService, ServiceProvider>();
@@ -435,8 +435,7 @@ public abstract class ServicesHandleBase implements ServicesHandle {
 	private void setServicesContext() {
 		if (httpMessage.getData() != null) {
 			// message has some content so we add ModifiableBytesServiceProvider provider
-			BytesServiceProvider byteSvcProvider = (BytesServiceProvider)services.get(ByteContentService.class).get(0);
-			ModifiableBytesServiceProvider modByteSvcProvider = new ModifiableBytesServiceProvider(byteSvcProvider);
+			ModifiableBytesServiceProvider modByteSvcProvider = new ModifiableBytesServiceProvider();
 			addServiceProvider(modByteSvcProvider, modByteSvcProvider, ModifiableBytesService.class);
 			
 			List<ProxyService> tmp = services.get(StringContentService.class);

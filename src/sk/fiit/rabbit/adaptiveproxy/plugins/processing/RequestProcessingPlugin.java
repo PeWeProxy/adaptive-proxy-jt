@@ -19,7 +19,7 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 		/**AdaptiveProxy should call getResponse() method to get immediate HttpResponse
 		 * on which it should do further response processing*/
 		NEW_RESPONSE,
-		/**AdaptiveProxy should call getNewResponse() method to get immediate HttpResponse
+		/**AdaptiveProxy should call getResponse() method to get immediate HttpResponse
 		 * which it should send without any changes*/
 		FINAL_RESPONSE,
 	}

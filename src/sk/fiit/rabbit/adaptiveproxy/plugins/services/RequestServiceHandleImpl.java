@@ -7,7 +7,7 @@ import rabbit.http.HttpHeader;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler;
 import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpRequestImpl;
 
-public class RequestServiceHandleImpl extends ServicesHandleBase {
+public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpRequestImpl> {
 	static List<RequestServicePlugin> plugins;
 	
 	public static void initPlugins(PluginHandler pluginHandler) {
@@ -22,17 +22,14 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 		return retVal;
 	}
 	
-	final ModifiableHttpRequestImpl request;
-	
 	public RequestServiceHandleImpl(ModifiableHttpRequestImpl request) {
 		super(request);
-		this.request = request;
 		doContentNeedDiscovery(plugins);
 	}
 	
 	@Override
 	boolean discoverContentNeed(ServicePlugin plugin) {
-		return ((RequestServicePlugin)plugin).wantRequestContent(request.getClientRequestHeaders());
+		return ((RequestServicePlugin)plugin).wantRequestContent(httpMessage.getClientRequestHeaders());
 	}
 	
 	@Override
@@ -49,7 +46,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 		for (RequestServicePlugin plugin : plugins) {
 			List<RequestServiceProvider> providers = null;
 			try {
-				providers = plugin.provideRequestServices(request);
+				providers = plugin.provideRequestServices(httpMessage);
 			} catch (Throwable t) {
 				log.info("Throwable raised while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'",t);
 			}
@@ -61,18 +58,18 @@ public class RequestServiceHandleImpl extends ServicesHandleBase {
 	@Override
 	void doSetContext() {
 		for (ServiceProvider serviceProvider : providersList) {
-			((RequestServiceProvider) serviceProvider).setRequestContext(request);
+			((RequestServiceProvider) serviceProvider).setRequestContext(httpMessage);
 		}
 	}
 
 	@Override
 	HttpHeader getOriginalHeader() {
-		return request.getClientRequestHeaders().getBackedHeader();
+		return httpMessage.getClientRequestHeaders().getBackedHeader();
 	}
 	
 	@Override
 	HttpHeader getProxyHeader() {
-		return request.getProxyRequestHeaders().getBackedHeader();
+		return httpMessage.getProxyRequestHeaders().getBackedHeader();
 	}
 	
 	@Override

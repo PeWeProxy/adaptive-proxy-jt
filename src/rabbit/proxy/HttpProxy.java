@@ -132,7 +132,7 @@ public class HttpProxy implements Resolver {
     /** The total traffic in and out of this proxy. */
     private TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
     
-    private AdaptiveEngine adaptiveEngineClass;
+    private AdaptiveEngine adaptiveEngine;
     
     private String htdocsDir;
 
@@ -307,9 +307,9 @@ public class HttpProxy implements Resolver {
     }
     
     private void setupAdaptiveEngine() {
-    	adaptiveEngineClass = new AdaptiveEngine(this);
+    	adaptiveEngine = new AdaptiveEngine(this);
     	SProperties props = config.getProperties ("AdaptiveEngine");
-    	adaptiveEngineClass.setup(props);
+    	adaptiveEngine.setup(props);
 	}
 
     private int getInt (String section, String key, int defaultValue) {
@@ -644,7 +644,7 @@ public class HttpProxy implements Resolver {
     }
     
     public AdaptiveEngine getAdaptiveEngine() {
-		return adaptiveEngineClass;
+		return adaptiveEngine;
 	}
     
     public String getHtdocsDir() {
