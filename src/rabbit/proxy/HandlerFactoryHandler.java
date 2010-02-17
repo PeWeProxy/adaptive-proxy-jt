@@ -93,6 +93,7 @@ class HandlerFactoryHandler {
 			className + "' for handler '" + handler + "'",
 			iae);
 	}
+	handlersForNames.put(id, hf);
 	return hf;
     }
 
