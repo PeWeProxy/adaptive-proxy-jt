@@ -65,7 +65,6 @@ class SingleSelectorRunner implements Runnable {
 		    selectorThread.join (10000);
 		}
 	    }
-	    if (selector != null)
 		selector.close ();
 	} catch (InterruptedException e) {
 	    logger.log (Level.WARNING,
@@ -365,10 +364,15 @@ class SingleSelectorRunner implements Runnable {
     }
 
     public void runSelectorTask (SelectorRunnable sr) {
-	if (!running.get () && selectorThread != null) {
-	    logger.finest ("Trying to add selector task while not running; " +
-			   sr);
-	    return;
+   	if (!running.get ()) {
+   	    synchronized (this) {
+   		if (selectorThread != null) {
+   		    String err = 
+   			"Trying to add selector task while not running: " + sr;
+   		    logger.finest (err);
+   		    return;
+   		}
+   	    }
 	}
 
 	synchronized (returnedTasksLock) {

@@ -204,12 +204,8 @@ public class Connection {
 	this.requestHandle = bh;
 	requestVersion = request.getHTTPVersion ();
 	proxy.getAdaptiveEngine().newRequest(this, isChunked);
-	if (requestVersion == null) {
-	    // TODO: fix http/0.9 handling.
-	    logger.info ("bad header read: " + request);
-	    closeDown ();
-	    return;
-	}
+	if (request.isDot9Request ())
+	    requestVersion = "HTTP/0.9";
 	requestVersion = requestVersion.toUpperCase ();
 	// Redeemer: original code = request.addHeader ("Via", requestVersion + " RabbIT");
 	String proxyChain = proxyRequest.getHeader("Via");
@@ -425,7 +421,8 @@ public class Connection {
 
     void webConnectionEstablished (RequestHandler rh) {
 	getProxy ().markForPipelining (rh.getWebConnection ());
-	setMayCacheFromCC (rh);
+	if (!proxyRequest.isDot9Request ())
+	    setMayCacheFromCC (rh);
 	resourceEstablished (rh);
     }
 
@@ -555,6 +552,8 @@ public class Connection {
     }
 
     private void finalFixesOnWebHeader (RequestHandler rh, Handler handler) {
+   	if (rh.getWebHeader () == null)
+   	    return;    	
 	if (chunk) {
 	    if (rh.getSize () < 0 || handler.changesContentSize ()) {
 		rh.getWebHeader ().removeHeader ("Content-Length");
@@ -607,12 +606,14 @@ public class Connection {
 	if (addedIMS)
 		proxyRequest.removeHeader ("If-Modified-Since");
 
-	if (checkWeakEtag (cachedHeader, rh.getWebHeader ())) {
+	if (ETagUtils.checkWeakEtag (cachedHeader, rh.getWebHeader ())) {
 	    NotModifiedHandler nmh = new NotModifiedHandler ();
 	    nmh.updateHeader (rh);
 	    setMayCache (false);
 	    try {
-		HttpHeader res304 = nmh.is304 (proxyRequest, this, rh);
+		HttpHeader res304 = 
+		    nmh.is304 (proxyRequest, getHttpGenerator (), rh);
+
 		if (res304 != null) {
 		    sendAndClose (res304);
 		    return true;
@@ -733,7 +734,7 @@ public class Connection {
 	if (d == null) {
 	    // we have an etag...
 	    String etag = oldresp.getHeader ("Etag");
-	    if (etag == null || !checkWeakEtag (etag, ifRange))
+	    if (etag == null || !ETagUtils.checkWeakEtag (etag, ifRange))
 		setMayUseCache (false);
 	}
     }
@@ -990,8 +991,9 @@ public class Connection {
 	this.meta = meta;
     }
 
-    /** Set the state of this request. This can only be promoted down..
-     * @param useCache true if we may use the cache for this request,
+    /** Specify if the current resource may be served from our cache.
+     *  This can only be promoted down..
+     * @param useCache true if we may use the cache for serving this request,
      *        false otherwise.
      */
     public void setMayUseCache (boolean useCache) {
@@ -1005,7 +1007,8 @@ public class Connection {
 	return mayUseCache;
     }
 
-    /** Set the state of this request. This can only be promoted down.
+    /** Specify if we may cache the response resource.
+     *  This can only be promoted down.
      * @param cacheAllowed true if we may cache the response, false otherwise.
      */
     public void setMayCache (boolean cacheAllowed) {
@@ -1157,41 +1160,6 @@ public class Connection {
 	    logger.log (Level.INFO, "Exception when sending http header", e);
 	    logAndClose (null);
 	}
-    }
-
-    protected boolean isWeak (String t) {
-	return t.startsWith ("W/");
-    }
-
-    protected boolean checkStrongEtag (String et, String im) {
-	return !isWeak (im) && im.equals (et);
-    }
-
-    /* Remove any W/ prefix then check if etags are equal.
-     * Inputs can be in any order.
-     * @return true if the etags match or at least one of the etag
-     *              headers do not exist.
-     */
-    private boolean checkWeakEtag (HttpHeader h1, HttpHeader h2) {
-	String et1 = h1.getHeader ("Etag");
-	String et2 = h2.getHeader ("Etag");
-	if (et1 == null || et2 == null)
-	    return true;
-	return checkWeakEtag (et1, et2);
-    }
-
-    /* Remove any W/ prefix from the inputs then check if they are equal.
-     * Inputs can be in any order.
-     * Returns true if equal.
-     */
-    protected boolean checkWeakEtag (String et, String im) {
-	if (et == null || im == null)
-	    return false;
-	if (isWeak (et))
-	    et = et.substring (2);
-	if (isWeak (im))
-	    im = im.substring (2);
-	return im.equals (et);
     }
 
     public HttpGenerator getHttpGenerator () {

@@ -26,6 +26,7 @@ import rabbit.httpio.ResourceSource;
 import rabbit.httpio.TransferHandler;
 import rabbit.httpio.TransferListener;
 import rabbit.io.BufferHandle;
+import rabbit.io.FileHelper;
 import rabbit.proxy.Connection;
 import rabbit.proxy.PartialCacher;
 import rabbit.proxy.TrafficLoggerHandler;
@@ -98,7 +99,7 @@ public class BaseHandler
 	this.request = request;
 	this.clientHandle = clientHandle;
 	this.response = response;
-	if (response == null)
+	if (!request.isDot9Request () && response == null)
 	    throw new IllegalArgumentException ("response may not be null");
 	this.content = content;
 	this.mayCache = mayCache;
@@ -135,7 +136,11 @@ public class BaseHandler
      * have all succeded
      */
     public void handle () {
-	sendHeader ();
+   	if (request.isDot9Request ())
+   		// Redeemer : introduced change (4.4) not fully analyzed !
+   	    send ();
+   	else 
+   	    sendHeader ();
     }
 
     /** 
@@ -230,22 +235,7 @@ public class BaseHandler
 		}
 	    }
 	    
-	    if (entry != null && mayCache) {
-		Cache<HttpHeader, HttpHeader> cache = 
-		    con.getProxy ().getCache ();
-		String entryName = 
-		    cache.getEntryName (entry.getId (), false, null);
-		File f = new File (entryName);
-		long filesize = f.length ();
-		entry.setSize (filesize);
-		String cl = response.getHeader ("Content-Length");
-		if (cl == null) {
-		    response.removeHeader ("Transfer-Encoding");
-		    response.setHeader ("Content-Length", "" + filesize);
-		}		
-		removePrivateParts (response);
-		cache.addEntry (entry);
-	    }
+	    finishCache ();
 	    if (response != null 
 		&& response.getHeader ("Content-Length") != null)
 		con.setContentLength (response.getHeader ("Content-length"));
@@ -272,6 +262,23 @@ public class BaseHandler
 	    clientHandle.possiblyFlush (); 
 	clientHandle = null;
     }
+    
+    private void finishCache () {
+   	if (entry == null || !mayCache) 
+   	    return;
+   	Cache<HttpHeader, HttpHeader> cache = con.getProxy ().getCache ();
+   	String entryName = cache.getEntryName (entry.getId (), false, null);
+   	File f = new File (entryName);
+   	long filesize = f.length ();
+   	entry.setSize (filesize);
+  	String cl = response.getHeader ("Content-Length");
+   	if (cl == null) {
+   	    response.removeHeader ("Transfer-Encoding");
+   	    response.setHeader ("Content-Length", "" + filesize);
+   	}		
+   	removePrivateParts (response);
+   	cache.addEntry (entry);
+   	}
 
     /** Try to use the resource size to decide if we may cache or not. 
      *  If the size is known and the size is bigger than the maximum cache 
@@ -551,6 +558,16 @@ public class BaseHandler
 	cause.printStackTrace (ps);
 	return sw.toString ();
     }
+    
+    protected void deleteFile (File f) {
+   	try {
+   	    FileHelper.delete (f);
+   	} catch (IOException e) {
+   	    getLogger ().log (Level.WARNING, 
+   			      "Failed to delete file",
+   			      e);
+   	}	
+    }
 
     protected void removeCache () {
 	if (cacheChannel != null) {
@@ -560,7 +577,7 @@ public class BaseHandler
 		    con.getProxy ().getCache ();
 		String entryName = cache.getEntryName (entry.getId (), false, null);
 		File f = new File (entryName);
-		f.delete ();
+		deleteFile (f);
 		entry = null;
 	    } catch (IOException e) {
 		getLogger ().log (Level.WARNING,

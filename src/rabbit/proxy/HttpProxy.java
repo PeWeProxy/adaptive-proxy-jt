@@ -52,7 +52,7 @@ import sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine;
 public class HttpProxy implements Resolver {
 
     /** Current version */
-    public static final String VERSION = "RabbIT proxy version 4.2";
+    public static final String VERSION = "RabbIT proxy version 4.4";
 
     /** The current config of this proxy. */
     private Config config;
@@ -216,11 +216,17 @@ public class HttpProxy implements Resolver {
     }
 
     private void setupCache () {
-	SProperties props =
-	    config.getProperties (NCache.class.getName ());
-	HttpHeaderFileHandler hhfh = new HttpHeaderFileHandler ();
-	cache = new NCache<HttpHeader, HttpHeader> (props, hhfh, hhfh);
-	cache.startCleaner ();
+   	SProperties props =
+   	    config.getProperties (NCache.class.getName ());
+   	HttpHeaderFileHandler hhfh = new HttpHeaderFileHandler ();
+   	try {
+   	    cache = new NCache<HttpHeader, HttpHeader> (props, hhfh, hhfh);
+   	    cache.startCleaner ();
+   	} catch (IOException e) {
+   	    logger.log (Level.SEVERE, 
+   			"Failed to setup cache", 
+   			e);
+   	}
     }
 
     /** Configure the SSL support RabbIT should have.
@@ -302,7 +308,7 @@ public class HttpProxy implements Resolver {
 	if (ssc != null) {
 		setupConnectionHandler ();
 		setupAdaptiveEngine();
-		logger.info ("Configuration loaded: ready for action.");
+		logger.info (VERSION + ": Configuration loaded: ready for action.");
 	}
     }
     
