@@ -19,6 +19,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import rabbit.handler.AdaptiveHandler;
+import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
 import rabbit.httpio.request.ContentFetcher;
@@ -167,6 +168,8 @@ public class AdaptiveEngine  {
 		ClientResourceHandler resourceHandler = null;
 		if (separator != null) {
 			// request has some content
+			if (log.isTraceEnabled())
+				log.trace("RQ: "+conHandle+" | Request separator used: "+separator.toString());
 			TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
 			boolean prefetch = conHandle.request.getServiceHandle().wantContent();
 			if (!prefetch) {
@@ -189,6 +192,9 @@ public class AdaptiveEngine  {
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator);
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
+		} else {
+			if (log.isTraceEnabled())
+				log.trace("RQ: "+conHandle+" | Request has no body");
 		}
 		final ClientResourceHandler handler = resourceHandler;
 		proxy.getNioHandler().runThreadTask(new Runnable() {
@@ -224,11 +230,11 @@ public class AdaptiveEngine  {
 	private boolean runRequestAdapters(ConnectionHandle conHandle) {
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Running request adapters");
-		RequestServiceHandleImpl serviceHandle = conHandle.request.getServiceHandle();
-		serviceHandle.doServiceDiscovery();
 		boolean again = false;
 		Set<RequestProcessingPlugin> pluginsChangedResponse = new HashSet<RequestProcessingPlugin>();
 		do {
+			// Discover services EVERY TIME there's new request
+			conHandle.request.getServiceHandle().doServiceDiscovery();
 			again = false;
 			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 				if (pluginsChangedResponse.contains(requestPlugin))
@@ -253,6 +259,7 @@ public class AdaptiveEngine  {
 					}
 				} catch (Throwable t) {
 					log.info("RQ: "+conHandle+" | Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
+					// TODO revert changes maybe ?
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
@@ -360,11 +367,11 @@ public class AdaptiveEngine  {
 	private void runResponseAdapters(ConnectionHandle conHandle) {
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Running response adapters");
-		ResponseServiceHandleImpl serviceHandle = conHandle.response.getServiceHandle();
-		serviceHandle.doServiceDiscovery();
 		boolean again = false;
 		Set<ResponseProcessingPlugin> pluginsChangedResponse = new HashSet<ResponseProcessingPlugin>();
 		do {
+			// Discover services EVERY TIME there's new response
+			conHandle.response.getServiceHandle().doServiceDiscovery();
 			again = false;
 			for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 				if (pluginsChangedResponse.contains(responsePlugin))
@@ -382,6 +389,7 @@ public class AdaptiveEngine  {
 					}
 				} catch (Throwable t) {
 					log.info("RP: "+conHandle+" | Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
+					// TODO revert changes maybe ?
 				}
 			}
 		} while (again);
@@ -610,5 +618,11 @@ public class AdaptiveEngine  {
 	
 	public boolean isProxyDying(){
 		return proxyDying;
+	}
+
+	public void responseHandlerUsed(Connection connection, Handler handler) {
+		ConnectionHandle conHandle = requestHandles.get(connection);
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | Handler used: "+handler.toString());
 	}
 }

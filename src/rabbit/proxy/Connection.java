@@ -520,6 +520,7 @@ public class Connection {
 	    if (handler == null) {
 		doError (500, "Something fishy with that handler....");
 	    } else {
+	    proxy.getAdaptiveEngine().responseHandlerUsed(this, handler);
 		finalFixesOnWebHeader (rh, handler);
 		// HTTP/0.9 does not support HEAD, so webheader should be valid.
 		if (clientRequest.isHeadOnlyRequest ()) {
