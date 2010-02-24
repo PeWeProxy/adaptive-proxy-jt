@@ -350,7 +350,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 			
 			HttpHeader header = getOriginalHeader();
 			String contentType = header.getHeader("Content-Type");
-			if (contentType != null && contentType.startsWith("text")) {
+			// TODO mimes move to config
+			if (contentType != null && (contentType.startsWith("text") || contentType.startsWith("application/xhtml"))) {
 				Charset charset = null;
 				boolean detected = false;
 				try {
