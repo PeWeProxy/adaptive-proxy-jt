@@ -14,15 +14,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-
 import javax.swing.JTextPane;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.Document;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
-import javax.swing.text.StyledDocument;
 
 public final class DebugWindow extends JFrame {
 
@@ -57,13 +54,14 @@ public final class DebugWindow extends JFrame {
 				}
 			};
 			jTextPane.setEditable(false);
+			jTextPane.setToolTipText("Right click to clone window into separate VM ...");
 			jTextPane.addMouseListener(new java.awt.event.MouseAdapter() {
 				public void mouseClicked(java.awt.event.MouseEvent e) {
 					if (e.getButton() == MouseEvent.BUTTON3) {
 						System.out.println(getJTextPane().getDocument().getClass());
 						try {
 							File dir = new File("./bin/");
-							final Process p = Runtime.getRuntime().exec("java test.DebugWindow",null,dir);
+							final Process p = Runtime.getRuntime().exec("javaw sk.fiit.redeemer.test.DebugWindow",null,dir);
 							ObjectOutputStream stream = new ObjectOutputStream(p.getOutputStream());
 							stream.flush();
 							stream.writeObject("Serialized output: "+getTitle());

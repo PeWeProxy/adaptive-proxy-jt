@@ -46,7 +46,7 @@ public aspect HandlerAspect {
 	pointcut initInHandlerCode(BaseHandler handler) : inHandlersOfInterest() && initialization(BaseHandler+.new(..)) && this(handler);
 	
 	pointcut methodInHandlerCode(BaseHandler handler) : initInHandlerCode(handler)
-						|| (inHandlersOfInterest() && execution(* *.*(..)) && (this(handler)));
+						|| (inHandlersOfInterest() && execution(* *.*(..)) && !execution(String *.toString(..)) && (this(handler)));
 	
 	pointcut methodInHandlersInnerClassCode(BaseHandler handler) : inHandlersOfInterest() && execution(* *.*(..))
 						&& !this(BaseHandler+) && this(Object) && cflow(methodInHandlerCode(handler));
@@ -154,11 +154,12 @@ public aspect HandlerAspect {
 		printMethod(thisJoinPoint, handler);
 	}
 	
-	// PO vykonavani metody objektu triedy vnorenej triede BaseHandler a podtriedam
+	// PO vykonavani metody objektu triedy BaseHandler a podtried
 	after(BaseHandler handler): methodInHandlerCode(handler) {
 		offsets.put(handler, offsets.get(handler).substring(3));
 	}
-	// PO vykonavani metody objektu triedy BaseHandler a podtried
+
+	// PO vykonavani metody objektu triedy vnorenej triede BaseHandler a podtriedam
 	after(BaseHandler handler): methodInHandlersInnerClassCode(handler) {
 		offsets.put(handler, offsets.get(handler).substring(3));
 	}

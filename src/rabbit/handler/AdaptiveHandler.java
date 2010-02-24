@@ -60,7 +60,8 @@ public class AdaptiveHandler extends FilterHandler {
 			h.notCaching = false;
 		askForCaching = true;
 		if (log.isDebugEnabled())
-			log.debug(h+" is handling connection "+con);
+			log.debug(h+" is handling connection "+con+" (requested "
+					+header.getRequestLine()+")");
 		return h;
 	}
 	

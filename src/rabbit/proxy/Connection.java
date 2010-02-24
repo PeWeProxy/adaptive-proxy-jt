@@ -1192,4 +1192,10 @@ public class Connection {
     public HttpHeader filterConstructedResponse(HttpHeader header) {
     	return proxy.getHttpHeaderFilterer().filterHttpOut(this, channel, header);
     }
+    
+    @Override
+    public String toString() {
+    	// TODO Auto-generated method stub
+    	return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
+    }
 }

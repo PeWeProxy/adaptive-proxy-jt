@@ -19,6 +19,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 import rabbit.handler.AdaptiveHandler;
+import rabbit.handler.BaseHandler;
 import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
@@ -141,14 +142,14 @@ public class AdaptiveEngine  {
 		ConnectionHandle newHandle = new ConnectionHandle(con);
 		requestHandles.put(con, newHandle);
 		if (log.isTraceEnabled())
-			log.trace("RQ: Registering new connection handle "+newHandle+" for connection "+con);
+			log.trace("RQ: "+newHandle+" | Registering new connection for connection "+con);
 	}
 	
 	public void connectionClosed(Connection con) {
 		//stackTraceWatcher.addStackTrace(con);
 		ConnectionHandle conHandle = requestHandles.remove(con);
 		if (log.isTraceEnabled())
-			log.trace("Removing connection handle "+conHandle+" for connection "+con);
+			log.trace("RQ: "+conHandle+" | Removing connection for connection "+con);
 	}
 	
 	public void newRequest(Connection con, boolean chunking) {
@@ -159,7 +160,8 @@ public class AdaptiveEngine  {
 		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getProxyRequestHeaders().getBackedHeader());
 		if (log.isTraceEnabled())
-			log.trace("RQ: "+conHandle+" | New request received");
+			log.trace("RQ: "+conHandle+" | New request received ("
+					+conHandle.request.getClientRequestHeaders().getRequestLine()+")");
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -289,10 +291,14 @@ public class AdaptiveEngine  {
 		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
 		if (log.isTraceEnabled())
-			log.trace("RQ: "+conHandle+" | New response received");
+			log.trace("RP: "+conHandle+" | New response received ( "
+					+response.getReasonPhrase()+" | requested "
+					+conHandle.request.getProxyRequestHeaders().getRequestLine()+")");
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
+		if (log.isTraceEnabled())
+			log.trace("RP: "+requestHandles.get(con)+" | New response constructed");
 		newResponse(con, header);
 		processResponse(con, proceedTask);
 	}
@@ -623,6 +629,7 @@ public class AdaptiveEngine  {
 	public void responseHandlerUsed(Connection connection, Handler handler) {
 		ConnectionHandle conHandle = requestHandles.get(connection);
 		if (log.isTraceEnabled())
-			log.trace("RP: "+conHandle+" | Handler used: "+handler.toString());
+			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response on "
+					+conHandle.request.getProxyRequestHeaders().getRequestLine());
 	}
 }
