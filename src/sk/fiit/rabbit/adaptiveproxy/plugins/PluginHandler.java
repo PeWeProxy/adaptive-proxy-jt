@@ -61,6 +61,7 @@ public class PluginHandler {
 	private final Map<Class<?>, String> checksums4ldClassMap;
 	private final Map<URL, String> checksums4ldLibsMap;
 	private final AbcPluginsComparator comparator;
+	private boolean pluginsStopped = false;
 	
 	static {
 		jarFilter = new FilenameFilter() {
@@ -92,6 +93,13 @@ public class PluginHandler {
 		checksums4ldClassMap = new HashMap<Class<?>, String>();
 		checksums4ldLibsMap = new HashMap<URL, String>();
 		comparator = new AbcPluginsComparator();
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				if (!pluginsStopped)
+					stopPlugins();
+			}
+		});
 	}
 	
 	public void setPluginRepository(File pluginRepositoryDir, File servicesDir, File sharedLibsDir, Set<String> excludeFileNames) {
@@ -856,5 +864,12 @@ public class PluginHandler {
 				retVal.add(type);
 		}
 		return retVal;
+	}
+	
+	public void stopPlugins() {
+		for (ProxyPlugin plugin : ldPlugin4EntryMap.values()) {
+			stopPlugin(plugin);
+		}
+		pluginsStopped = true;
 	}
 }
