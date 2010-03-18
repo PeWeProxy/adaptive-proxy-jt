@@ -113,6 +113,7 @@ public class Connection {
 	proxy.addCurrentConnection (this);
 	responseHandler =
 	    new StandardResponseHeaders (proxy.getServerIdentity (), this);
+	proxy.getAdaptiveEngine().getEventsHandler().logClientMadeCon(this);
     }
 
     // For logging and status

@@ -15,22 +15,39 @@ public class EventsHandler {
 	static final Logger log = Logger.getLogger(EventsHandler.class);
 	
 	private final AdaptiveEngine adaptiveEngine;
-	private final List<CloseEventPlugin> closeEventPlugins;
+	private final List<ConnectionEventPlugin> connectionEventPlugins;
 	private final List<TimeoutEventPlugin> timeoutEventPlugins;
 	private final List<FailureEventPlugin> failureEventPlugins;
 	
 	public EventsHandler(AdaptiveEngine adaptiveEngine) {
 		this.adaptiveEngine = adaptiveEngine;
-		closeEventPlugins = new LinkedList<CloseEventPlugin>();
+		connectionEventPlugins = new LinkedList<ConnectionEventPlugin>();
 		timeoutEventPlugins = new LinkedList<TimeoutEventPlugin>();
 		failureEventPlugins = new LinkedList<FailureEventPlugin>();
 	}
 	
 	public void setup() {
 		PluginHandler pluginHandler = adaptiveEngine.getPluginHandler();
-		closeEventPlugins.addAll(pluginHandler.getPlugins(CloseEventPlugin.class));
+		connectionEventPlugins.addAll(pluginHandler.getPlugins(ConnectionEventPlugin.class));
 		timeoutEventPlugins.addAll(pluginHandler.getPlugins(TimeoutEventPlugin.class));
 		failureEventPlugins.addAll(pluginHandler.getPlugins(FailureEventPlugin.class));
+	}
+	
+	public void logClientMadeCon(Connection con) {
+		final InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
+		adaptiveEngine.getProxy().getNioHandler().runThreadTask(new Runnable() {
+			@Override
+			public void run() {
+				for (ConnectionEventPlugin plugin : connectionEventPlugins) {
+					try {
+						plugin.clientMadeConnection(clientSocketAdr);
+					} catch (Throwable t) {
+						log.info("Throwable raised during processing event by event plugin '"+plugin+"'",t);
+					}
+				}
+			}
+		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logClientClosedCon",
+				"Dispatching 'client made the connection' message to all ConnectionEventPlugin plugins"));
 	}
 	
 	public void logClientClosedCon(Connection con) {
@@ -38,7 +55,7 @@ public class EventsHandler {
 		adaptiveEngine.getProxy().getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				for (CloseEventPlugin plugin : closeEventPlugins) {
+				for (ConnectionEventPlugin plugin : connectionEventPlugins) {
 					try {
 						plugin.clientClosedConnection(clientSocketAdr);
 					} catch (Throwable t) {
@@ -47,7 +64,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logClientClosedCon",
-				"Dispatching 'client closed the connection' message to all CloseEventPlugin plugins"));
+				"Dispatching 'client closed the connection' message to all ConnectionEventPlugin plugins"));
 	}
 	
 	public void logProxyClosedCon(Connection con) {
@@ -57,7 +74,7 @@ public class EventsHandler {
 		Runnable task = new Runnable() {
 			@Override
 			public void run() {
-				for (CloseEventPlugin plugin : closeEventPlugins) {
+				for (ConnectionEventPlugin plugin : connectionEventPlugins) {
 					try {
 						if (requestPresent)
 							plugin.proxyClosedConnection(request);
@@ -73,7 +90,7 @@ public class EventsHandler {
 			task.run();
 		else
 			adaptiveEngine.getProxy().getNioHandler().runThreadTask(task, new DefaultTaskIdentifier(getClass().getSimpleName()+".logProxyClosedCon",
-				"Dispatching 'proxy closed the connection' message to all CloseEventPlugin plugins"));
+				"Dispatching 'proxy closed the connection' message to all ConnectionEventPlugin plugins"));
 	}
 
 	public void logRequestReadFailed(Connection con) {
@@ -95,7 +112,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logRequestReadFailed",
-		"Dispatching 'request read failed' message to all CloseEventPlugin plugins"));
+		"Dispatching 'request read failed' message to all FailureEventPlugin plugins"));
 	}
 
 	public void logRequestDeliveryFailed(Connection con) {
@@ -112,7 +129,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logRequestDeliveryFailed",
-		"Dispatching 'request delivery failed' message to all CloseEventPlugin plugins"));
+		"Dispatching 'request delivery failed' message to all FailureEventPlugin plugins"));
 	}
 
 	public void logResponseReadFailed(Connection con) {
@@ -134,7 +151,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logResponseReadFailed",
-		"Dispatching 'response read failed' message to all CloseEventPlugin plugins"));
+		"Dispatching 'response read failed' message to all FailureEventPlugin plugins"));
 	}
 
 	public void logResponseDeliveryFailed(Connection con) {
@@ -151,7 +168,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logResponseDeliveryFailed",
-		"Dispatching 'response delivery failed' message to all CloseEventPlugin plugins"));
+		"Dispatching 'response delivery failed' message to all FailureEventPlugin plugins"));
 	}
 
 	public void logRequestReadTimeout(Connection con) {
@@ -173,7 +190,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logRequestReadTimeout",
-		"Dispatching 'request read timeout' message to all CloseEventPlugin plugins"));
+		"Dispatching 'request read timeout' message to all TimeoutEventPlugin plugins"));
 	}
 
 	public void logRequestDeliveryTimeout(Connection con) {
@@ -190,7 +207,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logRequestDeliveryTimeout",
-		"Dispatching 'request delivery timeout' message to all CloseEventPlugin plugins"));
+		"Dispatching 'request delivery timeout' message to all TimeoutEventPlugin plugins"));
 	}
 
 	public void logResponseReadTimeout(Connection con) {
@@ -212,7 +229,7 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logResponseReadTimeout",
-		"Dispatching 'response read timeout' message to all CloseEventPlugin plugins"));
+		"Dispatching 'response read timeout' message to all TimeoutEventPlugin plugins"));
 	}
 
 	public void logResponseDeliveryTimeout(Connection con) {
@@ -229,12 +246,12 @@ public class EventsHandler {
 				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logResponseDeliveryTimeout",
-		"Dispatching 'response delivery timeout' message to all CloseEventPlugin plugins"));
+		"Dispatching 'response delivery timeout' message to all TimeoutEventPlugin plugins"));
 	}
 	
-	public List<CloseEventPlugin> getLoadedCloseEventPlugins() {
-		List<CloseEventPlugin> retVal = new LinkedList<CloseEventPlugin>();
-		retVal.addAll(closeEventPlugins);
+	public List<ConnectionEventPlugin> getLoadedCloseEventPlugins() {
+		List<ConnectionEventPlugin> retVal = new LinkedList<ConnectionEventPlugin>();
+		retVal.addAll(connectionEventPlugins);
 		return retVal;
 	}
 	
