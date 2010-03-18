@@ -18,9 +18,9 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.events.FailureEventPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.events.TimeoutEventPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServicePlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServicePlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
@@ -86,19 +86,19 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 	}
 	
 	private void addModulesPart(StringBuilder sb) {
-		sb.append ("<p><h2>Modules summary</h2></p>\n");
+		sb.append ("<p><h2>Service modules summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
 		sb.append ("<th width=\"20%\">Plugin name</th>");
 		sb.append ("<th width=\"70%\">Provided services</th>\n");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
 		sb.append ("<th width=\"5%\">RP</th>\n");
-		List<RequestServicePlugin> rqServicePlugins = RequestServiceHandleImpl.getLoadedModules();
-		List<ResponseServicePlugin> rpServicePlugins = ResponseServiceHandleImpl.getLoadedModules();
-		Set<ServicePlugin> loadedModules = new LinkedHashSet<ServicePlugin>();
+		List<RequestServiceModule> rqServicePlugins = RequestServiceHandleImpl.getLoadedModules();
+		List<ResponseServiceModule> rpServicePlugins = ResponseServiceHandleImpl.getLoadedModules();
+		Set<ServiceModule> loadedModules = new LinkedHashSet<ServiceModule>();
 		loadedModules.addAll(rqServicePlugins);
 		loadedModules.addAll(rpServicePlugins);
-		for (ServicePlugin plugin : loadedModules) {
+		for (ServiceModule plugin : loadedModules) {
 			sb.append ("<tr><td>");
 			sb.append(pluginHandler.getPluginName(plugin));
 			sb.append ("</td>\n<td>\n");

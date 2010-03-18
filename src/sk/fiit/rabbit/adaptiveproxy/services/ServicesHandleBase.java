@@ -34,7 +34,7 @@ import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceProvider;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ByteContentService;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ModifiableBytesService;
@@ -66,20 +66,20 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 		//cpDetector.add(ASCIIDetector.getInstance());
 	}
 	
-	static class ServicePluginsComparator implements Comparator<ServicePlugin> {
-		Map<ServicePlugin, Set<Class<? extends ProxyService>>> dependencies =
-			new HashMap<ServicePlugin, Set<Class<? extends ProxyService>>>();
-		Map<ServicePlugin, Set<Class<? extends ProxyService>>> providedServices =
-			new HashMap<ServicePlugin, Set<Class<? extends ProxyService>>>();
+	static class ServicePluginsComparator implements Comparator<ServiceModule> {
+		Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies =
+			new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();
+		Map<ServiceModule, Set<Class<? extends ProxyService>>> providedServices =
+			new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();
 		
-		public ServicePluginsComparator(Map<ServicePlugin, Set<Class<? extends ProxyService>>> dependencies,
-				Map<ServicePlugin, Set<Class<? extends ProxyService>>> providedServices) {
+		public ServicePluginsComparator(Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies,
+				Map<ServiceModule, Set<Class<? extends ProxyService>>> providedServices) {
 			this.dependencies = dependencies;
 			this.providedServices = providedServices;
 		}
 		
 		@Override
-		public int compare(ServicePlugin o1, ServicePlugin o2) {
+		public int compare(ServiceModule o1, ServiceModule o2) {
 			Set<Class<? extends ProxyService>> dependenciesOf2 = dependencies.get(o2);
 			if (dependenciesOf2 != null) {
 				Set<Class<? extends ProxyService>> providedSvcsBy1 = providedServices.get(o1);
@@ -436,7 +436,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 	
 	abstract void doSpecificServiceDiscovery();
 	
-	final void addServiceProviders(ServicePlugin plugin, List<? extends ServiceProvider> providedServices) {
+	final void addServiceProviders(ServiceModule plugin, List<? extends ServiceProvider> providedServices) {
 		for (ServiceProvider serviceProvider : providedServices) {
 			ProxyService service = serviceProvider.getService();
 			Class<? extends ProxyService> implementedService = serviceProvider.getServiceClass();

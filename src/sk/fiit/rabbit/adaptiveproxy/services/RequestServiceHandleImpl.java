@@ -10,22 +10,22 @@ import java.util.Set;
 import rabbit.http.HttpHeader;
 import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceProvider;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
 
-public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpRequestImpl,RequestServicePlugin> {
-	static List<RequestServicePlugin> plugins;
-	static Map<ServicePlugin, Set<Class<? extends ProxyService>>> providedServices;
+public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpRequestImpl,RequestServiceModule> {
+	static List<RequestServiceModule> plugins;
+	static Map<ServiceModule, Set<Class<? extends ProxyService>>> providedServices;
 	
 	public static void initPlugins(PluginHandler pluginHandler) {
-		plugins = new LinkedList<RequestServicePlugin>();
-		plugins.addAll(pluginHandler.getPlugins(RequestServicePlugin.class));
-		providedServices = new HashMap<ServicePlugin, Set<Class<? extends ProxyService>>>();
-		Map<ServicePlugin, Set<Class<? extends ProxyService>>> dependencies
-			= new HashMap<ServicePlugin, Set<Class<? extends ProxyService>>>();;
-		for (RequestServicePlugin plugin : plugins) {
+		plugins = new LinkedList<RequestServiceModule>();
+		plugins.addAll(pluginHandler.getPlugins(RequestServiceModule.class));
+		providedServices = new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();
+		Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies
+			= new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();;
+		for (RequestServiceModule plugin : plugins) {
 			try {
 				Set<Class<? extends ProxyService>> pluginDependencies = plugin.getDependencies();
 				if (pluginDependencies != null)
@@ -40,8 +40,8 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 		Collections.sort(plugins, new ServicePluginsComparator(dependencies,providedServices));
 	}
 	
-	public static List<RequestServicePlugin> getLoadedModules() {
-		List<RequestServicePlugin> retVal = new LinkedList<RequestServicePlugin>();
+	public static List<RequestServiceModule> getLoadedModules() {
+		List<RequestServiceModule> retVal = new LinkedList<RequestServiceModule>();
 		retVal.addAll(plugins);
 		return retVal;
 	}
@@ -51,12 +51,12 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	}
 	
 	@Override
-	Set<Class<? extends ProxyService>> getProvidedServices(RequestServicePlugin plugin) {
+	Set<Class<? extends ProxyService>> getProvidedServices(RequestServiceModule plugin) {
 		return providedServices.get(plugin);
 	}
 	
 	@Override
-	Set<Class<? extends ProxyService>> discoverDesiredServices(RequestServicePlugin plugin) {
+	Set<Class<? extends ProxyService>> discoverDesiredServices(RequestServiceModule plugin) {
 		try {
 			return plugin.desiredRequestServices(httpMessage.getClientRequestHeaders());
 		} catch (Throwable t) {
@@ -76,7 +76,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	
 	@Override
 	void doSpecificServiceDiscovery() {
-		for (RequestServicePlugin plugin : plugins) {
+		for (RequestServiceModule plugin : plugins) {
 			List<RequestServiceProvider> providers = null;
 			try {
 				providers = plugin.provideRequestServices(httpMessage);
