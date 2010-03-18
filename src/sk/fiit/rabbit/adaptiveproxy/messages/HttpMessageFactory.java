@@ -1,6 +1,6 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
+package sk.fiit.rabbit.adaptiveproxy.messages;
 
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.RequestHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
 
 public interface HttpMessageFactory {
 	ModifiableHttpRequest constructHttpRequest(HttpRequest request, RequestHeaders fromHeaders, String contentType);

@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.services;
+package sk.fiit.rabbit.adaptiveproxy.services;
 
 import info.monitorenter.cpdetector.io.ByteOrderMarkDetector;
 import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
@@ -28,14 +28,18 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.util.CharsetDetector;
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpMessageImpl;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpRequest;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpMessageImpl;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpRequest;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpResponse;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ByteContentService;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableBytesService;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableStringService;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.StringContentService;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.services.content.ByteContentService;
+import sk.fiit.rabbit.adaptiveproxy.services.content.ModifiableBytesService;
+import sk.fiit.rabbit.adaptiveproxy.services.content.ModifiableStringService;
+import sk.fiit.rabbit.adaptiveproxy.services.content.StringContentService;
 
 public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, PluginType extends ProxyPlugin> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);

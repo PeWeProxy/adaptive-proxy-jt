@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.services;
+package sk.fiit.rabbit.adaptiveproxy.services;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,8 +8,12 @@ import java.util.Map;
 import java.util.Set;
 
 import rabbit.http.HttpHeader;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponseImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpResponseImpl;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
 
 public final class ResponseServiceHandleImpl extends ServicesHandleBase<ModifiableHttpResponseImpl,ResponseServicePlugin> {
 	static List<ResponseServicePlugin> plugins;

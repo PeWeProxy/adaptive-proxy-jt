@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.services;
+package sk.fiit.rabbit.adaptiveproxy.services;
 
 import java.util.List;
 import java.util.Set;

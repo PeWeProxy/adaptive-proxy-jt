@@ -7,9 +7,9 @@ import org.apache.log4j.Logger;
 import rabbit.nio.DefaultTaskIdentifier;
 import rabbit.proxy.Connection;
 import sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpRequest;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpRequest;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpResponse;
 
 public class EventsHandler {
 	static final Logger log = Logger.getLogger(EventsHandler.class);

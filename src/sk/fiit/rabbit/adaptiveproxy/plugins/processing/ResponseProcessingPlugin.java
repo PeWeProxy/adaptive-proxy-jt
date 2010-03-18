@@ -1,9 +1,9 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.processing;
 
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpMessageFactory;
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpResponse;
+import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ResponsePlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpMessageFactory;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpResponse;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpResponse;
 
 public interface ResponseProcessingPlugin extends ResponsePlugin {
 	public enum ResponseProcessingActions {

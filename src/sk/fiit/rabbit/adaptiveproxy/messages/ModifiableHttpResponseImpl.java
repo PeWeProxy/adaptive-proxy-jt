@@ -1,9 +1,9 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
+package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import java.net.InetSocketAddress;
 
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
 
 public final class ModifiableHttpResponseImpl extends HttpMessageImpl implements ModifiableHttpResponse {
 	private final ModifiableHttpRequestImpl request;

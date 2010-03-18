@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.services;
+package sk.fiit.rabbit.adaptiveproxy.services;
 
 public final class ServiceUnavailableException extends Exception {
 	private static final long serialVersionUID = 7393269656517250304L;

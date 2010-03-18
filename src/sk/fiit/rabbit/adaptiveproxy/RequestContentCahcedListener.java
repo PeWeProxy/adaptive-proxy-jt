@@ -1,6 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy;
 
 import java.util.Queue;
+
 import rabbit.httpio.request.ContentCachingListener;
 import rabbit.proxy.Connection;
 

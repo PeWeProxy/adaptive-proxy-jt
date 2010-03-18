@@ -18,12 +18,12 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.events.FailureEventPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.events.TimeoutEventPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ProxyService;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServicePlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServicePlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicePlugin;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
+import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
 
 public class AdaptiveProxyStatus extends BaseMetaHandler {
 	AdaptiveEngine adaptiveEngine = null;

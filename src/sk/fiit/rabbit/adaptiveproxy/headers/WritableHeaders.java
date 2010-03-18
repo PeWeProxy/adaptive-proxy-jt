@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.headers;
+package sk.fiit.rabbit.adaptiveproxy.headers;
 
 public interface WritableHeaders extends ReadableHeaders {
 	

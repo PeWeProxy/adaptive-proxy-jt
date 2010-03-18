@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.services.content;
+package sk.fiit.rabbit.adaptiveproxy.services.content;
 
 import java.nio.charset.Charset;
 

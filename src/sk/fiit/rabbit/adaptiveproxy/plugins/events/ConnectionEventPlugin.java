@@ -2,8 +2,8 @@ package sk.fiit.rabbit.adaptiveproxy.plugins.events;
 
 import java.net.InetSocketAddress;
 
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpRequest;
 
 public interface ConnectionEventPlugin extends ProxyPlugin {
 	

@@ -11,7 +11,7 @@ import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 
 /** A class to verify if a cache entry can be used.
  *

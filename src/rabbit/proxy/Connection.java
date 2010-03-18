@@ -35,7 +35,7 @@ import rabbit.nio.DefaultTaskIdentifier;
 import rabbit.nio.NioHandler;
 import rabbit.nio.TaskIdentifier;
 import rabbit.util.Counter;
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 
 /** The base connection class for rabbit.
  *

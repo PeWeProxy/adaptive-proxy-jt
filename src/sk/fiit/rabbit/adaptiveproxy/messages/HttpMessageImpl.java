@@ -1,4 +1,4 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
+package sk.fiit.rabbit.adaptiveproxy.messages;
 
 public abstract class HttpMessageImpl {
 	byte[] data = null;

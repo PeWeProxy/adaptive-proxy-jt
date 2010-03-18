@@ -1,6 +1,6 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
+package sk.fiit.rabbit.adaptiveproxy.messages;
 
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.ResponseHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeaders;
 
 public interface HttpResponse extends HttpRequest {
 		ResponseHeaders getWebResponseHeaders();

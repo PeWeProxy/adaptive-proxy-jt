@@ -1,12 +1,12 @@
-package sk.fiit.rabbit.adaptiveproxy.plugins.messages;
+package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import java.util.Date;
 import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.plugins.headers.RequestHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
 import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
