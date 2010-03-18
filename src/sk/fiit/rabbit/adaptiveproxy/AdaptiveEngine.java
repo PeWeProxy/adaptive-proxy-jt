@@ -51,6 +51,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.RequestProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ProxyService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicesHandleBase;
@@ -178,24 +179,28 @@ public class AdaptiveEngine  {
 			if (log.isTraceEnabled())
 				log.trace("RQ: "+conHandle+" | Request separator used: "+separator.toString());
 			TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
-			boolean prefetch = conHandle.request.getServiceHandle().wantContent();
-			if (!prefetch) {
-				for (RequestProcessingPlugin requestPlugin : requestPlugins) {
-					if (requestPlugin.wantRequestContent(conHandle.request.getClientRequestHeaders())) {
-						if (log.isDebugEnabled())
-							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants request content");
-						prefetch = true;
-						break;
-					}
-				}
+			boolean prefetch = false;
+			Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
+			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
+				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
+					= requestPlugin.desiredRequestServices(conHandle.request.getClientRequestHeaders());
+				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
+					if (log.isDebugEnabled())
+						log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants 'content' service for request");
+					prefetch = true;
+					break;
+				} else
+					desiredServices.addAll(pluginsDesiredSvcs);
 			}
+			if (!prefetch)
+				prefetch = conHandle.request.getServiceHandle().needContent(desiredServices);
 			if (prefetch) {
 				RequestContentCahcedListener contentCachedListener = new RequestContentCahcedListener(con);
 				new ContentFetcher(con,bufHandle,tlh,separator,contentCachedListener,dataSize);
 				return;
 			} else {
 				if (log.isDebugEnabled())
-					log.debug("RQ: "+conHandle+" | No plugin wants request content");
+					log.debug("RQ: "+conHandle+" | No plugin wants 'content' service for request");
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator);
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
@@ -314,17 +319,21 @@ public class AdaptiveEngine  {
 		// conHandle.response.proxyRPHeaders were modified meanwhile
 		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
 		conHandle.adaptiveHandling = true;
-		if (conHandle.response.getServiceHandle().wantContent())
-			return true;
+		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
-			if (responsePlugin.wantResponseContent(conHandle.response.getWebResponseHeaders())) {
+			Set<Class<? extends ProxyService>> pluginsDesiredSvcs
+				= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeaders());
+			if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 				if (log.isDebugEnabled())
-					log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants request content");
+					log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants 'content' service for response");
 				return true;
-			}
+			} else
+				desiredServices.addAll(pluginsDesiredSvcs);
 		}
+		if (conHandle.request.getServiceHandle().needContent(desiredServices))
+			return true;
 		if (log.isDebugEnabled())
-			log.debug("RP: "+conHandle+" | No plugin wants response");
+			log.debug("RP: "+conHandle+" | No plugin wants 'content' service for response");
 		return false;
 	}
 

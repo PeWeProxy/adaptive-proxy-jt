@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.util.CharsetDetector;
+import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.messages.HttpMessageImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.plugins.messages.ModifiableHttpResponse;
@@ -36,13 +37,14 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableBytesServ
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableStringService;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.StringContentService;
 
-public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> implements ServicesHandle {
+public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, PluginType extends ProxyPlugin> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
 	static final Charset defaultCharset;
 	static final CodepageDetectorProxy cpDetector;
 	static Pattern stringServicesPattern;
 			
 	final MessageType httpMessage;
+	final List<PluginType> plugins;
 	final List<ServiceProvider> providersList;
 	final Map<ProxyService, ServiceProvider> serviceProviders;
 	final Map<Class<? extends ProxyService>, List<ProxyService>> services;
@@ -66,15 +68,10 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 		Map<ServicePlugin, Set<Class<? extends ProxyService>>> providedServices =
 			new HashMap<ServicePlugin, Set<Class<? extends ProxyService>>>();
 		
-		public ServicePluginsComparator(List<? extends ServicePlugin> plugins) {
-			for (ServicePlugin servicePlugin : plugins) {
-				Set<Class<? extends ProxyService>> pluginDependencies = servicePlugin.getDependencies();
-				if (pluginDependencies != null)
-					dependencies.put(servicePlugin, pluginDependencies);
-				Set<Class<? extends ProxyService>> pluginServices = servicePlugin.getProvidedServices();
-				if (pluginServices != null)
-					providedServices.put(servicePlugin, servicePlugin.getProvidedServices());
-			}
+		public ServicePluginsComparator(Map<ServicePlugin, Set<Class<? extends ProxyService>>> dependencies,
+				Map<ServicePlugin, Set<Class<? extends ProxyService>>> providedServices) {
+			this.dependencies = dependencies;
+			this.providedServices = providedServices;
 		}
 		
 		@Override
@@ -308,26 +305,50 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 		}
 	}
 	
-	public ServicesHandleBase(MessageType httpMessage) {
+	public ServicesHandleBase(MessageType httpMessage, List<PluginType> plugins) {
 		this.httpMessage = httpMessage;
+		this.plugins = plugins;
 		providersList = new LinkedList<ServiceProvider>();
 		serviceProviders = new HashMap<ProxyService, ServiceProvider>();
 		services = new HashMap<Class<? extends ProxyService>, List<ProxyService>>();
 	}
 	
-	<T extends ServicePlugin> void doContentNeedDiscovery(List<T> plugins) {
-		for (T plugin : plugins) {
-			if (discoverContentNeed(plugin)) {
-					wantContent = true;
+	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices) {
+		/*if (contentNeeded(desiredServices))
+			return true;*/
+		for (ListIterator<PluginType> iterator = plugins.listIterator(plugins.size()); iterator.hasPrevious();) {
+			PluginType plugin = iterator.previous();
+			if (overlapSets(desiredServices, getProvidedServices(plugin))) {
+				desiredServices.addAll(discoverDesiredServices(plugin));
+				if (contentNeeded(desiredServices)) {
 					if (log.isDebugEnabled())
 						log.debug(getLogTextHead()+"Service plugin "+plugin+" wants "
-								+getText4Logging(loggingTextTypes.NORMAL)+" content");
-					break;
+								+"'content' service for "+getText4Logging(loggingTextTypes.NORMAL));
+					return true;
+				}
 			}
 		}
+		return false;
 	}
 	
-	abstract <T extends ServicePlugin> boolean discoverContentNeed(T plugin);
+	private <E> boolean overlapSets(Set<E> set1, Set<E> set2) {
+		for (E element : set1) {
+			if (set2.contains(element))
+				return true;
+		}
+		return false;
+	}
+	
+	public static boolean contentNeeded(Set<Class<? extends ProxyService>> desiredServices) {
+		return (desiredServices.contains(ModifiableStringService.class)
+				|| desiredServices.contains(StringContentService.class)
+				|| desiredServices.contains(ModifiableBytesService.class)
+				|| desiredServices.contains(ByteContentService.class));
+	}
+	
+	abstract Set<Class<? extends ProxyService>> getProvidedServices(PluginType plugin);
+	
+	abstract Set<Class<? extends ProxyService>> discoverDesiredServices(PluginType plugin);
 	
 	protected enum loggingTextTypes {NORMAL,CAPITAL,SHORT};
 	
