@@ -52,7 +52,6 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 	final List<ServiceProvider> providersList;
 	final Map<ProxyService, ServiceProvider> serviceProviders;
 	final Map<Class<? extends ProxyService>, List<ProxyService>> services;
-	boolean wantContent = false;
 	boolean servicesDiscovered = false;
 	int lastRtnedSvcProviderIndex = -1;
 	boolean changesPropagation = false;
@@ -146,6 +145,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 			return ByteContentService.class;
 		}
 		
+		// TODO move to ModifiableBytesServiceProvider
 		@Override
 		public void doChanges() {
 			byte[] data = httpMessage.getData();
@@ -232,6 +232,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 				charset = newCharset;
 		}
 		
+		// TODO move to ModifiableContentServiceProvider
 		@Override
 		public void doChanges() {
 			if(!underlyingBytesChanged()) {
@@ -361,10 +362,6 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 	}
 	
 	abstract String getText4Logging(loggingTextTypes type);
-	
-	public boolean wantContent() {
-		return wantContent;
-	}
 	
 	public void doServiceDiscovery() {
 		if (servicesDiscovered)
