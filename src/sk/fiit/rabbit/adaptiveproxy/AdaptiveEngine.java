@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -50,6 +53,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.R
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServicesHandleBase;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
@@ -57,6 +61,7 @@ public class AdaptiveEngine  {
 	private static final File homeDir = new File(System.getProperty("user.dir"));
 	private static final String ORDERING_REQUEST_TEXT = "[request]";
 	private static final String ORDERING_RESPONSE_TEXT = "[response]";
+	private static final String DE_PATTERN_TEXTMSGS = "^text/(.*)|^application/xhtml(\\+xml)?";
 	
 	/*private static AdaptiveEngine instance;
 	
@@ -526,6 +531,15 @@ public class AdaptiveEngine  {
 			excludeFiles.add(pluginsOrderFileName);
 			pluginHandler.setPluginRepository(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles);
 		}
+		String patternString = prop.getProperty("stringServicesPattern", DE_PATTERN_TEXTMSGS);
+		Pattern pattern = null;
+		try {
+			pattern = Pattern.compile(patternString);
+		} catch (PatternSyntaxException e) {
+			log.info("Invalid or no pattern for string content services, default one will be used", e);
+			pattern = Pattern.compile(DE_PATTERN_TEXTMSGS);
+		}
+		ServicesHandleBase.setStringServicesPattern(pattern);
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");
 	}
