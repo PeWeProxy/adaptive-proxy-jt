@@ -406,9 +406,11 @@ public class PluginHandler {
 					servicesLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(servicesDirURL));
 			}
 			if (servicesLibsDirSame)
-				log.debug("Services definitions directory hasn not been changed");
+				log.info("Services definitions directory has not been changed");
+			else
+				log.info("Services definitions directory has been changed so all plugins will be reloaded");
 		} else
-			log.info("No services definitions directory set, no services will be available to processing plugins");
+			servicesLibsDirSame = true;
 		boolean sharedLibsDirSame = false;
 		if (sharedLibsDir != null) {
 			URL sharedDirURL = null;
@@ -424,7 +426,9 @@ public class PluginHandler {
 					sharedLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(sharedDirURL));
 			}
 			if (sharedLibsDirSame)
-				log.debug("Shared libraries directory hasn not been changed");
+				log.info("Shared libraries directory has not been changed");
+			else
+				log.info("Shared libraries directory has been changed so all plugins will be reloaded");
 		} else
 			sharedLibsDirSame = true;
 		Map<PluginConfigEntry, ProxyPlugin> tmpPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
@@ -457,43 +461,41 @@ public class PluginHandler {
 				if (!libsChanged) {
 					boolean supportsReconfigure = false;
 					try {
-						supportsReconfigure = loadedPlugin.supportsReconfigure();
+						supportsReconfigure = loadedPlugin.supportsReconfigure(newCfgEntry.properties);
 					} catch (Throwable t) {
 						log.info("Throwable raised while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'",t);
 					}
 					if (supportsReconfigure) {
-						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring at it's current state");
-						if (newCfgEntry != null) {
-							Class<?> newClazz = null;
-							try {
-								newClazz = loadClass(newCfgEntry.className, newCfgEntry.classLoader);
-							} catch (ClassNotFoundException e) {
-								log.info("Plugin '"+newCfgEntry.name+"' | plugin class '"+newCfgEntry.className+"' not found at '"+
-										new File(pluginRepositoryDir,newCfgEntry.classLocation).getAbsolutePath()+"'", e);
-							}
-							Class<?> oldClass = loadedPlugin.getClass();
-							String newClassChecksum = null;
-							if (newClazz != null) {
-								newClassChecksum = checksums4ldClassMap.get(newClazz);
-								if (oldClass == newClazz || checksums4ldClassMap.get(oldClass).equals(newClassChecksum)) {
-									log.debug("Seems like class '"+newClazz.getName()+"' hasn't changed, so we try to keep already loaded plugin '"+loadedPlugin+"'");
-									if (setupPlugin(loadedPlugin, newCfgEntry.properties)) {
-										tmpPlugin4EntryMap.put(newCfgEntry,loadedPlugin);
-										entry4ldPluginMap.put(loadedPlugin, newCfgEntry);
-										if (newClazz != loadedPlugin.getClass())
-											checksums4ldClassMap.remove(newClazz);
-										newCfgEntry.classLoader = oldClass.getClassLoader();
-										log.debug("Loaded plugin '"+loadedPlugin+"' preserved, no classes (re)loading will ocur");
-										continue;
-									} else
-										log.debug("Plugin of class '"+newCfgEntry.className+"' is not reconfigured properly, it was stoped and thrown away");
-								} else {
-									log.debug("Seems like class '"+newClazz.getName()+"' has changed, thus plugin '"+loadedPlugin+"' will be reloaded");
-								}
+						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring with new properties at it's current state");
+						Class<?> newClazz = null;
+						try {
+							newClazz = loadClass(newCfgEntry.className, newCfgEntry.classLoader);
+						} catch (ClassNotFoundException e) {
+							log.info("Plugin '"+newCfgEntry.name+"' | plugin class '"+newCfgEntry.className+"' not found at '"+
+									new File(pluginRepositoryDir,newCfgEntry.classLocation).getAbsolutePath()+"'", e);
+						}
+						Class<?> oldClass = loadedPlugin.getClass();
+						String newClassChecksum = null;
+						if (newClazz != null) {
+							newClassChecksum = checksums4ldClassMap.get(newClazz);
+							if (oldClass == newClazz || checksums4ldClassMap.get(oldClass).equals(newClassChecksum)) {
+								log.debug("Seems like class '"+newClazz.getName()+"' hasn't changed, so we try to keep already loaded plugin '"+loadedPlugin+"'");
+								if (startPlugin(loadedPlugin, newCfgEntry.properties)) {
+									tmpPlugin4EntryMap.put(newCfgEntry,loadedPlugin);
+									entry4ldPluginMap.put(loadedPlugin, newCfgEntry);
+									if (newClazz != loadedPlugin.getClass())
+										checksums4ldClassMap.remove(newClazz);
+									newCfgEntry.classLoader = oldClass.getClassLoader();
+									log.debug("Loaded plugin '"+loadedPlugin+"' preserved, no classes (re)loading will ocur");
+									continue;
+								} else
+									log.debug("Plugin of class '"+newCfgEntry.className+"' is not reconfigured properly, it will be stoped and thrown away");
+							} else {
+								log.debug("Seems like class '"+newClazz.getName()+"' has changed, thus plugin '"+loadedPlugin+"' will be reloaded");
 							}
 						}
 					} else
-						log.debug("Loaded plugin '"+loadedPlugin+"' does not support reconfiguring at it's current state so it'll be reloaded");
+						log.debug("Loaded plugin '"+loadedPlugin+"' does not support reconfiguring with new properties at it's current state so it'll be reloaded");
 				} else {
 					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed so it'll be reloaded");
 				}
@@ -541,23 +543,12 @@ public class PluginHandler {
 		return urls.equals(getCLoaderURLSet((URLClassLoader)cLoader));
 	}
 	
-	private boolean setupPlugin(ProxyPlugin plugin, PluginProperties props) {
-		log.info("Setting up plugin '"+plugin+"'");
-		try {
-			return plugin.setup(props);
-		} catch (Throwable t) {
-			log.info("Throwable raised while seting up plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
-		}
-		return false;
-	}
-	
-	private boolean startPlugin(ProxyPlugin plugin) {
+	private boolean startPlugin(ProxyPlugin plugin, PluginProperties props) {
 		log.info("Starting plugin '"+plugin+"'");
 		try {
-			plugin.start();
-			return true;
+			return plugin.start(props);
 		} catch (Throwable t) {
-			log.info("Throwable raised while starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
+			log.info("Throwable raised while seting up and starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
 		return false;
 	}
@@ -841,7 +832,7 @@ public class PluginHandler {
 			if (clazz != null) {
 				plugin = getInstance(clazz);
 				if (plugin != null) {
-					if (setupPlugin(plugin, cfgEntry.properties) && startPlugin(plugin)) {
+					if (startPlugin(plugin,cfgEntry.properties)) {
 						ldPlugin4EntryMap.put(cfgEntry, plugin);
 						entry4ldPluginMap.put(plugin, cfgEntry);
 					} else {
