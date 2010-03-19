@@ -1,6 +1,6 @@
 package sk.fiit.rabbit.adaptiveproxy.messages;
 
-import sk.fiit.rabbit.adaptiveproxy.headers.WritableResponseHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.WritableResponseHeader;
 
 /**
  * Representation of modifiable HTTP response message.
@@ -13,5 +13,5 @@ public interface ModifiableHttpResponse extends HttpResponse {
 	 * server back to the client.
 	 * @return sending HTTP response header
 	 */
-	WritableResponseHeaders getProxyResponseHeaders();
+	WritableResponseHeader getProxyResponseHeader();
 }

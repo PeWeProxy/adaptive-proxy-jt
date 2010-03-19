@@ -7,8 +7,8 @@ import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
-import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
 import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
@@ -24,7 +24,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	
 	@Override
 	public ModifiableHttpRequest constructHttpRequest(InetSocketAddress clientSocket,
-			RequestHeaders baseHeader, boolean withContent) {
+			RequestHeader baseHeader, boolean withContent) {
 		HeaderWrapper clientHeaders = null;
 		if (baseHeader != null) {
 			clientHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
@@ -39,7 +39,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	}
 
 	@Override
-	public ModifiableHttpResponse constructHttpResponse(ResponseHeaders baseHeader, boolean withContent) {
+	public ModifiableHttpResponse constructHttpResponse(ResponseHeader baseHeader, boolean withContent) {
 		HeaderWrapper fromHeaders = null;
 		if (baseHeader != null)
 			fromHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());

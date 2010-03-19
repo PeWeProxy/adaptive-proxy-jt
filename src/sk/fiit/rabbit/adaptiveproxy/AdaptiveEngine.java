@@ -166,10 +166,10 @@ public class AdaptiveEngine  {
 		conHandle.request = new ModifiableHttpRequestImpl(new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
 		conHandle.messageFactory = new HttpMessageFactoryImpl(con,conHandle.request);
 		conHandle.requestChunking = chunking;
-		con.setProxyRHeader(conHandle.request.getProxyRequestHeaders().getBackedHeader());
+		con.setProxyRHeader(conHandle.request.getProxyRequestHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
-					+conHandle.request.getClientRequestHeaders().getRequestLine()+")");
+					+conHandle.request.getClientRequestHeader().getRequestLine()+")");
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -186,7 +186,7 @@ public class AdaptiveEngine  {
 			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 				try {
 					Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-						= requestPlugin.desiredRequestServices(conHandle.request.getClientRequestHeaders());
+						= requestPlugin.desiredRequestServices(conHandle.request.getClientRequestHeader());
 					if (pluginsDesiredSvcs == null)
 						pluginsDesiredSvcs = Collections.emptySet();
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
@@ -311,7 +311,7 @@ public class AdaptiveEngine  {
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
 					+response.getReasonPhrase()+" | requested "
-					+conHandle.request.getProxyRequestHeaders().getRequestLine()+")");
+					+conHandle.request.getProxyRequestHeader().getRequestLine()+")");
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
@@ -331,7 +331,7 @@ public class AdaptiveEngine  {
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 			try {
 				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-					= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeaders());
+					= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeader());
 				if (pluginsDesiredSvcs == null)
 					pluginsDesiredSvcs = Collections.emptySet();
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
@@ -393,7 +393,7 @@ public class AdaptiveEngine  {
 		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {
-				handler.sendResponse(response.getProxyResponseHeaders().getBackedHeader(),modifiedContent);
+				handler.sendResponse(response.getProxyResponseHeader().getBackedHeader(),modifiedContent);
 			}
 		});
 	}
@@ -456,8 +456,8 @@ public class AdaptiveEngine  {
 		BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(new byte[4096]));
 		Connection con = conHandle.con;
 		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
-		HttpHeader requestHeaders = conHandle.request.getProxyRequestHeaders().getBackedHeader();
-		final HttpHeader responseHeaders = conHandle.response.getProxyResponseHeaders().getBackedHeader();
+		HttpHeader requestHeaders = conHandle.request.getProxyRequestHeader().getBackedHeader();
+		final HttpHeader responseHeaders = conHandle.response.getProxyResponseHeader().getBackedHeader();
 		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
 		handlerFactory.nextInstanceWillNotCache();
 		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, bufHandle, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
@@ -471,29 +471,29 @@ public class AdaptiveEngine  {
 	
 	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
 		return "Running plugins processing on request \""
-			+ conHandle.request.getClientRequestHeaders().getRequestLine()
+			+ conHandle.request.getClientRequestHeader().getRequestLine()
 			+ "\" from " + conHandle.request.getClientSocketAddress();
 	}
 
 	private String responseProcessingTaskInfo (ConnectionHandle conHandle) {
 		return "Running plugins processing on response \""
-			+ conHandle.response.getWebResponseHeaders().getStatusLine()
-			+ "\" for request \"" + conHandle.request.getProxyRequestHeaders().getRequestLine()
+			+ conHandle.response.getWebResponseHeader().getStatusLine()
+			+ "\" for request \"" + conHandle.request.getProxyRequestHeader().getRequestLine()
 			+ "\" from " + conHandle.request.getClientSocketAddress();
 	}
 
 	private String requestSendingTaskInfo(ConnectionHandle conHandle) {
 		return "Proceeding in handling request \""
-			+ conHandle.request.getProxyRequestHeaders().getRequestLine()
-			+ "\" (orig: \""+ conHandle.request.getClientRequestHeaders().getRequestLine()
+			+ conHandle.request.getProxyRequestHeader().getRequestLine()
+			+ "\" (orig: \""+ conHandle.request.getClientRequestHeader().getRequestLine()
 			+ "\") from " + conHandle.request.getClientSocketAddress();
 	}
 
 	private String responseSendingTaskInfo (ConnectionHandle conHandle) {
 		return "Proceeding in handling response \""
-			+ conHandle.response.getProxyResponseHeaders().getStatusLine()
-			+ "\" (orig: \""+ conHandle.response.getWebResponseHeaders().getStatusLine()
-			+ "\") for request \"" + conHandle.request.getProxyRequestHeaders().getRequestLine()
+			+ conHandle.response.getProxyResponseHeader().getStatusLine()
+			+ "\" (orig: \""+ conHandle.response.getWebResponseHeader().getStatusLine()
+			+ "\") for request \"" + conHandle.request.getProxyRequestHeader().getRequestLine()
 			+ "\" from " + conHandle.request.getClientSocketAddress();
 	}
 
@@ -667,6 +667,6 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(connection);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response on "
-					+conHandle.request.getProxyRequestHeaders().getRequestLine());
+					+conHandle.request.getProxyRequestHeader().getRequestLine());
 	}
 }

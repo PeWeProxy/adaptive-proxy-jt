@@ -530,7 +530,7 @@ public class Connection {
 				@Override
 				public void run() {
 					HttpHeader response = ((HeaderWrapper)getProxy().getAdaptiveEngine()
-						.getResponseForConnection(Connection.this).getProxyResponseHeaders()).getBackedHeader();
+						.getResponseForConnection(Connection.this).getProxyResponseHeader()).getBackedHeader();
 					sendAndRestart (response);
 				}
 			});

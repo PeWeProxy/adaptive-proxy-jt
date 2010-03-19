@@ -2,7 +2,7 @@ package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import java.net.InetSocketAddress;
 
-import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
 
 /**
  * Representation of read-only HTTP requests message.
@@ -14,14 +14,14 @@ public interface HttpRequest extends HttpMessage {
 	 * Returns read-only HTTP request header received from the client.
 	 * @return original HTTP request header received from the client
 	 */
-	RequestHeaders getClientRequestHeaders();
+	RequestHeader getClientRequestHeader();
 	
 	/**
 	 * Returns read-only HTTP request header that will be (or was) sent by proxy
 	 * server to the web source.
 	 * @return sending HTTP request header
 	 */
-	RequestHeaders getProxyRequestHeaders();
+	RequestHeader getProxyRequestHeader();
 	
 	/**
 	 * Returns client's endpoint info (socket address) of connection through which

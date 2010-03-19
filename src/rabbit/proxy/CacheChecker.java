@@ -98,7 +98,7 @@ class CacheChecker {
 				@Override
 				public void run() {
 					HttpHeader response = ((HeaderWrapper)conn.getProxy().getAdaptiveEngine()
-						.getResponseForConnection(conn).getProxyResponseHeaders()).getBackedHeader();
+						.getResponseForConnection(conn).getProxyResponseHeader()).getBackedHeader();
 					conn.sendAndClose (response);
 				}
 			});

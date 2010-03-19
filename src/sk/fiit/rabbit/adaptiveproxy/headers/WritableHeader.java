@@ -5,7 +5,7 @@ package sk.fiit.rabbit.adaptiveproxy.headers;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  * @see <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2">RFC 2616: 4.2 Message Headers</a>
  */
-public interface WritableHeaders extends ReadableHeaders {
+public interface WritableHeader extends ReadableHeader {
 	
 	/**
 	 * Sets the HTTP version value of this message header.

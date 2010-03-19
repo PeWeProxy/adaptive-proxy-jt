@@ -19,12 +19,12 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl implements 
 	}
 	
 	@Override
-	public HeaderWrapper getProxyRequestHeaders() {
+	public HeaderWrapper getProxyRequestHeader() {
 		return proxyRQHeaders;
 	}
 
 	@Override
-	public HeaderWrapper getClientRequestHeaders() {
+	public HeaderWrapper getClientRequestHeader() {
 		return clientRQHeaders;
 	}
 

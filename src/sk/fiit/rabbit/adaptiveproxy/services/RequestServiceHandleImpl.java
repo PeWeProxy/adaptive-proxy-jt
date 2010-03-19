@@ -58,7 +58,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	@Override
 	Set<Class<? extends ProxyService>> discoverDesiredServices(RequestServiceModule plugin) {
 		try {
-			return plugin.desiredRequestServices(httpMessage.getClientRequestHeaders());
+			return plugin.desiredRequestServices(httpMessage.getClientRequestHeader());
 		} catch (Throwable t) {
 			log.info("Throwable raised while obtaining set of desired services from RequestServiceModule '"+plugin+"'",t);
 		}
@@ -101,12 +101,12 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 
 	@Override
 	HttpHeader getOriginalHeader() {
-		return httpMessage.getClientRequestHeaders().getBackedHeader();
+		return httpMessage.getClientRequestHeader().getBackedHeader();
 	}
 	
 	@Override
 	HttpHeader getProxyHeader() {
-		return httpMessage.getProxyRequestHeaders().getBackedHeader();
+		return httpMessage.getProxyRequestHeader().getBackedHeader();
 	}
 	
 	@Override

@@ -2,7 +2,7 @@ package sk.fiit.rabbit.adaptiveproxy.plugins;
 
 import java.util.Set;
 
-import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ByteContentService;
 
@@ -10,7 +10,7 @@ import sk.fiit.rabbit.adaptiveproxy.services.content.ByteContentService;
  * Base interface for proxy plugins that are involved in the process of handling HTTP requests.
  * This interface defines only one method used to decide whether request body data should be
  * precached before processing by plugins or not (see
- * {@link #desiredRequestServices(RequestHeaders)}).
+ * {@link #desiredRequestServices(RequestHeader)}).
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
@@ -23,5 +23,5 @@ public interface RequestPlugin extends ProxyPlugin {
 	 * @param clientRQHeaders read-only request headers
 	 * @return set of service classes that plugin wishes to have later in the processing phase
 	 */
-	Set<Class<? extends ProxyService>> desiredRequestServices(RequestHeaders clientRQHeaders);
+	Set<Class<? extends ProxyService>> desiredRequestServices(RequestHeader clientRQHeaders);
 }

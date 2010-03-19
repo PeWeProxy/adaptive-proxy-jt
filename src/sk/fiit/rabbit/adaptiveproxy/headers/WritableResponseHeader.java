@@ -5,7 +5,7 @@ package sk.fiit.rabbit.adaptiveproxy.headers;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface WritableResponseHeaders extends ResponseHeaders, WritableHeaders {
+public interface WritableResponseHeader extends ResponseHeader, WritableHeader {
 	
 	/**
 	 * Sets the status line value of this response message header.

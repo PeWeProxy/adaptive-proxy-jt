@@ -2,8 +2,8 @@ package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import java.net.InetSocketAddress;
 
-import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeaders;
-import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeaders;
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
 
 /**
  * A HTTP message factory is an entity, that could serve proxy plugins as a builder
@@ -26,7 +26,7 @@ public interface HttpMessageFactory {
 	 * @param withContent whether constructed request should have body
 	 * @return constructed HTTP request message
 	 */
-	ModifiableHttpRequest constructHttpRequest(InetSocketAddress clientSocket, RequestHeaders baseHeader, boolean withContent);
+	ModifiableHttpRequest constructHttpRequest(InetSocketAddress clientSocket, RequestHeader baseHeader, boolean withContent);
 	
 	/**
 	 * Returns constructed HTTP response based on copy of passed HTTP response header
@@ -36,5 +36,5 @@ public interface HttpMessageFactory {
 	 * @param baseHeader HTTP response header to base constructed message on, may be null 
 	 * @param withContent whether constructed response should message
 	 */
-	ModifiableHttpResponse constructHttpResponse(ResponseHeaders baseHeader, boolean withContent);
+	ModifiableHttpResponse constructHttpResponse(ResponseHeader baseHeader, boolean withContent);
 }

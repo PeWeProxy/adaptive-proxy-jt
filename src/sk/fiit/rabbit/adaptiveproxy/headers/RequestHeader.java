@@ -5,7 +5,7 @@ package sk.fiit.rabbit.adaptiveproxy.headers;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestHeaders extends ReadableHeaders {
+public interface RequestHeader extends ReadableHeader {
 	/**
 	 * Returns the request line value of this request message header.
 	 * @return request line of this request header

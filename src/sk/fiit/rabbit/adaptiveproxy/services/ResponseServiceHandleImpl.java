@@ -58,7 +58,7 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Modifiab
 	@Override
 	Set<Class<? extends ProxyService>> discoverDesiredServices(ResponseServiceModule plugin) {
 		try {
-			return plugin.desiredResponseServices(httpMessage.getWebResponseHeaders());
+			return plugin.desiredResponseServices(httpMessage.getWebResponseHeader());
 		} catch (Throwable t) {
 			log.info("RP | Throwable raised while obtaining set of desired services from ResponseServicePlugin of class '"+plugin.getClass()+"'",t);
 		}
@@ -101,16 +101,16 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Modifiab
 	
 	@Override
 	HttpHeader getOriginalHeader() {
-		return httpMessage.getWebResponseHeaders().getBackedHeader();
+		return httpMessage.getWebResponseHeader().getBackedHeader();
 	}
 	
 	@Override
 	HttpHeader getProxyHeader() {
-		return httpMessage.getProxyResponseHeaders().getBackedHeader();
+		return httpMessage.getProxyResponseHeader().getBackedHeader();
 	}
 	
 	@Override
 	HttpHeader getRequestHeader() {
-		return httpMessage.getProxyRequestHeaders().getBackedHeader();
+		return httpMessage.getProxyRequestHeader().getBackedHeader();
 	}
 }

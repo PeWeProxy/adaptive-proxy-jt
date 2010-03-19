@@ -20,7 +20,8 @@ public interface ProxyPlugin {
 	 * This method is called to configure (reconfigure) and start this proxy plugin. In this
 	 * method the plugin should allocate all needed resources and do all possibly time
 	 * consuming preparations according to passed properties <code>props</code> loaded
-	 * from the plugin's configuration file in the plugins folder.
+	 * from the plugin's configuration file in the plugins folder. Returning value signals
+	 * whether this plugin was successfully configured / started and is ready for action.
 	 * </p><p>
 	 * <i>Reconfiguration</i><br>
 	 * Reconfiguration of a loaded and running proxy plugin takes place only if plugin's

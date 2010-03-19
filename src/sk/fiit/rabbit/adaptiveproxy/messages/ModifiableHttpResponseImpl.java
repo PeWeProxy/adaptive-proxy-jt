@@ -20,12 +20,12 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl implements
 	}
 	
 	@Override
-	public HeaderWrapper getProxyResponseHeaders() {
+	public HeaderWrapper getProxyResponseHeader() {
 		return proxyRPHeaders;
 	}
 	
 	@Override
-	public HeaderWrapper getWebResponseHeaders() {
+	public HeaderWrapper getWebResponseHeader() {
 		return webRPHeaders;
 	}
 	
@@ -35,13 +35,13 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl implements
 	}
 
 	@Override
-	public HeaderWrapper getProxyRequestHeaders() {
-		return request.getProxyRequestHeaders();
+	public HeaderWrapper getProxyRequestHeader() {
+		return request.getProxyRequestHeader();
 	}
 
 	@Override
-	public HeaderWrapper getClientRequestHeaders() {
-		return request.getClientRequestHeaders();
+	public HeaderWrapper getClientRequestHeader() {
+		return request.getClientRequestHeader();
 	}
 	
 	@Override

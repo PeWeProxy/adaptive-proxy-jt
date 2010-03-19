@@ -7,7 +7,7 @@ import java.util.List;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  * @see <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2">RFC 2616: 4.2 Message Headers</a>
  */
-public interface ReadableHeaders {
+public interface ReadableHeader {
 	public enum HTTPVersion {
 		HTTP_09,
 		HTTP_10,
