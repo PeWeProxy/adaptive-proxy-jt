@@ -218,11 +218,11 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 				hStart += 3;
 				int resStart = destination.indexOf('/', hStart);
 				if (resStart != -1) {
-					backedHeader.setRequestLine(destination);
+					backedHeader.setRequestURI(destination);
 					if (host != null)
 						backedHeader.setHeader("Host", destination.substring(hStart, resStart));
 				} else {
-					backedHeader.setRequestLine(destination+"/");
+					backedHeader.setRequestURI(destination+"/");
 					if (host != null)
 						backedHeader.setHeader("Host", destination.substring(hStart));
 				}
@@ -231,15 +231,16 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 				int protoEnd = reqURI.indexOf("://");
 				if (protoEnd != -1)
 					protocol = reqURI.substring(0, protoEnd+3) ;
-				backedHeader.setRequestURI(protocol+destination);
 				int resStart = destination.indexOf('/');
 				if (resStart == -1) {
 					if (host != null)
 						backedHeader.setHeader("Host", destination);
+					destination = destination+"/";
 				} else {
 					if (host != null)
 						backedHeader.setHeader("Host", destination.substring(0, resStart));
 				}
+				backedHeader.setRequestURI(protocol+destination);
 			}
 		}
 	}

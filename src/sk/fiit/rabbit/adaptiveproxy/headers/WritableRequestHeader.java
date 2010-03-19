@@ -37,8 +37,7 @@ public interface WritableRequestHeader extends RequestHeader, WritableHeader {
 	
 	/**
 	 * Sets the the request line and host header fields of this request message header
-	 * to correctly point to resource on host referenced by <code>hostURI</code> under
-	 * relative path <code>resourcePath</code>.
+	 * to correctly point to resource referenced by passed absolute URI address.
 	 * @param destination new absolute URI address of the requested resource 
 	 * @see <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html#sec5.1.2">RFC 2616: 5.1.2 Request-URI</a>
 	 */
