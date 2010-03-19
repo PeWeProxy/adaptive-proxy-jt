@@ -132,14 +132,18 @@ public class HttpHeader extends GeneralHeader implements Cloneable {
      * @return the http version.
      */
     public String getHTTPVersion () {
+    if (isRequest())
 	return httpVersion;
+    else return method;
     }
 
     /** Set the HTTP Version to use for request.
      * @param version the version to use.
      */
     public void setHTTPVersion (String version) {
+    if (isRequest())
 	httpVersion = version;
+    else method = version;
     }
     
     /** Get the HTTP version of the response (only valid for responses).

@@ -83,14 +83,15 @@ public class GeneralHeader implements Storable {
     }
 
     /** Set a specified header 
+     * @param type the type or category that we want to set
      * @param current the type or category that we want to set.
      * @param newValue the value we want to set
      */
-    public void setExistingValue (String current, String newValue) {
+    public void setExistingValue (String type, String current, String newValue) {
 	int s = headers.size ();
 	for (int i = 0; i < s; i++) {
 	    Header h = headers.get (i);
-	    if (h.getValue ().equals (current)) {
+	    if (h.getType().equals(type) && h.getValue ().equals (current)) {
 		h.setValue (newValue);
 		return;
 	    }	    

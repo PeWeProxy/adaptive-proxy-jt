@@ -1,10 +1,41 @@
 package sk.fiit.rabbit.adaptiveproxy.headers;
 
 import java.util.List;
-
 import rabbit.http.HttpHeader;
 
 public final class HeaderWrapper implements WritableRequestHeaders, WritableResponseHeaders {
+	enum HTTP_Version {
+		HTTP_11 (HTTPVersion.HTTP_11,"HTTP/1.1"),
+		HTTP_10 (HTTPVersion.HTTP_10,"HTTP/1.0"),
+		HTTP_09 (HTTPVersion.HTTP_09,"HTTP/0.9");
+		
+		HTTPVersion APIversion;
+		String versionString;
+		
+		private HTTP_Version(HTTPVersion APIversion, String versionString) {
+			this.APIversion = APIversion;
+			this.versionString = versionString;
+		}
+			
+		static HTTPVersion getType4String(String versionstring) {
+			HTTPVersion retVal = null;
+			for (HTTP_Version type : HTTP_Version.values()) {
+				if (type.versionString.equals(versionstring)) {
+					retVal = type.APIversion;
+					break;
+				}
+			}
+			return retVal;
+		}
+		
+		static HTTP_Version getType4APIType(HTTPVersion version) {
+			for (HTTP_Version type : HTTP_Version.values()) {
+				if (type.APIversion == version)
+					return type;
+			}
+			return null;
+		}
+	}
 	private final HttpHeader backedHeader; 
 	
 	public HeaderWrapper(HttpHeader header) {
@@ -16,8 +47,8 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 	}
 	
 	@Override
-	public void addHeader(String type, String value) {
-		backedHeader.addHeader(type, value);
+	public void addField(String name, String value) {
+		backedHeader.addHeader(name, value);
 	}
 	
 	/*@Override
@@ -26,21 +57,26 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 	}*/
 	
 	@Override
-	public String getHeader(String type) {
-		return backedHeader.getHeader(type);
+	public String getField(String name) {
+		return backedHeader.getHeader(name);
 	}
 	
 	@Override
-	public List<String> getHeaders(String type) {
-		return backedHeader.getHeaders(type);
+	public List<String> getFields(String name) {
+		return backedHeader.getHeaders(name);
 	}
 	
 	@Override
-	public String getHTTPVersion() {
+	public String getHTTPVersionString() {
 		if (backedHeader.isRequest())
 			return backedHeader.getHTTPVersion();
 		else
 			return backedHeader.getResponseHTTPVersion();
+	}
+	
+	@Override
+	public HTTPVersion getHTTPVersion() {
+		return HTTP_Version.getType4String(getHTTPVersionString());
 	}
 	
 	@Override
@@ -64,6 +100,24 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 	}
 	
 	@Override
+	public String getDestionation() {
+		String reqURI = getRequestURI();
+		String host = getField("Host");
+		if (reqURI.charAt(0) == '/') {
+			// Podla RFC by proxy srv VZDY mal dostat plnu URI v Request-Line
+			// tudiz toto by sa NIKDY nemalo stat
+			String protocol = "";
+			String versionString = getHTTPVersionString();
+			if (versionString.toLowerCase().contains("http/"))
+				protocol = "http://";
+			else if (getHTTPVersionString().toLowerCase().contains("https/"))
+				protocol = "https://";
+			return protocol+host+reqURI;
+		}
+		return reqURI;
+	}
+	
+	@Override
 	public String getStatusCode() {
 		return backedHeader.getStatusCode();
 	}
@@ -73,18 +127,18 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 		return backedHeader.getStatusLine();
 	}
 	
-	@Override
-	public boolean isSecure() {
+	/*@Override
+	public boolean isTunneling() {
 		return backedHeader.isSecure();
+	}*/
+	
+	@Override
+	public void removeField(String name) {
+		backedHeader.removeHeader(name);
 	}
 	
 	@Override
-	public void removeHeader(String type) {
-		backedHeader.removeHeader(type);
-	}
-	
-	@Override
-	public void removeValue(String value) {
+	public void removeValue(String name, String value) {
 		backedHeader.removeValue(value);
 	}
 	
@@ -94,21 +148,31 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 	}*/
 	
 	@Override
-	public void setExistingValue(String current, String newValue) {
-		backedHeader.setExistingValue(current, newValue);
+	public void setExistingValue(String name, String value, String newValue) {
+		backedHeader.setExistingValue(null, value, newValue);
 	}
 	
 	@Override
-	public void setHeader(String type, String value) {
-		backedHeader.setHeader(type, value);
+	public void setField(String name, String value) {
+		backedHeader.setHeader(name, value);
 	}
 	
 	@Override
-	public void setHTTPVersion(String version) {
+	public void setHTTPVersionString(String version) {
 		if (backedHeader.isRequest())
 			backedHeader.setHTTPVersion(version);
 		else
 			backedHeader.setResponseHTTPVersion(version);
+	}
+	
+	@Override
+	public void setHTTPVersion(HTTPVersion version) {
+		String versionString = HTTP_Version.getType4APIType(version).versionString;
+		if (backedHeader.isRequest())
+			backedHeader.setHTTPVersion(versionString);
+		else
+			backedHeader.setResponseHTTPVersion(versionString);
+		
 	}
 	
 	@Override
@@ -129,6 +193,55 @@ public final class HeaderWrapper implements WritableRequestHeaders, WritableResp
 	@Override
 	public void setRequestURI(String requestURI) {
 		backedHeader.setRequestURI(requestURI);
+	}
+	
+	@Override
+	public void setDestination(String destination) {
+		String reqURI = getRequestURI();
+		String host = getField("Host");
+		if (reqURI.charAt(0) == '/' && host != null) {
+			// nemalo by sa vykonat kedze klienti MUSIA posielat uplnu
+			// absolutnu URI ked idu cez proxy
+			int hStart = destination.indexOf("://");
+			hStart = (hStart == -1) ? 0 : hStart+3;
+			int resStart = destination.indexOf('/', hStart);
+			if (resStart != -1) {
+				backedHeader.setHeader("Host", destination.substring(hStart, resStart));
+				backedHeader.setRequestURI(destination.substring(resStart));
+			} else {
+				backedHeader.setHeader("Host", destination.substring(hStart));
+				backedHeader.setRequestURI("/");
+			}
+		} else {
+			int hStart = destination.indexOf("://");
+			if (hStart != -1) {
+				hStart += 3;
+				int resStart = destination.indexOf('/', hStart);
+				if (resStart != -1) {
+					backedHeader.setRequestLine(destination);
+					if (host != null)
+						backedHeader.setHeader("Host", destination.substring(hStart, resStart));
+				} else {
+					backedHeader.setRequestLine(destination+"/");
+					if (host != null)
+						backedHeader.setHeader("Host", destination.substring(hStart));
+				}
+			} else {
+				String protocol = "http://";
+				int protoEnd = reqURI.indexOf("://");
+				if (protoEnd != -1)
+					protocol = reqURI.substring(0, protoEnd+3) ;
+				backedHeader.setRequestURI(protocol+destination);
+				int resStart = destination.indexOf('/');
+				if (resStart == -1) {
+					if (host != null)
+						backedHeader.setHeader("Host", destination);
+				} else {
+					if (host != null)
+						backedHeader.setHeader("Host", destination.substring(0, resStart));
+				}
+			}
+		}
 	}
 	
 	@Override

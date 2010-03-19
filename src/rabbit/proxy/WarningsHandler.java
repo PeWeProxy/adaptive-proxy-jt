@@ -85,7 +85,7 @@ class WarningsHandler {
 		    }
 		}
 		if (sb.length () != 0) 
-		    header.setExistingValue (val, sb.toString ());
+		    header.setExistingValue ("Warning", val, sb.toString ());
 		else 
 		    header.removeValue (val);
 	    } catch (StringIndexOutOfBoundsException e) {
