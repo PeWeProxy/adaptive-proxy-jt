@@ -16,6 +16,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -324,7 +325,10 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 		for (ListIterator<PluginType> iterator = plugins.listIterator(plugins.size()); iterator.hasPrevious();) {
 			PluginType plugin = iterator.previous();
 			if (overlapSets(desiredServices, getProvidedServices(plugin))) {
-				desiredServices.addAll(discoverDesiredServices(plugin));
+				Set<Class<? extends ProxyService>> plgDesiredSvcs = discoverDesiredServices(plugin);
+				if (plgDesiredSvcs == null)
+					plgDesiredSvcs = Collections.emptySet();
+				desiredServices.addAll(plgDesiredSvcs);
 				if (contentNeeded(desiredServices)) {
 					if (log.isDebugEnabled())
 						log.debug(getLogTextHead()+"Service plugin "+plugin+" wants "

@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -183,15 +184,21 @@ public class AdaptiveEngine  {
 			boolean prefetch = false;
 			Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
-				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-					= requestPlugin.desiredRequestServices(conHandle.request.getClientRequestHeaders());
-				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
-					if (log.isDebugEnabled())
-						log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants 'content' service for request");
-					prefetch = true;
-					break;
-				} else
-					desiredServices.addAll(pluginsDesiredSvcs);
+				try {
+					Set<Class<? extends ProxyService>> pluginsDesiredSvcs
+						= requestPlugin.desiredRequestServices(conHandle.request.getClientRequestHeaders());
+					if (pluginsDesiredSvcs == null)
+						pluginsDesiredSvcs = Collections.emptySet();
+					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
+						if (log.isDebugEnabled())
+							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants 'content' service for request");
+						prefetch = true;
+						break;
+					} else
+						desiredServices.addAll(pluginsDesiredSvcs);
+				} catch (Throwable t) {
+					log.info("RQ: Throwable raised while obtaining set of desired services from plugin '"+requestPlugin+"'",t);
+				}
 			}
 			if (!prefetch)
 				prefetch = conHandle.request.getServiceHandle().needContent(desiredServices);
@@ -322,14 +329,20 @@ public class AdaptiveEngine  {
 		conHandle.adaptiveHandling = true;
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
-			Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-				= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeaders());
-			if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
-				if (log.isDebugEnabled())
-					log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants 'content' service for response");
-				return true;
-			} else
-				desiredServices.addAll(pluginsDesiredSvcs);
+			try {
+				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
+					= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeaders());
+				if (pluginsDesiredSvcs == null)
+					pluginsDesiredSvcs = Collections.emptySet();
+				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
+					if (log.isDebugEnabled())
+						log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants 'content' service for response");
+					return true;
+				} else
+					desiredServices.addAll(pluginsDesiredSvcs);
+			} catch (Throwable t) {
+				log.info("RP: Throwable raised while obtaining set of desired services from plugin '"+responsePlugin+"'",t);
+			}
 		}
 		if (conHandle.request.getServiceHandle().needContent(desiredServices))
 			return true;

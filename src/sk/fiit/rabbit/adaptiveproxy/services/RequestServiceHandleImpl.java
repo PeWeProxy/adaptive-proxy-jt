@@ -60,7 +60,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 		try {
 			return plugin.desiredRequestServices(httpMessage.getClientRequestHeaders());
 		} catch (Throwable t) {
-			log.info("Throwable raised while obtaining set of desired services from RequestServicePlugin of class '"+plugin.getClass()+"'",t);
+			log.info("Throwable raised while obtaining set of desired services from RequestServiceModule '"+plugin+"'",t);
 		}
 		return Collections.emptySet();
 	}
@@ -81,7 +81,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 			try {
 				providers = plugin.provideRequestServices(httpMessage);
 			} catch (Throwable t) {
-				log.info("Throwable raised while obtaining service providers from RequestServicePlugin of class '"+plugin.getClass()+"'",t);
+				log.info("Throwable raised while obtaining service providers from RequestServiceModule '"+plugin+"'",t);
 			}
 			if (providers != null && !providers.isEmpty())
 				addServiceProviders(plugin,providers);
