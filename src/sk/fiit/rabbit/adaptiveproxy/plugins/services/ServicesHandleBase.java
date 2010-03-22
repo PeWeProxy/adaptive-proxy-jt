@@ -94,7 +94,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 					}
 				}
 			}
-			return 0;
+			return 1;
 		}
 	}
 	
