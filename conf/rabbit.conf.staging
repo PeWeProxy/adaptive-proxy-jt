@@ -14,7 +14,7 @@
 
 # This is the port the proxy listens on.
 # Use any port available (over 1024 unless you run as root).
-port=9666
+port=9667
 
 # The number of selector threads to run
 # If not specified will use the same as the number of processors
