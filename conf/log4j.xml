@@ -1,53 +1,56 @@
+<?xml version="1.0"?>
 <!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
-<log4j:configuration debug="false" xmlns:log4j="http://jakarta.apache.org/log4j/">
-    <appender name="zeroconf" class="org.apache.log4j.net.ZeroConfSocketHubAppender">
-        <param name="Name" value="AdaptiveProxy Logging"/>
-		<param name="LocationInfo" value="true" />
-    </appender>
-    <appender name="stdout" class="org.apache.log4j.ConsoleAppender">
-        <param name="Name" value="Standard output appender"/>
-        <layout class="org.apache.log4j.PatternLayout">
-			<!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
-			<param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
-		</layout>
-    </appender>
-    <!--
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/" debug="false">
+  <appender name="zeroconf" class="org.apache.log4j.net.ZeroConfSocketHubAppender">
+    <param name="Name" value="AdaptiveProxy Logging"/>
+    <param name="LocationInfo" value="true"/>
+  </appender>
+  <appender name="file" class="org.apache.log4j.FileAppender">
+    <param name="Name" value="File appender"/>
+    <param name="File" value="logs/adaptive-proxy.log"/>
+    <param name="Append" value="false"/>
+    <layout class="org.apache.log4j.PatternLayout">
+      <!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
+      <param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
+    </layout>
+  </appender>
+  <!--
     <appender name="socket" class="org.apache.log4j.net.SocketHubAppender">
         <param name="Name" value="SocketHubAppender@4560"/>
    		<param name="Port" value="4560"/>
    		<param name="Threshold" value="ALL"/>
     </appender>
     -->
-    <logger name="org.apache">
-    	<level value="warn" />
-    </logger>
-    <logger name="rabbit">
-    	<level value="debug" />
-    </logger>
-    <!-- <logger name="rabbit.util.CharsetDetector">
+  <logger name="org.apache">
+    <level value="warn"/>
+  </logger>
+  <logger name="rabbit">
+    <level value="debug"/>
+  </logger>
+  <!-- <logger name="rabbit.util.CharsetDetector">
     	<level value="all" />
     </logger> -->
-    <logger name="sk.fiit.rabbit.adaptiveproxy">
-    	<level value="warn" />
-    </logger>
-     <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
-    	<level value="trace" />
-    </logger>
-    <logger name="rabbit.handler.AdaptiveHandler">
-    	<level value="debug" />
-    </logger>
-    <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
-    	<level value="debug" />
-    </logger>
-    <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
-    	<level value="warn" />
-    </logger>
-    <logger name="sk.fiit.redeemer.test">
-    	<level value="warn" />
-    </logger>
-    <!--ROOT Logger-->
-    <root>
-        <level value="all" />
-        <appender-ref ref="stdout" />
-    </root>
+  <logger name="sk.fiit.rabbit.adaptiveproxy">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
+    <level value="trace"/>
+  </logger>
+  <logger name="rabbit.handler.AdaptiveHandler">
+    <level value="debug"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
+    <level value="debug"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.redeemer.test">
+    <level value="warn"/>
+  </logger>
+  <!--ROOT Logger-->
+  <root>
+    <level value="all"/>
+    <appender-ref ref="file"/>
+  </root>
 </log4j:configuration>
