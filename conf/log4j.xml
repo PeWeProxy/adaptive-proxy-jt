@@ -5,9 +5,10 @@
     <param name="Name" value="AdaptiveProxy Logging"/>
     <param name="LocationInfo" value="true"/>
   </appender>
-  <appender name="file" class="org.apache.log4j.FileAppender">
+  <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
     <param name="Name" value="File appender"/>
     <param name="File" value="log/adaptive-proxy.log"/>
+    <param name="DatePattern" value="'.'yyyy-MM-dd"/>
     <param name="Append" value="false"/>
     <layout class="org.apache.log4j.PatternLayout">
       <!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
