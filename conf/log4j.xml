@@ -22,7 +22,7 @@
     	<level value="warn" />
     </logger>
     <logger name="rabbit">
-    	<level value="debug" />
+    	<level value="warn" />
     </logger>
     <!-- <logger name="rabbit.util.CharsetDetector">
     	<level value="all" />
@@ -31,13 +31,13 @@
     	<level value="warn" />
     </logger>
      <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
-    	<level value="trace" />
+    	<level value="warn" />
     </logger>
     <logger name="rabbit.handler.AdaptiveHandler">
-    	<level value="debug" />
+    	<level value="warn" />
     </logger>
     <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
-    	<level value="debug" />
+    	<level value="warn" />
     </logger>
     <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
     	<level value="warn" />
