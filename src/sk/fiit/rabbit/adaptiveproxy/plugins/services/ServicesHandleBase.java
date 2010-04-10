@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+
 import org.apache.log4j.Logger;
 import rabbit.http.HttpHeader;
 import rabbit.util.CharsetDetector;
@@ -38,6 +40,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
 	static final Charset defaultCharset;
 	static final CodepageDetectorProxy cpDetector;
+	static Pattern stringServicesPattern;
 			
 	final MessageType httpMessage;
 	final List<ServiceProvider> providersList;
@@ -350,8 +353,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 			
 			HttpHeader header = getOriginalHeader();
 			String contentType = header.getHeader("Content-Type");
-			// TODO mimes move to config
-			if (contentType != null && (contentType.startsWith("text") || contentType.startsWith("application/xhtml"))) {
+			if (contentType != null && stringServicesPattern.matcher(contentType).matches()) {
 				Charset charset = null;
 				boolean detected = false;
 				try {
@@ -500,6 +502,10 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 			changesPropagation = false;
 		}
 		return retVal;
+	}
+	
+	public static void setStringServicesPattern(Pattern pattern) {
+		stringServicesPattern = pattern;
 	}
 	
 	@Override
