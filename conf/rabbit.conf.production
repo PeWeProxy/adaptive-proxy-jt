@@ -53,7 +53,7 @@ StrictHTTP=false
 
 [AdaptiveEngine]
 # Points to log4j configuration file to be used to configure Log4j logging
-#logging_conf=conf/log4j.xml
+logging_conf=conf/log4j.xml
 
 # If 'logging_conf' property is not set, default logging to console
 # configured with this logging level will be used. If no value is set
