@@ -7,7 +7,7 @@
   </appender>
   <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
     <param name="Name" value="File appender"/>
-    <param name="File" value="log/adaptive-proxy.log"/>
+    <param name="File" value="logs/adaptive-proxy.log"/>
     <param name="DatePattern" value="'.'yyyy-MM-dd"/>
     <param name="Append" value="false"/>
     <layout class="org.apache.log4j.PatternLayout">
@@ -26,7 +26,7 @@
     <level value="warn"/>
   </logger>
   <logger name="rabbit">
-    <level value="debug"/>
+    <level value="warn"/>
   </logger>
   <!-- <logger name="rabbit.util.CharsetDetector">
     	<level value="all" />
@@ -35,13 +35,13 @@
     <level value="warn"/>
   </logger>
   <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
-    <level value="trace"/>
+    <level value="warn"/>
   </logger>
   <logger name="rabbit.handler.AdaptiveHandler">
-    <level value="debug"/>
+    <level value="warn"/>
   </logger>
   <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
-    <level value="debug"/>
+    <level value="warn"/>
   </logger>
   <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
     <level value="warn"/>
