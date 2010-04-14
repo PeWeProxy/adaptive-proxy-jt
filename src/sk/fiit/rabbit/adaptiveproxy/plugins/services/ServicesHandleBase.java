@@ -1,10 +1,10 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
-import info.monitorenter.cpdetector.io.ASCIIDetector;
 import info.monitorenter.cpdetector.io.ByteOrderMarkDetector;
 import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
-import info.monitorenter.cpdetector.io.JChardetFacade;
 import info.monitorenter.cpdetector.io.ParsingDetector;
+import info.monitorenter.cpdetector.io.UnknownCharset;
+
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -56,8 +56,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 		cpDetector = CodepageDetectorProxy.getInstance();
 		cpDetector.add(new ByteOrderMarkDetector());
 		cpDetector.add(new ParsingDetector(true));
-		cpDetector.add(JChardetFacade.getInstance());
-		cpDetector.add(ASCIIDetector.getInstance());
+		//cpDetector.add(JChardetFacade.getInstance());
+		//cpDetector.add(ASCIIDetector.getInstance());
 	}
 	
 	static class ServicePluginsComparator implements Comparator<ServicePlugin> {
@@ -371,7 +371,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 						log.warn(getLogTextHead()+"Exception raised while trying to detect charset by cpDetector");
 					}
 				}
-				if (charset == null)
+				if (charset == null || charset instanceof UnknownCharset)
 					charset = defaultCharset;
 				CharBuffer charbuf = null;
 				try {
