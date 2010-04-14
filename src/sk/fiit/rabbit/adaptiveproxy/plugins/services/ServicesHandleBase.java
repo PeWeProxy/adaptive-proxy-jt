@@ -1,9 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
-import info.monitorenter.cpdetector.io.ASCIIDetector;
 import info.monitorenter.cpdetector.io.ByteOrderMarkDetector;
 import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
-import info.monitorenter.cpdetector.io.JChardetFacade;
 import info.monitorenter.cpdetector.io.ParsingDetector;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -56,8 +54,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 		cpDetector = CodepageDetectorProxy.getInstance();
 		cpDetector.add(new ByteOrderMarkDetector());
 		cpDetector.add(new ParsingDetector(true));
-		cpDetector.add(JChardetFacade.getInstance());
-		cpDetector.add(ASCIIDetector.getInstance());
+		//cpDetector.add(JChardetFacade.getInstance());
+		//cpDetector.add(ASCIIDetector.getInstance());
 	}
 	
 	static class ServicePluginsComparator implements Comparator<ServicePlugin> {
