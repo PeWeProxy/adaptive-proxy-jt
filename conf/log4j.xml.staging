@@ -47,7 +47,7 @@
   </logger>
   <!--ROOT Logger-->
   <root>
-    <level value="all"/>
+    <level value="warn"/>
     <appender-ref ref="file"/>
     <appender-ref ref="hoptoad" />
   </root>
