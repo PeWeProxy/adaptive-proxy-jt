@@ -55,7 +55,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl> im
 		defaultCharset = Charset.forName("ISO-8859-1");
 		cpDetector = CodepageDetectorProxy.getInstance();
 		cpDetector.add(new ByteOrderMarkDetector());
-		cpDetector.add(new ParsingDetector(true));
+		cpDetector.add(new ParsingDetector(false));
 		//cpDetector.add(JChardetFacade.getInstance());
 		//cpDetector.add(ASCIIDetector.getInstance());
 	}
