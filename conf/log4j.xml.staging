@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/" debug="false">
+  <appender name="zeroconf" class="org.apache.log4j.net.ZeroConfSocketHubAppender">
+    <param name="Name" value="AdaptiveProxy Logging"/>
+    <param name="LocationInfo" value="true"/>
+  </appender>
+  <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
+    <param name="Name" value="File appender"/>
+    <param name="File" value="logs/adaptive-proxy.log"/>
+    <param name="DatePattern" value="'.'yyyy-MM-dd"/>
+    <param name="Append" value="false"/>
+    <layout class="org.apache.log4j.PatternLayout">
+      <!-- <param name="ConversionPattern" value="%-5p [%t] %c{2} @ %C{1}.%M()  : %m%n"/> -->
+      <param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
+    </layout>
+  </appender>
+  <appender name="hoptoad" class="code.lucamarrocco.hoptoad.HoptoadAppender">
+    	<param name="Name" value="Hoptoad appender"/>
+    	<param name="api_key" value="98c15e1b46bdbb1d93229daec24af000"/>
+    	<param name="env" value="staging"/>
+    	<param name="enabled" value="true"/>
+  </appender>
+  <logger name="org.apache">
+    <level value="warn"/>
+  </logger>
+  <logger name="rabbit">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine">
+    <level value="warn"/>
+  </logger>
+  <logger name="rabbit.handler.AdaptiveHandler">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.services">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.rabbit.adaptiveproxy.plugins.PluginHandler">
+    <level value="warn"/>
+  </logger>
+  <logger name="sk.fiit.redeemer.test">
+    <level value="warn"/>
+  </logger>
+  <!--ROOT Logger-->
+  <root>
+    <level value="all"/>
+    <appender-ref ref="file"/>
+    <appender-ref ref="hoptoad" />
+  </root>
+</log4j:configuration>

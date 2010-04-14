@@ -15,22 +15,18 @@
       <param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
     </layout>
   </appender>
-  <!--
-    <appender name="socket" class="org.apache.log4j.net.SocketHubAppender">
-        <param name="Name" value="SocketHubAppender@4560"/>
-   		<param name="Port" value="4560"/>
-   		<param name="Threshold" value="ALL"/>
-    </appender>
-    -->
+  <appender name="hoptoad" class="code.lucamarrocco.hoptoad.HoptoadAppender">
+    	<param name="Name" value="Hoptoad appender"/>
+    	<param name="api_key" value="98c15e1b46bdbb1d93229daec24af000"/>
+    	<param name="env" value="production"/>
+    	<param name="enabled" value="true"/>
+  </appender>
   <logger name="org.apache">
     <level value="warn"/>
   </logger>
   <logger name="rabbit">
     <level value="warn"/>
   </logger>
-  <!-- <logger name="rabbit.util.CharsetDetector">
-    	<level value="all" />
-    </logger> -->
   <logger name="sk.fiit.rabbit.adaptiveproxy">
     <level value="warn"/>
   </logger>
@@ -53,5 +49,6 @@
   <root>
     <level value="all"/>
     <appender-ref ref="file"/>
+    <appender-ref ref="hoptoad" />
   </root>
 </log4j:configuration>
