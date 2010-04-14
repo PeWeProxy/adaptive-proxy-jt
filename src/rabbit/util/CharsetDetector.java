@@ -2,9 +2,18 @@ package rabbit.util;
 
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.HashMap;
+import java.util.Map;
+
 import rabbit.http.HttpHeader;
 
 public abstract class CharsetDetector {
+	private static final Map<String, String> substitutions;
+	
+	static {
+		substitutions = new HashMap<String, String>();
+		substitutions.put("UTF=8", "UTF-8");
+	}
 	
 	public static String detectCharsetString(HttpHeader headers) {
 		String cs = null;
@@ -24,6 +33,8 @@ public abstract class CharsetDetector {
 					cs = "ISO8859_1";*/
 		    }
 	    }
+		if (cs != null && substitutions.containsKey(cs))
+			cs = substitutions.get(cs);
 		return cs;
 	}
 	
