@@ -2,8 +2,8 @@ package sk.fiit.rabbit.adaptiveproxy.utils;
 
 import rabbit.http.HttpHeader;
 
-public final class ContentHeadersRemover {
-	private ContentHeadersRemover() {}
+public final class HeaderUtils {
+	private HeaderUtils() {}
 	
 	public static void removeContentHeaders(HttpHeader headers) {
 		headers.removeHeader("Transfer-Encoding");

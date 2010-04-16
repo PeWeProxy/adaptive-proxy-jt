@@ -30,7 +30,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import sk.fiit.rabbit.adaptiveproxy.utils.MD5ChecksumGenerator;
+import sk.fiit.rabbit.adaptiveproxy.utils.ChecksumUtils;
 import sk.fiit.rabbit.adaptiveproxy.utils.XMLFileParser;
 
 public class PluginHandler {
@@ -203,7 +203,7 @@ public class PluginHandler {
 				}
 				
 				try {
-					newLibChecksums.put(url, MD5ChecksumGenerator.createHexChecksum(libFile,classFilter));
+					newLibChecksums.put(url, ChecksumUtils.createHexChecksum(libFile,classFilter));
 				} catch (IOException e) {
 					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' for MD5 checksum computing");
 				}
@@ -354,7 +354,7 @@ public class PluginHandler {
 					}
 				}
 				try {
-					newLibChecksums.put(sharedDirURL, MD5ChecksumGenerator.createHexChecksum(dir,loadableFilter));
+					newLibChecksums.put(sharedDirURL, ChecksumUtils.createHexChecksum(dir,loadableFilter));
 				} catch (IOException e) {
 					log.info("Error when reading "+logDirDescr+" direcotry '"+dir.getAbsolutePath()+"' for MD5 checksum computing");
 				}
@@ -805,7 +805,7 @@ public class PluginHandler {
 		Class<?> clazz = cLoader.loadClass(className);
 		try {
 			File classFile = getClassFile(clazz);
-			checksums4ldClassMap.put(clazz, MD5ChecksumGenerator.createHexChecksum(classFile,null));
+			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
 			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
 				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so proxy server won't be able to reload it on the fly if it changes");

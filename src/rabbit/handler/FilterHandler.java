@@ -19,7 +19,7 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import rabbit.util.CharsetDetector;
+import rabbit.util.CharsetUtils;
 import rabbit.util.SProperties;
 import rabbit.zip.GZipUnpackListener;
 import rabbit.zip.GZipUnpacker;
@@ -87,7 +87,7 @@ public class FilterHandler extends GZipHandler {
 	    if (overrideCharSet != null) {
 	    	cs = overrideCharSet;
 	    } else {
-	    	cs = CharsetDetector.detectCharsetString(response); 
+	    	cs = CharsetUtils.detectCharsetString(response); 
 	    	if (cs == null)
 	    		cs = defaultCharSet;
 	    }

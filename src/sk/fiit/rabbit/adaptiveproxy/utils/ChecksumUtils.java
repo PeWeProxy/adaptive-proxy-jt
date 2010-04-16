@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.log4j.Logger;
 
-public final class MD5ChecksumGenerator {
-	private static final Logger log = Logger.getLogger(MD5ChecksumGenerator.class.getName());
+public final class ChecksumUtils {
+	private static final Logger log = Logger.getLogger(ChecksumUtils.class.getName());
 	private static final MessageDigest md5Generator;
 	private static final byte[] HEX_CHAR_TABLE;    
 	 
@@ -33,7 +33,7 @@ public final class MD5ChecksumGenerator {
 			    (byte)'c', (byte)'d', (byte)'e', (byte)'f'};    
 	}
 	
-	private MD5ChecksumGenerator() {}
+	private ChecksumUtils() {}
 	
 	private static byte[] createChecksum(File file) throws IOException {
 		//log.debug("\tCalculating MD5 checksum for file "+file);

@@ -12,7 +12,7 @@ import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
 import sk.fiit.rabbit.adaptiveproxy.utils.BytesChunker;
-import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
+import sk.fiit.rabbit.adaptiveproxy.utils.HeaderUtils;
 import sk.fiit.rabbit.adaptiveproxy.utils.InMemBytesStore;
 
 public class AdaptiveHandler extends FilterHandler {
@@ -147,7 +147,7 @@ public class AdaptiveHandler extends FilterHandler {
 		} else {
 			if (log.isDebugEnabled())
 				log.debug("Sending response with no data");
-			ContentHeadersRemover.removeContentHeaders(response);
+			HeaderUtils.removeContentHeaders(response);
 			isCompressing = false;
 			if (this.content != null) {
 				this.content.release();
