@@ -61,9 +61,9 @@ logging_conf=conf/log4j.xml
 logging_level=ALL
 
 # Path to plugin's home directory. This is the directory from which plugins'
-# configuration xml files will be loaded. Path is relative to JVM working
-# directory. When no value is set, default path 'plugins' is used. 
-#pluginsHome=plugins
+# configuration xml files will be loaded. Path is relative to this configuration
+# file parent directory. When no value is set, default path '../plugins' is used.
+#pluginsHome=../plugins
 
 # Path to services definitions directory. This is the directory in which all jar
 # files will be accessible by plugins' dynamically created class loaders. The
@@ -75,7 +75,7 @@ logging_level=ALL
 # Path to shared libraries directory. This is the directory in which all libraries
 # = jar files in it's subtree, will be accessible by plugins' dynamically created class
 # loaders. The whole directory is also used for classloading the same way as if it was
-# in JVM classpath. When no value is set, default path 'shared_libs' is used. Use blank
+# in JVM classpath. When no value is set, default path '../shared_libs' is used. Use blank
 # if you don't want to use any shared directory. Path is relative to 'pluginsHome'
 # directory.
 #shared_libs_folder=

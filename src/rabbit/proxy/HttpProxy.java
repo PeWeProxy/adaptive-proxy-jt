@@ -135,6 +135,8 @@ public class HttpProxy implements Resolver {
     private AdaptiveEngine adaptiveEngine;
     
     private String htdocsDir;
+    
+    private File cfgFile;
 
     public HttpProxy () throws UnknownHostException {
 	localhost = InetAddress.getLocalHost ();
@@ -144,13 +146,13 @@ public class HttpProxy implements Resolver {
      * @param conf the name of the file to use for proxy configuration.
      */
     public void setConfig (String conf) throws IOException {
-    File cfgFile = new File(conf); 
+    cfgFile = new File(conf); 
     String path = cfgFile.getAbsolutePath();
     try {
     	path = cfgFile.getCanonicalPath();
     } catch (IOException ignored) {}
     System.out.println("Proxy is using configuration file "+path);	
-	setConfig (new Config (conf));
+	setConfig (new Config (cfgFile));
     }
 
     private void setupLogging () {
@@ -657,4 +659,8 @@ public class HttpProxy implements Resolver {
     public String getHtdocsDir() {
     	return htdocsDir;
     }
+    
+    public File getConfigFile() {
+		return cfgFile;
+	}
 }
