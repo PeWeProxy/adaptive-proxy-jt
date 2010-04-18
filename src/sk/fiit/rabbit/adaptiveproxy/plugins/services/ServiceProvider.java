@@ -15,11 +15,12 @@ public interface ServiceProvider<Service extends ProxyService> {
 	 */
 	Service getService();
 	
-	boolean initChangedModel();
-	
 	/**
-	 * Returns runtime class of service implementation this service provider provides.
-	 * @return class of provided service implementation
+	 * Returns whether initialization of service implementation this provider provides
+	 * changes realization's inner model. This value is used to determine if this provider
+	 * should be considered only one with up-to-date inner model after it's creation.
+	 * @return <code>true</code> if creation of this provider's service implementation
+	 * changed it's inner model, <code>false</code> otherwise 
 	 */
-	//Class<? extends ProxyService> getServiceClass();
+	boolean initChangedModel();
 }

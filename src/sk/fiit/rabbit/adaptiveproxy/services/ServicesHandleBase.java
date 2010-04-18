@@ -48,8 +48,6 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		@Override
 		public boolean start(PluginProperties props) {return true;}
 		@Override
-		public Set<Class<? extends ProxyService>> getDependencies() {return null;		}
-		@Override
 		public Set<Class<? extends ProxyService>> getProvidedRequestServices() {return null;}
 		@Override
 		public Set<Class<? extends ProxyService>> getProvidedResponseServices() {return null;}
@@ -311,8 +309,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				if (changedModelBinding != binding) {
 					if (!actualServicesBindings.contains(binding)) {
 						// usable service realization is not initialized (within group of others)
-						if (log.isTraceEnabled())
-							log.trace(getLogTextHead()+"New "+svcInfo.serviceClass.getName()+" service realization has to be created");
+						if (log.isDebugEnabled())
+							log.debug(getLogTextHead()+"New "+svcInfo.serviceClass.getName()+" service realization has to be created");
 						if (changedModelBinding != null) {
 							applyLastChanges();
 						}
@@ -357,8 +355,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 			} catch (Throwable t) {
 				log.info(getLogTextHead()+"Service provider "+svcProvider+" raised throwable when initChangedModel() called",t);
 			}
-			if (log.isTraceEnabled())
-				log.trace(getLogTextHead()+((modifyingInit)? "M": "Non-m")+"odifying initialization of provider "+svcProvider+" made");
+			if (log.isDebugEnabled())
+				log.debug(getLogTextHead()+((modifyingInit)? "M": "Non-m")+"odifying initialization of provider "+svcProvider+" made");
 			if (modifyingInit)
 				actualServicesBindings.clear();
 		} catch (Throwable t) {
@@ -391,6 +389,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (svcProvider == null)
 			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
 		Service svcImpl = createRealService(svcProvider, serviceClass);
+		if (log.isTraceEnabled())
+			log.trace(getLogTextHead()+"Service provider "+svcProvider+" provided for service "+serviceClass.getName());
 		return new ServiceRealization<Service>(svcImpl, svcProvider, module);
 	}
 	
@@ -417,7 +417,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> ServiceRealization<Service> getNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
 		if (log.isDebugEnabled())
-			log.debug(getLogTextHead()+"Asking for service "+svcInfo.serviceClass);
+			log.debug(getLogTextHead()+"Asking for service "+svcInfo.serviceClass.getName());
 		boolean skip = (svcInfo.ignoredModule != null);
 		// try to use already initialized service
 		for (ServiceBinding<?> existingBinding : actualServicesBindings) {
@@ -438,10 +438,12 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 		skip = (svcInfo.ignoredModule != null);
 		ServiceUnavailableException cause = null;
-		// if one of basic services, provide realizations
-		ServiceProvider<Service> basicSvcProvider = getBasicProvider(svcInfo.serviceClass);
-		if (basicSvcProvider != null) {
-			return new ServiceRealization<Service>(basicSvcProvider.getService(), basicSvcProvider, (ModuleType)baseModule);
+		// if one of base services, provide realizations
+		ServiceProvider<Service> baseSvcProvider = getBasicProvider(svcInfo.serviceClass);
+		if (baseSvcProvider != null) {
+			if (log.isTraceEnabled())
+				log.trace(getLogTextHead()+"Base service provider "+baseSvcProvider+" created");
+			return new ServiceRealization<Service>(baseSvcProvider.getService(), baseSvcProvider, (ModuleType)baseModule);
 		}
 		for (ModuleType module : modules) {
 			try {
@@ -482,8 +484,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	}
 	
 	private void applyLastChanges() {
-		if (log.isTraceEnabled())
-			log.trace(getLogTextHead()+"Aplying changes made in inner model of "+changedModelBinding.realization.realService);
+		if (log.isDebugEnabled())
+			log.debug(getLogTextHead()+"Aplying changes made in inner model of "+changedModelBinding.realization.realService);
 		ServiceProvider<?> svcProvider = changedModelBinding.realization.provider;
 		changedModelBinding = null;
 		callDoChanges(svcProvider);

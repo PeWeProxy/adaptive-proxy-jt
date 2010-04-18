@@ -1,8 +1,6 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
-import java.util.Set;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
-import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 
 /**
  * Base interface for all service modules. Service module is a proxy plugin
@@ -17,5 +15,5 @@ public interface ServiceModule extends ProxyPlugin {
 	 * it provides implementation for. 
 	 * @return set of service classes this service module depends on
 	 */
-	Set<Class<? extends ProxyService>> getDependencies();
+	//Set<Class<? extends ProxyService>> getDependencies();
 }
