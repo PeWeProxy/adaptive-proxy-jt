@@ -22,7 +22,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	
 	@Override
 	public ModifiableHttpRequest constructHttpRequest(HttpRequest request,
-			RequestHeaders fromHeaders, boolean withContent) {
+			RequestHeaders fromHeaders, String contentType) {
 		HeaderWrapper clientHeaders = null;
 		if (fromHeaders != null) {
 			clientHeaders = (HeaderWrapper) fromHeaders;
@@ -30,21 +30,26 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			clientHeaders = new HeaderWrapper(new HttpHeader());
 		}
 		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(clientHeaders,request.getClientSocketAddress());
-		if (withContent)
+		if (contentType != null) {
+			clientHeaders.setHeader ("Content-Type", contentType);
+			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
+			clientHeaders.setHeader ("Content-Length", "0");
 			retVal.setData(new byte[0]);
+		}
 		retVal.getServiceHandle().doServiceDiscovery();
 		return retVal;
 	}
 
 	@Override
-	public ModifiableHttpResponse constructHttpResponse(HttpResponse response, boolean withContent) {
+	public ModifiableHttpResponse constructHttpResponse(HttpResponse response, String contentType) {
 		if (response == null)
 			throw new IllegalArgumentException("'response' can not be null");
 		HeaderWrapper webRPHeaders = ((ModifiableHttpResponseImpl)response).getWebResponseHeaders();
-		return makeHttpResponse(webRPHeaders, withContent);
+		return makeHttpResponse(webRPHeaders, contentType);
 	}
 	
-	private ModifiableHttpResponse makeHttpResponse(HeaderWrapper fromHeaders, boolean withContent) {
+	private ModifiableHttpResponse makeHttpResponse(HeaderWrapper fromHeaders, String contentType) {
+		boolean withContent = (contentType != null);
 		if (fromHeaders != null) {
 			if (!withContent) {
 				ContentHeadersRemover.removeContentHeaders(fromHeaders.getBackedHeader());
@@ -54,7 +59,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			HttpHeader header = fromHeaders.getBackedHeader();
 			header.setStatusLine("HTTP/1.1 200 OK");
 			if (withContent) {
-				header.setHeader ("Content-Type", "text/plain");
+				header.setHeader ("Content-Type", contentType);
 				// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
 				header.setHeader ("Content-Length", "0");
 			}
@@ -73,7 +78,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	}
 	
 	@Override
-	public ModifiableHttpResponse constructHttpResponse(boolean withContent) {
-		return makeHttpResponse(null, withContent);
+	public ModifiableHttpResponse constructHttpResponse(String contentType) {
+		return makeHttpResponse(null, contentType);
 	}
 }
