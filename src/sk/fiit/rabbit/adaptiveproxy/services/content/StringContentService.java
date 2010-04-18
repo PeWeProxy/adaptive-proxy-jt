@@ -18,5 +18,6 @@ public interface StringContentService extends ProxyService {
 	 * Returns text of textual body of the HTTP message
 	 * @return text of the HTTP message body
 	 */
+	@readonly
 	public String getContent();
 }

@@ -18,5 +18,6 @@ public interface ByteContentService extends ProxyService {
 	 * Returns HTTP message body data as an array of bytes.
 	 * @return byte array of message body
 	 */
+	@readonly
 	byte[] getData();
 }
