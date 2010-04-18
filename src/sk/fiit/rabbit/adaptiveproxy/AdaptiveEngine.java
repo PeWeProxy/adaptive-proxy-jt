@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
@@ -24,7 +22,6 @@ import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 
 import rabbit.handler.AdaptiveHandler;
-import rabbit.handler.BaseHandler;
 import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
@@ -54,35 +51,20 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.RequestProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
-import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
 import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandleBase;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
 	
-	private static final File homeDir = new File(System.getProperty("user.dir"));
 	private static final String ORDERING_REQUEST_TEXT = "[request]";
 	private static final String ORDERING_RESPONSE_TEXT = "[response]";
-	private static final String DE_PATTERN_TEXTMSGS = "^text/.*|^application/xhtml(\\+xml)?.*";
-	
-	/*private static AdaptiveEngine instance;
-	
-	public static void setup(HttpProxy proxy) {
-		instance = new AdaptiveEngine(proxy);
-	}
-	
-	public static AdaptiveEngine getSingleton() {
-		if (instance == null)
-			throw new IllegalStateException("AdaptiveEngine singleton instance not initialized by setup() method");
-		return instance;
-	}*/
 	
 	private final Map<Connection, ConnectionHandle> requestHandles;
 	private final HttpProxy proxy;
 	private PluginHandler pluginHandler;
 	private final EventsHandler loggingHandler;
-	//private final SimpleUserHandler userHandler;
+	private ServiceModulesManager modulesManager;
 	private final List<RequestProcessingPlugin> requestPlugins;
 	private final List<ResponseProcessingPlugin> responsePlugins;
 	private File pluginsOrderFile = null; 
@@ -113,9 +95,8 @@ public class AdaptiveEngine  {
 		requestHandles = new HashMap<Connection, ConnectionHandle>();
 		this.proxy = proxy;
 		loggingHandler = new EventsHandler(this);
-		//userHandler = new SimpleUserHandler();
-		//userHandler.setFile("./conf/users");
 		pluginHandler = new PluginHandler();
+		modulesManager = new ServiceModulesManager(this);
 		requestPlugins = new LinkedList<RequestProcessingPlugin>();
 		responsePlugins = new LinkedList<ResponseProcessingPlugin>();
 	}
@@ -163,8 +144,8 @@ public class AdaptiveEngine  {
 	public void newRequest(Connection con, boolean chunking) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
-		conHandle.request = new ModifiableHttpRequestImpl(new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
-		conHandle.messageFactory = new HttpMessageFactoryImpl(con,conHandle.request);
+		conHandle.request = new ModifiableHttpRequestImpl(modulesManager,new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
+		conHandle.messageFactory = new HttpMessageFactoryImpl(this,con,conHandle.request);
 		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getProxyRequestHeader().getBackedHeader());
 		if (log.isTraceEnabled())
@@ -253,8 +234,6 @@ public class AdaptiveEngine  {
 		boolean again = false;
 		Set<RequestProcessingPlugin> pluginsChangedResponse = new HashSet<RequestProcessingPlugin>();
 		do {
-			// Discover services EVERY TIME there's new request
-			conHandle.request.getServiceHandle().doServiceDiscovery();
 			again = false;
 			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
 				if (pluginsChangedResponse.contains(requestPlugin))
@@ -287,7 +266,7 @@ public class AdaptiveEngine  {
 				}
 			}
 		} while (again);
-		conHandle.request.getServiceHandle().doChanges();
+		conHandle.request.getServiceHandle().finalize();
 		return true;
 	}
 
@@ -307,7 +286,7 @@ public class AdaptiveEngine  {
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
-		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
+		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
 					+response.getReasonPhrase()+" | requested "
@@ -325,13 +304,13 @@ public class AdaptiveEngine  {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
 		// conHandle.response.proxyRPHeaders were modified meanwhile
-		conHandle.response = new ModifiableHttpResponseImpl(new HeaderWrapper(response),conHandle.request);
+		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
 		conHandle.adaptiveHandling = true;
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 			try {
 				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-					= responsePlugin.desiredResponseServices(conHandle.response.getClientRequestHeader());
+					= responsePlugin.desiredResponseServices(conHandle.response.getWebResponseHeader());
 				if (pluginsDesiredSvcs == null)
 					pluginsDesiredSvcs = Collections.emptySet();
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
@@ -405,7 +384,6 @@ public class AdaptiveEngine  {
 		Set<ResponseProcessingPlugin> pluginsChangedResponse = new HashSet<ResponseProcessingPlugin>();
 		do {
 			// Discover services EVERY TIME there's new response
-			conHandle.response.getServiceHandle().doServiceDiscovery();
 			again = false;
 			for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 				if (pluginsChangedResponse.contains(responsePlugin))
@@ -427,7 +405,7 @@ public class AdaptiveEngine  {
 				}
 			}
 		} while (again);
-		conHandle.response.getServiceHandle().doChanges();
+		conHandle.response.getServiceHandle().finalize();
 	}
 	
 	private void proceedWithResponse(final ConnectionHandle conHandle, final Runnable proceedTask) {
@@ -448,7 +426,7 @@ public class AdaptiveEngine  {
 		if (processResponse) {
 			runResponseAdapters(conHandle);
 		} else {
-			conHandle.response.getServiceHandle().doChanges();
+			conHandle.response.getServiceHandle().finalize();
 		}
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Sending response");
@@ -512,10 +490,11 @@ public class AdaptiveEngine  {
 	public void setup(SProperties prop) {
 		if (prop == null)
 			prop = new SProperties();
+		File confDir = proxy.getConfigFile().getParentFile();
 		String log4jConfFile = prop.getProperty("logging_conf");
 		File loggingConfFile = null;
 		if (log4jConfFile != null) {
-			loggingConfFile = new File(homeDir,log4jConfFile); 
+			loggingConfFile = new File(confDir,log4jConfFile); 
 			if (!loggingConfFile.canRead())
 				log4jConfFile = null;
 		}
@@ -537,13 +516,14 @@ public class AdaptiveEngine  {
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
 		String pluginsHomeProp = prop.getProperty("pluginsHome");
-		boolean homeDirConfigPresent = pluginsHomeProp != null;
-		if (pluginsHomeProp == null) pluginsHomeProp = "plugins"; 
-		File pluginsHomeDir = new File(homeDir,pluginsHomeProp);
+		boolean defaultPlgDir = pluginsHomeProp != null;
+		if (pluginsHomeProp == null)
+			pluginsHomeProp = "../plugins"; 
+		File pluginsHomeDir = new File(confDir,pluginsHomeProp);
 		String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering");
 		pluginsOrderFile = new File(pluginsHomeDir,pluginsOrderFileName);
 		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
-			log.info("Unable to find or access "+((!homeDirConfigPresent)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
+			log.info("Unable to find or access "+((!defaultPlgDir)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
 		} else {
 			File svcsDir = new File(pluginsHomeDir,prop.getProperty("services_folder","services"));
 			File sharedLibDir = null;
@@ -554,15 +534,7 @@ public class AdaptiveEngine  {
 			excludeFiles.add(pluginsOrderFileName);
 			pluginHandler.setPluginRepository(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles);
 		}
-		String patternString = prop.getProperty("stringServicesPattern", DE_PATTERN_TEXTMSGS);
-		Pattern pattern = null;
-		try {
-			pattern = Pattern.compile(patternString);
-		} catch (PatternSyntaxException e) {
-			log.info("Invalid or no pattern for string content services, default one will be used", e);
-			pattern = Pattern.compile(DE_PATTERN_TEXTMSGS);
-		}
-		ServicesHandleBase.setStringServicesPattern(pattern);
+		modulesManager.setPattern(prop.getProperty("stringServicesPattern"));
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");
 	}
@@ -571,10 +543,7 @@ public class AdaptiveEngine  {
 		log.info("Reloading plugins");
 		pluginHandler.reloadPlugins();
 		loggingHandler.setup();
-		log.info("Loading request service plugins");
-		RequestServiceHandleImpl.initPlugins(pluginHandler);
-		log.info("Loading response service plugins");
-		ResponseServiceHandleImpl.initPlugins(pluginHandler);
+		modulesManager.initPlugins(pluginHandler);
 		requestPlugins.clear();
 		responsePlugins.clear();
 		log.info("Loading request processing plugins");
@@ -668,5 +637,9 @@ public class AdaptiveEngine  {
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response on "
 					+conHandle.request.getProxyRequestHeader().getRequestLine());
+	}
+
+	public ServiceModulesManager getModulesManager() {
+		return modulesManager;
 	}
 }

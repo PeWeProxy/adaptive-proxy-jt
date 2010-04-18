@@ -1,338 +1,111 @@
 package sk.fiit.rabbit.adaptiveproxy.services;
 
-import info.monitorenter.cpdetector.io.ByteOrderMarkDetector;
-import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
-import info.monitorenter.cpdetector.io.ParsingDetector;
-import info.monitorenter.cpdetector.io.UnknownCharset;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
+import java.io.IOException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
-import rabbit.http.HttpHeader;
-import rabbit.util.CharsetDetector;
+
+import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
 import sk.fiit.rabbit.adaptiveproxy.messages.HttpMessageImpl;
-import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpRequest;
-import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
-import sk.fiit.rabbit.adaptiveproxy.plugins.ProxyPlugin;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceProvider;
-import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpRequest;
+import sk.fiit.rabbit.adaptiveproxy.messages.HttpResponse;
+import sk.fiit.rabbit.adaptiveproxy.plugins.PluginProperties;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ByteServiceImpl;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableByteServiceImpl;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ModifiableStringServiceImpl;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.StringServiceImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService.readonly;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ByteContentService;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ModifiableBytesService;
 import sk.fiit.rabbit.adaptiveproxy.services.content.ModifiableStringService;
 import sk.fiit.rabbit.adaptiveproxy.services.content.StringContentService;
 
-public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, PluginType extends ProxyPlugin> implements ServicesHandle {
+public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>, ModuleType extends ServiceModule> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
-	static final Charset defaultCharset;
-	static final CodepageDetectorProxy cpDetector;
-	static Pattern stringServicesPattern;
-			
+	private static ServiceModule baseModule = new BaseModule();
+	
+	static class BaseModule implements RequestServiceModule, ResponseServiceModule {
+		@Override
+		public boolean supportsReconfigure(PluginProperties newProps) {return false;}
+		@Override
+		public void stop() {}
+		@Override
+		public boolean start(PluginProperties props) {return true;}
+		@Override
+		public Set<Class<? extends ProxyService>> getDependencies() {return null;		}
+		@Override
+		public Set<Class<? extends ProxyService>> getProvidedRequestServices() {return null;}
+		@Override
+		public Set<Class<? extends ProxyService>> getProvidedResponseServices() {return null;}
+		@Override
+		public Set<Class<? extends ProxyService>> desiredRequestServices(
+				RequestHeader clientRQHeaders) {return null;}
+		@Override
+		public Set<Class<? extends ProxyService>> desiredResponseServices(
+				ResponseHeader webRPHeaders) {return null;}
+		@Override
+		public <Service extends ProxyService> ServiceProvider<Service> provideRequestService(
+				HttpRequest request, Class<Service> serviceClass) {return null;}
+		@Override
+		public <Service extends ProxyService> ServiceProvider<Service> provideResponseService(
+				HttpResponse response, Class<Service> serviceClass)
+				throws ServiceUnavailableException {return null;}
+	}
+	
+	
+	final ServiceModulesManager manager;
 	final MessageType httpMessage;
-	final List<PluginType> plugins;
-	final List<ServiceProvider> providersList;
-	final Map<ProxyService, ServiceProvider> serviceProviders;
-	final Map<Class<? extends ProxyService>, List<ProxyService>> services;
-	boolean servicesDiscovered = false;
-	int lastRtnedSvcProviderIndex = -1;
-	boolean changesPropagation = false;
+	private final ClassLoader servicesCLoader;
+	private final List<ModuleType> modules;
+	private final Map<ProxyService, ServiceBinding<?>> serviceBindings;
+	private final List<ServiceBinding<?>> actualServicesBindings;
+	private ServiceBinding<?> changedModelBinding;
 	
-	static {
-		defaultCharset = Charset.forName("ISO-8859-1");
-		cpDetector = CodepageDetectorProxy.getInstance();
-		cpDetector.add(new ByteOrderMarkDetector());
-		cpDetector.add(new ParsingDetector(false));
-		//cpDetector.add(JChardetFacade.getInstance());
-		//cpDetector.add(ASCIIDetector.getInstance());
-	}
-	
-	static class ServicePluginsComparator implements Comparator<ServiceModule> {
-		Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies =
-			new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();
-		Map<ServiceModule, Set<Class<? extends ProxyService>>> providedServices =
-			new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();
-		
-		public ServicePluginsComparator(Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies,
-				Map<ServiceModule, Set<Class<? extends ProxyService>>> providedServices) {
-			this.dependencies = dependencies;
-			this.providedServices = providedServices;
-		}
-		
-		@Override
-		public int compare(ServiceModule o1, ServiceModule o2) {
-			Set<Class<? extends ProxyService>> dependenciesOf2 = dependencies.get(o2);
-			if (dependenciesOf2 != null) {
-				Set<Class<? extends ProxyService>> providedSvcsBy1 = providedServices.get(o1);
-				for (Class<? extends ProxyService> dependencyClass : dependenciesOf2) {
-					if (providedSvcsBy1.contains(dependencyClass)) {
-						return -1;
-					}
-				}
-			}
-			Set<Class<? extends ProxyService>> dependenciesOf1 = dependencies.get(o1);
-			if (dependenciesOf1 != null) {
-				Set<Class<? extends ProxyService>> providedSvcsBy2 = providedServices.get(o2);
-				for (Class<? extends ProxyService> dependencyClass : dependenciesOf1) {
-					if (providedSvcsBy2.contains(dependencyClass)) {
-						return 1;
-					}
-				}
-			}
-			return 1;
-		}
-	}
-	
-	abstract class GenericServiceProvider implements ProxyService, RequestServiceProvider, ResponseServiceProvider {
-		public void setRequestContext(ModifiableHttpRequest request) {
-			// no-op
-		}
-		
-		@Override
-		public void setResponseContext(ModifiableHttpResponse response) {
-			// no-op
-		}
-
-		@Override
-		public void doChanges() {
-			// no-op
-		}
-
-		@Override
-		public ProxyService getService() {
-			return this;
-		}
-	}
-	
-	class BytesServiceProvider extends GenericServiceProvider implements ByteContentService {
-		
-		public BytesServiceProvider() {
-			if (httpMessage.getData() == null)
-				throw new IllegalStateException("Associated HTTP message does not contain any data");
-		}
-		
-		@Override
-		public byte[] getData() {
-			byte[] data = httpMessage.getData();
-			return Arrays.copyOf(data, data.length);
-		}
-
-		@Override
-		public String getServiceIdentification() {
-			return "AdaptiveProxy.ByteContentService";
-		}
-
-		@Override
-		public Class<? extends ProxyService> getServiceClass() {
-			return ByteContentService.class;
-		}
-		
-		// TODO move to ModifiableBytesServiceProvider
-		@Override
-		public void doChanges() {
-			byte[] data = httpMessage.getData();
-			if (getOriginalHeader().getHeader("Content-Length") != null) {
-				getProxyHeader().setHeader("Content-Length", Integer.toString(data.length, 10));
-			}
-		}
-	}
-	
-	class ModifiableBytesServiceProvider extends GenericServiceProvider implements ModifiableBytesService {
-		
-		public ModifiableBytesServiceProvider() {
-			if (httpMessage.getData() == null)
-				throw new IllegalStateException("Associated HTTP message does not contain any data");;
-		}
-		
-		@Override
-		public void setData(byte[] data) {
-			httpMessage.setData(data);
-		}
-		
-		@Override
-		public Class<? extends ProxyService> getServiceClass() {
-			return ModifiableBytesService.class;
-		}
-		
-		@Override
-		public String getServiceIdentification() {
-			return "AdaptiveProxy.ModifiableBytesService";
-		}
-
-		@Override
-		public byte[] getData() {
-			return httpMessage.getData();
-		}
-	}
-	
-	class ContentServicesProvider extends GenericServiceProvider implements StringContentService {
-		byte[] lastByteData = null;
-		StringBuilder sb;
-		Charset charset = defaultCharset;
-		
-		public ContentServicesProvider(String content, Charset charset) {
-			if (httpMessage.getData() == null)
-				throw new IllegalStateException("Associated HTTP message does not contain any data");
-			if (charset == null)
-				throw new IllegalStateException("Charset can not be hull");
-			this.charset = charset;
-			lastByteData = httpMessage.getData();
-			sb = new StringBuilder(content);
-		}
-		
-		@Override
-		public Class<? extends ProxyService> getServiceClass() {
-			return StringContentService.class;
-		}
-		
-		private boolean underlyingBytesChanged() {
-			return httpMessage.getData() != lastByteData;
-		}
-		
-		@Override
-		public String getContent() {
-			if (underlyingBytesChanged()) {
-				byte[] data = httpMessage.getData();
-				//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
-				inspectCharset();
-				CharBuffer charBuf = null;
-				try {
-					charBuf = decodeBytes(data, charset,true);
-				} catch (CharacterCodingException e) {
-					log.debug(getLogTextHead()+"Data of this message has changed and cant be decoded");
-				}
-				sb = new StringBuilder(charBuf);
-				//MemoryUsageInspector.printMemoryUsage(log, "After StringBuilder creation");
-				lastByteData = data;
-			}
-			return sb.toString();
-		}
-		
-		private void inspectCharset() {
-			Charset newCharset = CharsetDetector.detectCharset(getProxyHeader());
-			if (newCharset != null)
-				charset = newCharset;
-		}
-		
-		// TODO move to ModifiableContentServiceProvider
-		@Override
-		public void doChanges() {
-			if(!underlyingBytesChanged()) {
-				inspectCharset();
-				String s = sb.toString();
-				httpMessage.setData(s.getBytes(charset));
-				lastByteData = httpMessage.getData();
-			}
-		}
-		
-		@Override
-		public String getServiceIdentification() {
-			return "AdaptiveProxy.StringContentService";
-		}
-	}
-	
-	class ModifiableContentServiceProvider extends GenericServiceProvider implements ModifiableStringService {
-		final ContentServicesProvider stringSvcProvider;
-		
-		public ModifiableContentServiceProvider(ContentServicesProvider stringSvcProvider) {
-			this.stringSvcProvider = stringSvcProvider;
-		}
-		
-		@Override
-		public StringBuilder getModifiableContent() {
-			if (stringSvcProvider.sb == null)
-				stringSvcProvider.getContent();
-			return stringSvcProvider.sb;
-		}
-		
-		@Override
-		public Class<? extends ProxyService> getServiceClass() {
-			return ModifiableStringService.class;
-		}
-		
-		@Override
-		public String getServiceIdentification() {
-			return "AdaptiveProxy.ModifiableContentService";
-		}
-
-		@Override
-		public void setContent(String content) {
-			stringSvcProvider.sb.setLength(0);
-			stringSvcProvider.sb.append(content);
-		}
-
-		@Override
-		public void setCharset(Charset charset) {
-			HttpHeader headers = getProxyHeader();
-			String cType = headers.getHeader("Content-Type");
-			if (cType == null)
-				return;
-			String trailing = "";
-			String leading = "charset=";
-			int chsIndex = cType.indexOf(leading);
-			if (chsIndex != -1) {
-				int afterChIndex = cType.substring(chsIndex+8).indexOf(';');
-				if (afterChIndex != -1)
-					trailing = cType.substring(chsIndex+8+afterChIndex);
-			} else {
-				chsIndex = cType.length();
-				leading = "; "+leading;
-			}
-			StringBuilder sbTmp = new StringBuilder();
-			sbTmp.append(cType.substring(0, chsIndex));
-			sbTmp.append(leading);
-			sbTmp.append(charset.toString());
-			sbTmp.append(trailing);
-			headers.setHeader("Content-Type", sbTmp.toString());
-		}
-
-		@Override
-		public String getContent() {
-			return stringSvcProvider.getContent();
-		}
-	}
-	
-	public ServicesHandleBase(MessageType httpMessage, List<PluginType> plugins) {
+	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ServiceModulesManager manager) {
 		this.httpMessage = httpMessage;
-		this.plugins = plugins;
-		providersList = new LinkedList<ServiceProvider>();
-		serviceProviders = new HashMap<ProxyService, ServiceProvider>();
-		services = new HashMap<Class<? extends ProxyService>, List<ProxyService>>();
+		this.modules = modules;
+		this.serviceBindings = new HashMap<ProxyService, ServiceBinding<?>>();
+		this.actualServicesBindings = new LinkedList<ServiceBinding<?>>();
+		this.changedModelBinding = null;
+		this.manager = manager;
+		this.servicesCLoader = manager.getAdaptiveEngine().getPluginHandler().getServicesCLoader();
 	}
 	
 	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices) {
 		/*if (contentNeeded(desiredServices))
 			return true;*/
-		for (ListIterator<PluginType> iterator = plugins.listIterator(plugins.size()); iterator.hasPrevious();) {
-			PluginType plugin = iterator.previous();
-			if (overlapSets(desiredServices, getProvidedServices(plugin))) {
-				Set<Class<? extends ProxyService>> plgDesiredSvcs = discoverDesiredServices(plugin);
+		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
+			ModuleType module = iterator.previous();
+			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
+				Set<Class<? extends ProxyService>> plgDesiredSvcs = null;
+				try {
+					plgDesiredSvcs = discoverDesiredServices(module);
+				} catch (Throwable t) {
+					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
+				}
 				if (plgDesiredSvcs == null)
 					plgDesiredSvcs = Collections.emptySet();
 				desiredServices.addAll(plgDesiredSvcs);
 				if (contentNeeded(desiredServices)) {
 					if (log.isDebugEnabled())
-						log.debug(getLogTextHead()+"Service plugin "+plugin+" wants "
-								+"'content' service for "+getText4Logging(loggingTextTypes.NORMAL));
+						log.debug(getLogTextHead()+"Service module "+module+" wants "
+								+"'content' service for "+getLogTextNormal());
 					return true;
 				}
 			}
@@ -355,183 +128,371 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl, Pl
 				|| desiredServices.contains(ByteContentService.class));
 	}
 	
-	abstract Set<Class<? extends ProxyService>> getProvidedServices(PluginType plugin);
+	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
 	
-	abstract Set<Class<? extends ProxyService>> discoverDesiredServices(PluginType plugin);
+	abstract Set<Class<? extends ProxyService>> discoverDesiredServices(ModuleType plugin);
 	
-	protected enum loggingTextTypes {NORMAL,CAPITAL,SHORT};
+	protected enum LogText {NORMAL,CAPITAL,SHORT};
 	
 	private String getLogTextHead() {
-		return getText4Logging(loggingTextTypes.SHORT)+": "+toString()+" | ";
+		return getText4Logging(LogText.SHORT)+": "+toString()+" | ";
 	}
 	
-	abstract String getText4Logging(loggingTextTypes type);
-	
-	public void doServiceDiscovery() {
-		if (servicesDiscovered)
-			return;
-		servicesDiscovered = true;
-		byte[] data = httpMessage.getData();
-		if (data != null) {
-			// message has some content so we add BytesServiceProvider provider
-			BytesServiceProvider byteSvcProvider = new BytesServiceProvider();
-			addServiceProvider(byteSvcProvider, byteSvcProvider, ByteContentService.class);
-			
-			HttpHeader header = getOriginalHeader();
-			String contentType = header.getHeader("Content-Type");
-			if (contentType != null && stringServicesPattern.matcher(contentType).matches()) {
-				Charset charset = null;
-				boolean detected = false;
-				try {
-					charset = CharsetDetector.detectCharset(header);
-				} catch (UnsupportedCharsetException e) {
-					log.warn(getLogTextHead()+getText4Logging(loggingTextTypes.CAPITAL)
-							+" header denotes unsupported charset "+e.getCharsetName());
-					detected = true;
-				}
-				if (charset == null && !detected) {
-					InputStream inStream = new ByteArrayInputStream(data);
-					try {
-						charset = cpDetector.detectCodepage(inStream, data.length);
-					} catch (Exception e) {
-						log.warn(getLogTextHead()+"Exception raised while trying to detect charset by cpDetector");
-					}
-				}
-				if (charset == null || charset instanceof UnknownCharset)
-					charset = defaultCharset;
-				CharBuffer charbuf = null;
-				try {
-					charbuf = decodeBytes(data, charset, false);
-				} catch (CharacterCodingException e) {
-					log.debug(getLogTextHead()+"Data of this message is not valid text data [requested: "+
-							getRequestHeader().getRequestLine()+" | message entity type: "+contentType+"]");
-				}
-				if (charbuf != null) {
-					// message has some valid text content so we add StringContentService provider
-					try {
-						ContentServicesProvider contentSvcProvider = new ContentServicesProvider(charbuf.toString(),charset);
-						addServiceProvider(contentSvcProvider, contentSvcProvider, StringContentService.class);
-					} catch (OutOfMemoryError e) {
-						log.warn(getLogTextHead()+"Java heap space saturated, unable to provide StringContentService \n"+e.toString());
-					}
-				}
-			}
-		}
-		doSpecificServiceDiscovery();
-		setServicesContext();
+	private String getLogTextCapital() {
+		return getText4Logging(LogText.CAPITAL);
 	}
 	
-	private CharBuffer decodeBytes(byte[] bytes, Charset charset, boolean report) throws CharacterCodingException {
-		CodingErrorAction action = (report)? CodingErrorAction.REPORT : CodingErrorAction.REPLACE;
-		CharsetDecoder decoder = charset.newDecoder();
-		decoder.onMalformedInput(action);
-		decoder.onUnmappableCharacter(action);
-		return decoder.decode(ByteBuffer.wrap(bytes));
+	private String getLogTextNormal() {
+		return getText4Logging(LogText.NORMAL);
 	}
 	
-	abstract HttpHeader getRequestHeader();
+	abstract String getText4Logging(LogText type);
 	
-	abstract HttpHeader getOriginalHeader();
-	
-	abstract HttpHeader getProxyHeader();
-	
-	abstract void doSpecificServiceDiscovery();
-	
-	final void addServiceProviders(ServiceModule plugin, List<? extends ServiceProvider> providedServices) {
-		for (ServiceProvider serviceProvider : providedServices) {
-			ProxyService service = serviceProvider.getService();
-			Class<? extends ProxyService> implementedService = serviceProvider.getServiceClass();
-			if (!implementedService.isInstance(service)) {
-				log.info(getLogTextHead()+"Provided service "+service+" is not of claimed type "+implementedService+" ("+
-						"service provided by "+serviceProvider+" obtained from plugin "+plugin+")");
-				continue;
-			}
-			addServiceProvider(serviceProvider, service, implementedService);
-		}
+	private ServiceProvider<ByteContentService> getByteService() {
+		if (httpMessage.hasBody())
+			return new ByteServiceImpl<MessageType>(httpMessage);
+		else
+			throw new ServiceUnavailableException(ByteContentService.class, "The massage carries no data", null);
 	}
 	
-	void addServiceProvider(ServiceProvider serviceProvider, ProxyService service, Class<? extends ProxyService> serviceClass) {
-		providersList.add(serviceProvider);
-		serviceProviders.put(service, serviceProvider);
-		List<ProxyService> suchServicesList = services.get(serviceClass);
-		if (suchServicesList == null) {
-			suchServicesList = new ArrayList<ProxyService>(1);
-			services.put(serviceClass, suchServicesList);
-		}
-		suchServicesList.add(service);
+	private ServiceProvider<ModifiableBytesService> getModByteServie()  {
+		if (httpMessage.hasBody())
+			return new ModifiableByteServiceImpl<MessageType>(httpMessage);
+		else
+			throw new ServiceUnavailableException(ModifiableBytesService.class, "The massage carries no data", null);
 	}
 	
-	private void setServicesContext() {
-		if (httpMessage.getData() != null) {
-			// message has some content so we add ModifiableBytesServiceProvider provider
-			ModifiableBytesServiceProvider modByteSvcProvider = new ModifiableBytesServiceProvider();
-			addServiceProvider(modByteSvcProvider, modByteSvcProvider, ModifiableBytesService.class);
-			
-			List<ProxyService> tmp = services.get(StringContentService.class);
-			if (tmp != null) {
-				// message has some string content so we add ModifiableContentService provider
-				ContentServicesProvider contentSvcProvider = (ContentServicesProvider)tmp.get(0);
-				ModifiableContentServiceProvider modContentSvcProvider = new ModifiableContentServiceProvider(contentSvcProvider);
-				addServiceProvider(modContentSvcProvider, modContentSvcProvider, ModifiableStringService.class);
-			}
-		}
-		doSetContext();
+	private boolean hasTextutalContent () {
+		if (!httpMessage.hasBody())
+			return false;
+		return manager.matchesStringServicePattern(httpMessage.getOriginalHeader());
 	}
 	
-	abstract void doSetContext();
-
-	public void doChanges() {
-		if (lastRtnedSvcProviderIndex != -1) {
-			//changesPropagation = true;
-			// TODO test
-			for (ListIterator<ServiceProvider> backwardIterator = providersList.listIterator(lastRtnedSvcProviderIndex+1); backwardIterator.hasPrevious();) {
-				ServiceProvider serviceProvider = (ServiceProvider) backwardIterator.previous();
-				serviceProvider.doChanges();
-			}
-		}
-		providersList.clear();
-		serviceProviders.clear();
-		services.clear();
+	private ServiceProvider<StringContentService> getStringService() {
+		Throwable cause = null;
+		String excMessage = "The message does not carry textual content";
+		if (hasTextutalContent())
+			try {
+				return new StringServiceImpl<MessageType>(httpMessage,false);
+			} catch (CharacterCodingException e) {
+				excMessage = "Data of this message don't match it's charset";
+				cause = e;
+				log.debug(getLogTextHead()+excMessage);
+			} catch (IOException e) {
+				excMessage = "IOException raised while trying to detect charset by cpDetector";
+				cause = e;
+				log.warn(getLogTextHead()+excMessage,e);
+			} catch (OutOfMemoryError e) {
+				excMessage = "Java heap space saturated, unable to provide string content services \n";
+				cause = e;
+				log.warn(getLogTextHead()+"Java heap space saturated, unable to provide string content services \n",e);
+			}  
+		throw new ServiceUnavailableException(StringContentService.class, excMessage, cause);
 	}
 	
-	@Override
-	public Set<Class<? extends ProxyService>> getAvailableServices() {
-		return services.keySet();
-	}
-	
-	@Override
-	public <S extends ProxyService> S getService(Class<S> serviceClass)
-			throws ServiceUnavailableException {
-		return getServices(serviceClass).get(0);
+	private ServiceProvider<ModifiableStringService> getModStringService() {
+		Throwable cause = null;
+		String excMessage = "The message does not carry textual content";
+		if (hasTextutalContent())
+			try {
+				return new ModifiableStringServiceImpl<MessageType>(httpMessage, false);
+			}  catch (UnsupportedCharsetException e) {
+				log.warn(getLogTextHead()+getLogTextCapital()
+						+" header denotes unsupported charset "+e.getCharsetName());
+			} catch (CharacterCodingException e) {
+				excMessage = "Data of this message don't match it's charset";
+				cause = e;
+				log.debug(getLogTextHead()+excMessage);
+			} catch (IOException e) {
+				excMessage = "IOException raised while trying to detect charset by cpDetector";
+				cause = e;
+				log.warn(getLogTextHead()+excMessage,e);
+			} catch (OutOfMemoryError e) {
+				excMessage = "Java heap space saturated, unable to provide string content services \n";
+				cause = e;
+				log.warn(getLogTextHead()+"Java heap space saturated, unable to provide string content services \n",e);
+			}  
+		throw new ServiceUnavailableException(ModifiableStringService.class, excMessage, cause);
 	}
 	
 	@SuppressWarnings("unchecked")
-	@Override
-	public <S extends ProxyService> List<S> getServices(Class<S> serviceClass)
-			throws ServiceUnavailableException {
-		List<S> retVal = (List<S>) services.get(serviceClass);
-		if (retVal == null || retVal.size() == 0)
-			throw new ServiceUnavailableException(serviceClass);
-		if (!changesPropagation) {
-			changesPropagation = true;
-			for (S service : retVal) {
-				ServiceProvider thisServiceProvider = serviceProviders.get(service);
-				int indexOfThisProvider = providersList.indexOf(thisServiceProvider); 
-				if (indexOfThisProvider != lastRtnedSvcProviderIndex) {
-					for (ListIterator<ServiceProvider> listIterator = providersList.listIterator(lastRtnedSvcProviderIndex+1); listIterator.hasPrevious();) {
-						listIterator.previous().doChanges();
-						lastRtnedSvcProviderIndex--;
-					}
-				}
-				lastRtnedSvcProviderIndex = indexOfThisProvider;
-			}
-			changesPropagation = false;
-		}
-		return retVal;
+	private <Service extends ProxyService> ServiceProvider<Service> getBasicProvider(Class<Service> serviceClass) {
+		if (serviceClass == ModifiableStringService.class)
+			return (ServiceProvider<Service>)getModStringService();
+		if (serviceClass == StringContentService.class)
+			return (ServiceProvider<Service>)getStringService();
+		if (serviceClass == ModifiableBytesService.class)
+			return (ServiceProvider<Service>)getModByteServie();
+		if (serviceClass == ByteContentService.class)
+			return (ServiceProvider<Service>)getByteService();
+		return null;
 	}
 	
-	public static void setStringServicesPattern(Pattern pattern) {
-		stringServicesPattern = pattern;
+	boolean isBasicService(Class<? extends ProxyService> serviceClass) {
+		return (serviceClass == ModifiableStringService.class ||
+				serviceClass == StringContentService.class ||
+				serviceClass == ModifiableBytesService.class ||
+				serviceClass == ByteContentService.class);
+	}
+	
+	private class ServiceInfo<Service extends ProxyService> {
+		final Class<Service> serviceClass;
+		final ModuleType ignoredModule;
+		
+		public ServiceInfo(Class<Service> serviceClass, ModuleType ignoredModule) {
+			this.serviceClass = serviceClass;
+			this.ignoredModule = ignoredModule;
+		}
+		
+		@Override
+		public String toString() {
+			return getClass().getSimpleName()+"(class:"+serviceClass.getName()
+				+", ignored:"+((ignoredModule == null)?"null":ignoredModule.toString())+")";
+		}
+	}
+	
+	private class ServiceRealization<Service extends ProxyService> {
+		Service realService;
+		ServiceProvider<Service> provider;
+		ModuleType module;
+		
+		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module) {
+			this.realService = realService;
+			this.provider = provider;
+			this.module = module;
+		}
+		
+		@Override
+		public String toString() {
+			return getClass().getSimpleName()+"(realService:"+realService.toString()+", provider:"+provider.toString()+", module:"+module.toString()+")";
+		}
+	}
+	
+	private class ServiceBinding<Service extends ProxyService> {
+		final ServiceInfo<Service> svcInfo;
+		Service proxiedService;
+		ServiceRealization<Service> realization;
+		
+		public ServiceBinding(ServiceInfo<Service> svcInfo) {
+			this.svcInfo = svcInfo;
+		}
+		
+		void bindToProxy(Service proxiedService) {
+			if (this.proxiedService != null)
+				throw new IllegalStateException("Already bound to proxiedService");
+			this.proxiedService = proxiedService;
+		}
+		
+		void bindToService(ServiceRealization<Service> svcRealization) {
+			this.realization = svcRealization;
+		}
+		
+		@Override
+		public String toString() {
+			// TODO Auto-generated method stub
+			return getClass().getSimpleName()+"(service:"+svcInfo.serviceClass.getName()+", module:"
+				+((realization != null) ? realization.module : "unbound")+")";
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <Service extends ProxyService> Service createDecoratedService(final ServiceInfo<Service> svcInfo,
+				final ServiceRealization<Service> realization) {
+		final ServiceBinding<Service> binding = new ServiceBinding<Service>(svcInfo);
+		InvocationHandler invHandler = new InvocationHandler() {
+			@Override
+			public Object invoke(Object proxy, Method method, Object[] args)
+					throws Throwable {
+				if (method.getDeclaringClass() == Object.class)
+					if (binding.realization != null)
+						return method.invoke(binding.realization.realService, args);
+					else
+						return method.invoke(binding, args);
+				if (changedModelBinding != binding) {
+					if (!actualServicesBindings.contains(binding)) {
+						// usable service realization is not initialized (within group of others)
+						if (log.isTraceEnabled())
+							log.trace(getLogTextHead()+"New "+svcInfo.serviceClass.getName()+" service realization has to be created");
+						if (changedModelBinding != null) {
+							applyLastChanges();
+						}
+						ServiceRealization<Service> newRealization = getNextService(svcInfo);
+						binding.bindToService(newRealization);
+						actualServicesBindings.add(binding);
+					}
+				} else {
+					if (log.isTraceEnabled())
+						log.trace(getLogTextHead()+"Same service used as last time");
+				}
+				// binding is actual
+				boolean readOnlyMethod = method.isAnnotationPresent(readonly.class);
+				if (log.isTraceEnabled())
+					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method of a service provided by "+realization.realService+" called");
+				Object retVal = method.invoke(binding.realization.realService, args);
+				if (!readOnlyMethod) {
+					actualServicesBindings.clear();
+					actualServicesBindings.add(binding);
+					changedModelBinding = binding;
+				}
+				return retVal;
+			}
+		};
+		Service proxyInstance = (Service) Proxy.newProxyInstance(servicesCLoader, new Class<?>[] {svcInfo.serviceClass}, invHandler);
+		proxyInstance.toString();
+		binding.bindToProxy(proxyInstance);
+		binding.bindToService(realization);
+		actualServicesBindings.add(binding);
+		return proxyInstance;
+	}
+	
+	
+	private <Service extends ProxyService> Service createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
+		Service svc = null;
+		Throwable cause = null;
+		try {
+			svc = svcProvider.getService();
+			boolean modifyingInit = true;
+			try {
+				modifyingInit = svcProvider.initChangedModel();
+			} catch (Throwable t) {
+				log.info(getLogTextHead()+"Service provider "+svcProvider+" raised throwable when initChangedModel() called",t);
+			}
+			if (log.isTraceEnabled())
+				log.trace(getLogTextHead()+((modifyingInit)? "M": "Non-m")+"odifying initialization of provider "+svcProvider+" made");
+			if (modifyingInit)
+				actualServicesBindings.clear();
+		} catch (Throwable t) {
+			log.info(getLogTextHead()+"Service provider "+svcProvider+" raised throwable when getService() called",t);
+			cause = t;
+		}
+		if (svc == null) {
+			if (cause == null)
+				throw new ServiceUnavailableException(serviceClass, "Module's provider returned no implementation", null);
+			else
+				throw new ServiceUnavailableException(serviceClass, "Module's provider failed at providing implementation", cause);
+		}
+		return svc;
+	}
+	
+	
+	private <Service extends ProxyService> ServiceRealization<Service> getRealService(ModuleType module, Class<Service> serviceClass)
+			throws ServiceUnavailableException {
+		ServiceProvider<Service> svcProvider = null;
+		try {
+			svcProvider = callProvideService(module, serviceClass);
+		} catch (Throwable e) {
+			if (e instanceof ServiceUnavailableException)
+				throw (ServiceUnavailableException)e;
+			else {
+				log.info(getLogTextHead()+"Module "+module+" raised throwable when asked for provider for service "+serviceClass,e);
+				throw new ServiceUnavailableException(serviceClass, "Module failed at providing service provider", e);
+			}
+		}
+		if (svcProvider == null)
+			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
+		Service svcImpl = createRealService(svcProvider, serviceClass);
+		return new ServiceRealization<Service>(svcImpl, svcProvider, module);
+	}
+	
+	abstract <Service extends ProxyService> ServiceProvider<Service> callProvideService(ModuleType module, Class<Service> serviceClass);
+	
+	abstract <Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider);
+	
+	@Override
+	public <Service extends ProxyService> Service getService(Class<Service> serviceClass)
+			throws ServiceUnavailableException {
+		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(serviceClass, null);
+		return createDecoratedService(svcInfo, getNextService(svcInfo));
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <Service extends ProxyService> Service getNextService(Service previousService) throws ServiceUnavailableException {
+		if (previousService == null)
+			throw new IllegalArgumentException("Previous service can not be null");
+		ServiceBinding<Service> svcContainer = (ServiceBinding<Service>)serviceBindings.get(previousService);
+		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(svcContainer.svcInfo.serviceClass, svcContainer.realization.module);
+		return createDecoratedService(svcInfo, getNextService(svcInfo));
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <Service extends ProxyService> ServiceRealization<Service> getNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
+		if (log.isDebugEnabled())
+			log.debug(getLogTextHead()+"Asking for service "+svcInfo.serviceClass);
+		boolean skip = (svcInfo.ignoredModule != null);
+		// try to use already initialized service
+		for (ServiceBinding<?> existingBinding : actualServicesBindings) {
+			if (log.isTraceEnabled())
+				log.trace(getLogTextHead()+"Available binding "+existingBinding);
+			if (existingBinding.svcInfo.serviceClass == svcInfo.serviceClass) {
+				if (existingBinding.realization.module == svcInfo.ignoredModule) {
+					log.trace("This is ignored module, skipping ended");
+					skip = false;
+					continue;
+				}
+				if (skip)
+					continue;
+				if (log.isTraceEnabled())
+					log.trace(getLogTextHead()+"This binding was picked");
+				return (ServiceRealization<Service>)existingBinding.realization;
+			}
+		}
+		skip = (svcInfo.ignoredModule != null);
+		ServiceUnavailableException cause = null;
+		// if one of basic services, provide realizations
+		ServiceProvider<Service> basicSvcProvider = getBasicProvider(svcInfo.serviceClass);
+		if (basicSvcProvider != null) {
+			return new ServiceRealization<Service>(basicSvcProvider.getService(), basicSvcProvider, (ModuleType)baseModule);
+		}
+		for (ModuleType module : modules) {
+			try {
+				Set<Class<? extends ProxyService>> providedSvcs = getProvidedSvcs(module);
+				if (providedSvcs != null && providedSvcs.contains(svcInfo.serviceClass)) {
+					if (log.isTraceEnabled())
+						log.trace(getLogTextHead()+"Fitting module "+module);
+					if (module == svcInfo.ignoredModule) {
+						log.trace("This is ignored module, skipping ended");
+						skip = false;
+						continue;
+					}
+					if (skip)
+						continue;
+					if (log.isTraceEnabled())
+						log.trace(getLogTextHead()+"This module was picked");
+					return getRealService(module, svcInfo.serviceClass);
+				}
+			} catch (ServiceUnavailableException e) {
+				log.info(getLogTextHead()+"ServiceUnavailableException raised while obtaining service providers from "
+							+getText4Logging(LogText.CAPITAL)+"ServiceModule '"+module+"'",e);
+				cause = e;
+			}
+		}
+		// throw the last exception 
+		throw cause;
+	}
+	
+	@Override
+	public <Service extends ProxyService> boolean isServiceAvailable(Class<Service> serviceClass) {
+		try {
+			getService(serviceClass);
+			return true;
+		} catch (ServiceUnavailableException e) {
+			log.trace(getLogTextHead()+"Service unavailable: "+serviceClass);
+		}
+		return false;
+	}
+	
+	private void applyLastChanges() {
+		if (log.isTraceEnabled())
+			log.trace(getLogTextHead()+"Aplying changes made in inner model of "+changedModelBinding.realization.realService);
+		ServiceProvider<?> svcProvider = changedModelBinding.realization.provider;
+		changedModelBinding = null;
+		callDoChanges(svcProvider);
+	}
+	
+	public void finalize() {
+		if (changedModelBinding != null) {
+			applyLastChanges();
+		}
 	}
 	
 	@Override

@@ -22,8 +22,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
-import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
 
 public class AdaptiveProxyStatus extends BaseMetaHandler {
 	AdaptiveEngine adaptiveEngine = null;
@@ -93,27 +92,39 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"70%\">Provided services</th>\n");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
 		sb.append ("<th width=\"5%\">RP</th>\n");
-		List<RequestServiceModule> rqServicePlugins = RequestServiceHandleImpl.getLoadedModules();
-		List<ResponseServiceModule> rpServicePlugins = ResponseServiceHandleImpl.getLoadedModules();
+		ServiceModulesManager modulesManager = adaptiveEngine.getModulesManager();
+		List<RequestServiceModule> rqServicePlugins = modulesManager.getLoadedRequestModules();
+		List<ResponseServiceModule> rpServicePlugins = modulesManager.getLoadedResponsetModules();
 		Set<ServiceModule> loadedModules = new LinkedHashSet<ServiceModule>();
 		loadedModules.addAll(rqServicePlugins);
 		loadedModules.addAll(rpServicePlugins);
-		for (ServiceModule plugin : loadedModules) {
+		for (ServiceModule module : loadedModules) {
 			sb.append ("<tr><td>");
-			sb.append(pluginHandler.getPluginName(plugin));
+			sb.append(pluginHandler.getPluginName(module));
 			sb.append ("</td>\n<td>\n");
-			Set<Class<? extends ProxyService>> svcs = plugin.getProvidedServices();
-			for (Class<? extends ProxyService> svcClass : svcs) {
-				sb.append(svcClass.getName());
-				sb.append("<br>\n");
+			boolean rq = (rqServicePlugins.contains(module));
+			boolean rp = (rpServicePlugins.contains(module));
+			sb.append ("<b>Services for requests:</b><br>\n");
+			if (rq) {
+				for (Class<? extends ProxyService> svcClass : modulesManager.getProvidedRequestServices((RequestServiceModule)module)) {
+					sb.append(svcClass.getName());
+					sb.append("<br>\n");
+				}
+			}
+			sb.append ("<b>Services for responses:</b><br>\n");
+			if (rq) {
+				for (Class<? extends ProxyService> svcClass : modulesManager.getProvidedResponseServices((ResponseServiceModule)module)) {
+					sb.append(svcClass.getName());
+					sb.append("<br>\n");
+				}
 			}
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rqServicePlugins.contains(plugin))
+			if (rq)
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rpServicePlugins.contains(plugin))
+			if (rp)
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");

@@ -62,6 +62,7 @@ public class PluginHandler {
 	private File sharedLibsDir;
 	private URL[] sharedLibsURLs;
 	private Set<String> excludeFileNames;
+	private ClassLoader servicesCLoader;
 	
 	private final List<PluginConfigEntry> configEntries;
 	private final Map<PluginConfigEntry, ProxyPlugin> ldPlugin4EntryMap;
@@ -85,7 +86,6 @@ public class PluginHandler {
 				return name.endsWith(".class");
 			}
 		};
-		
 		loadableFilter = new FilenameFilter() {
 			@Override
 			public boolean accept(File dir, String name) {
@@ -167,11 +167,12 @@ public class PluginHandler {
 
 	private void createClassLoaders(Map<URL, String> newLibChecksums) {
 		Map<URL, ClassLoader> cLoaders = new HashMap<URL, ClassLoader>();
-		URLClassLoader servicesCLoader = null;
 		if (servicesLibsURLs != null) {
 			servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
 			log.debug("Creating new services definitions ClassLoader "+servicesCLoader+" with URLs set to "+Arrays.toString(servicesLibsURLs)
 					+" with parent ClassLoader set to "+servicesCLoader.getParent());
+		} else {
+			servicesCLoader = null;
 		}
 		for (Iterator<PluginConfigEntry> iterator = configEntries.iterator(); iterator.hasNext();) {
 			PluginConfigEntry cfgEntry =  iterator.next();
@@ -253,7 +254,7 @@ public class PluginHandler {
 			}
 			if (cfgEntry.classLoader == null) {
 				// plugin can not share existing ClassLoader
-				URLClassLoader parentCLoader = servicesCLoader;
+				ClassLoader parentCLoader = servicesCLoader;
 				URL[] urls = new URL[] {classLocURL};
 				if (!cfgEntry.libsrariesURLSet.isEmpty()) {
 					URL[] libsURLs = cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]);
@@ -278,7 +279,7 @@ public class PluginHandler {
 		}
 	}
 	
-	private URLClassLoader createClassLoader(URL[] urls, URLClassLoader parent, PluginConfigEntry cfgEntry) {
+	private URLClassLoader createClassLoader(URL[] urls, ClassLoader parent, PluginConfigEntry cfgEntry) {
 		URLClassLoader retVal = null;
 		if (parent != null)
 			retVal = URLClassLoader.newInstance(urls,parent);
@@ -808,7 +809,8 @@ public class PluginHandler {
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
 			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
-				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so proxy server won't be able to reload it on the fly if it changes");
+				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin," +
+						"and the proxy server won't be able to reload it on the fly if it changes");
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");
 		} 
@@ -933,5 +935,11 @@ public class PluginHandler {
 			stopPlugin(plugin);
 		}
 		pluginsStopped = true;
+	}
+	
+	public ClassLoader getServicesCLoader() {
+		if (servicesCLoader == null)
+			return getClass().getClassLoader();
+		return servicesCLoader;
 	}
 }
