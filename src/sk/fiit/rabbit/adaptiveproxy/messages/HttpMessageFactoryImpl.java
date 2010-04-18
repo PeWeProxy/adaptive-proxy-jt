@@ -27,7 +27,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	
 	@Override
 	public ModifiableHttpRequest constructHttpRequest(InetSocketAddress clientSocket,
-			RequestHeader baseHeader, boolean withContent) {
+			RequestHeader baseHeader, String contentType) {
 		HeaderWrapper clientHeaders = null;
 		if (baseHeader != null) {
 			clientHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
@@ -36,13 +36,18 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		}
 		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager()
 					,clientHeaders,(request != null) ? request.getClientSocketAddress() : null);
-		if (withContent)
+		if (contentType != null) {
+			clientHeaders.setField ("Content-Type", contentType);
+			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
+			clientHeaders.setField ("Content-Length", "0");
 			retVal.setData(new byte[0]);
+		}
 		return retVal;
 	}
 
 	@Override
-	public ModifiableHttpResponse constructHttpResponse(ResponseHeader baseHeader, boolean withContent) {
+	public ModifiableHttpResponse constructHttpResponse(ResponseHeader baseHeader, String contentType) {
+		boolean withContent = (contentType != null);
 		HeaderWrapper fromHeaders = null;
 		if (baseHeader != null)
 			fromHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
@@ -55,7 +60,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			HttpHeader header = fromHeaders.getBackedHeader();
 			header.setStatusLine("HTTP/1.1 200 OK");
 			if (withContent) {
-				header.setHeader ("Content-Type", "text/plain");
+				header.setHeader ("Content-Type", contentType);
 				// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
 				header.setHeader ("Content-Length", "0");
 			}
