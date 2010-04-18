@@ -306,14 +306,15 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						return method.invoke(binding.realization.realService, args);
 					else
 						return method.invoke(binding, args);
+				boolean readOnlyMethod = method.isAnnotationPresent(readonly.class);
+				if (log.isTraceEnabled())
+					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method of a service provided by "+realization.realService+" called");
 				if (changedModelBinding != binding) {
 					if (!actualServicesBindings.contains(binding)) {
 						// usable service realization is not initialized (within group of others)
+						readingAttempt(binding);
 						if (log.isDebugEnabled())
 							log.debug(getLogTextHead()+"New "+svcInfo.serviceClass.getName()+" service realization has to be created");
-						if (changedModelBinding != null) {
-							applyLastChanges();
-						}
 						ServiceRealization<Service> newRealization = getNextService(svcInfo);
 						binding.bindToService(newRealization);
 						actualServicesBindings.add(binding);
@@ -323,14 +324,9 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						log.trace(getLogTextHead()+"Same service used as last time");
 				}
 				// binding is actual
-				boolean readOnlyMethod = method.isAnnotationPresent(readonly.class);
-				if (log.isTraceEnabled())
-					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method of a service provided by "+realization.realService+" called");
 				Object retVal = method.invoke(binding.realization.realService, args);
 				if (!readOnlyMethod) {
-					actualServicesBindings.clear();
-					actualServicesBindings.add(binding);
-					changedModelBinding = binding;
+					modifyingAttempt(binding);
 				}
 				return retVal;
 			}
@@ -343,6 +339,41 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		return proxyInstance;
 	}
 	
+	private void readingAttempt(ServiceBinding<?> binding) {
+		if (changedModelBinding != null && changedModelBinding != binding) {
+			applyLastChanges();
+		}
+	}
+	
+	public void headerBeingRead(Object obj) {
+		if (log.isTraceEnabled())
+			log.trace(getLogTextHead()+"An attempt to read message header");
+		ServiceBinding<?> binding = null;
+		if (obj instanceof ProxyService) {
+			// TODO zistit binding z proxyInstance = obj
+		}
+		readingAttempt(binding);
+	}
+	
+	private void modifyingAttempt(ServiceBinding<?> binding) {
+		if (log.isTraceEnabled())
+			log.trace(getLogTextHead()+"Modifying attempt, actualServicesBindings list cleared");
+		actualServicesBindings.clear();
+		if (binding != null)
+			actualServicesBindings.add(binding);
+		changedModelBinding = binding;
+	}
+	
+	public void headerBeingModified(Object obj) {
+		if (log.isTraceEnabled())
+			log.trace(getLogTextHead()+"An attempt to modify message header");
+		headerBeingRead(obj);
+		ServiceBinding<?> binding = null;
+		if (obj instanceof ProxyService) {
+			// TODO zistit binding z proxyInstance = obj
+		}
+		modifyingAttempt(binding);
+	}
 	
 	private <Service extends ProxyService> Service createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
 		Service svc = null;
@@ -401,6 +432,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	@Override
 	public <Service extends ProxyService> Service getService(Class<Service> serviceClass)
 			throws ServiceUnavailableException {
+		if (log.isDebugEnabled())
+			log.debug(getLogTextHead()+"Asking for service "+serviceClass.getName());
 		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(serviceClass, null);
 		return createDecoratedService(svcInfo, getNextService(svcInfo));
 	}
@@ -410,14 +443,14 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (previousService == null)
 			throw new IllegalArgumentException("Previous service can not be null");
 		ServiceBinding<Service> svcContainer = (ServiceBinding<Service>)serviceBindings.get(previousService);
+		if (log.isDebugEnabled())
+			log.debug(getLogTextHead()+"Asking for next service "+svcContainer.svcInfo.serviceClass.getName()+"(previous: "+previousService+")");
 		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(svcContainer.svcInfo.serviceClass, svcContainer.realization.module);
 		return createDecoratedService(svcInfo, getNextService(svcInfo));
 	}
 	
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> ServiceRealization<Service> getNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
-		if (log.isDebugEnabled())
-			log.debug(getLogTextHead()+"Asking for service "+svcInfo.serviceClass.getName());
 		boolean skip = (svcInfo.ignoredModule != null);
 		// try to use already initialized service
 		for (ServiceBinding<?> existingBinding : actualServicesBindings) {
