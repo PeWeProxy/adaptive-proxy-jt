@@ -19,6 +19,12 @@ public interface ProxyService  {
 	 */
 	String getServiceIdentification();
 	
+	/**
+	 * Readonly annotation signals proxy server that particular method of service
+	 * implementation does not change implementation's inner model. If used on
+	 * definition of service method, realization of this method in every service
+	 * implementation will be considered readonly.
+	 */
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
 	public @interface readonly { }

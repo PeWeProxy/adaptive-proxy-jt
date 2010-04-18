@@ -293,6 +293,15 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 	}
 	
+	private boolean isReadOnlyMethod(Method method, ProxyService realService) {
+		if (method.isAnnotationPresent(readonly.class))
+			return true;
+		try {
+			return realService.getClass().getMethod(method.getName(), method.getParameterTypes()).isAnnotationPresent(readonly.class);
+		} catch (Exception ignored) {}
+		return false;
+	}
+	
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> Service createDecoratedService(final ServiceInfo<Service> svcInfo,
 				final ServiceRealization<Service> realization) {
@@ -306,7 +315,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						return method.invoke(binding.realization.realService, args);
 					else
 						return method.invoke(binding, args);
-				boolean readOnlyMethod = method.isAnnotationPresent(readonly.class);
+				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization.realService);
 				if (log.isTraceEnabled())
 					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method of a service provided by "+realization.realService+" called");
 				if (changedModelBinding != binding) {
