@@ -1,7 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
 import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpRequest;
-import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandle;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 
 /**
  * Request service provider is a service provider that provides particular service
@@ -9,15 +9,13 @@ import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandle;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestServiceProvider extends ServiceProvider {
+public interface RequestServiceProvider<Service extends ProxyService> extends ServiceProvider<Service> {
 	/**
-	 * Sets the full context of a request message represented by representation of
-	 * modifiable HTTP request message. Service handle associated with passed
-	 * modifiable request is also able to provide content services over request
-	 * message that can edit request body data, if the message has any body data.
-	 * @param request modifiable request message
-	 * @see ModifiableHttpRequest#getServiceHandle()
-	 * @see ServicesHandle
+	 * Signals this request service provider to apply all changes that were made by using
+	 * provided service implementation. In this method, the service provider should
+	 * introduce all changes made to the inner model of provided service implementation
+	 * to the actual HTTP request message.
+	 * @param request modifiable response message to introduce changes into
 	 */
-	void setRequestContext(ModifiableHttpRequest request);
+	void doChanges(ModifiableHttpRequest request);
 }

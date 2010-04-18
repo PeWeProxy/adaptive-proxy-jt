@@ -1,9 +1,10 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
-import java.util.List;
+import java.util.Set;
 
 import sk.fiit.rabbit.adaptiveproxy.messages.HttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.plugins.RequestPlugin;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 
 /**
  * Interface for request service modules. Request service module is a service module
@@ -17,10 +18,23 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.RequestPlugin;
  */
 public interface RequestServiceModule extends ServiceModule, RequestPlugin {
 	/**
-	 * Returns list of request service providers that provide implementation
-	 * of particular services over passed request message.
-	 * @param request request message to provide request service providers for
-	 * @return list of request service implementation providers
+	 * Returns set of service classes which this request service module is able to provide
+	 * implementation for, depending on particular request messages context. 
+	 * @return set of service classes this request service module provides implementation for
 	 */
-	List<RequestServiceProvider> provideRequestServices(HttpRequest request);
+	Set<Class<? extends ProxyService>> getProvidedRequestServices();
+	
+	/**
+	 * Returns service provider that provide implementation of requested service
+	 * identified by passed <code>serviceClass</code> over passed request message.
+	 * If this request service module is unable to provide the service over this
+	 * request message, returns <code>null</code>.
+	 * @param request request message to provide request service provider for
+	 * @param serviceClass class of the service to provide implementation for
+	 * @return service provider providing requested service over passed request
+	 * or <code>null</code> if this service module is unable to provide the service
+	 * for this request
+	 */
+	<Service extends ProxyService> ServiceProvider<Service> provideRequestService(HttpRequest request,
+				Class<Service> serviceClass);
 }

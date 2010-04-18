@@ -8,24 +8,18 @@ import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface ServiceProvider {
+public interface ServiceProvider<Service extends ProxyService> {
 	/**
 	 * Returns implementation of the service this service provider provides.
 	 * @return implementation of provided service
 	 */
-	ProxyService getService();
+	Service getService();
+	
+	boolean initChangedModel();
 	
 	/**
 	 * Returns runtime class of service implementation this service provider provides.
 	 * @return class of provided service implementation
 	 */
-	Class<? extends ProxyService> getServiceClass();
-	
-	/**
-	 * Signals this service provider to apply all changes that were made by using
-	 * provided service implementation. In this method, the service provider should
-	 * introduce all changes made to the inner model of provided service implementation
-	 * since the last call of this method to the actual HTTP message.
-	 */
-	void doChanges();
+	//Class<? extends ProxyService> getServiceClass();
 }

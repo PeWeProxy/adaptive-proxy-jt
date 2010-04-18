@@ -1,7 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
 import sk.fiit.rabbit.adaptiveproxy.messages.ModifiableHttpResponse;
-import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandle;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
 
 /**
  * Response service provider is a service provider that provides particular service
@@ -9,15 +9,13 @@ import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandle;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface ResponseServiceProvider extends ServiceProvider {
+public interface ResponseServiceProvider<Service extends ProxyService> extends ServiceProvider<Service> {
 	/**
-	 * Sets the full context of a response message represented by representation of
-	 * modifiable HTTP response message. Service handle associated with passed
-	 * modifiable response is also able to provide content services over response
-	 * message that can edit response body data, if the message has any body data.
-	 * @param response modifiable response message
-	 * @see ModifiableHttpResponse#getServiceHandle()
-	 * @see ServicesHandle
+	 * Signals this response service provider to apply all changes that were made by using
+	 * provided service implementation. In this method, the service provider should
+	 * introduce all changes made to the inner model of provided service implementation
+	 * to the actual HTTP response message.
+	 * @param response modifiable response message to introduce changes into
 	 */
-	void setResponseContext(ModifiableHttpResponse response);
+	void doChanges(ModifiableHttpResponse response);
 }

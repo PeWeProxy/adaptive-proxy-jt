@@ -18,11 +18,4 @@ public interface ServiceModule extends ProxyPlugin {
 	 * @return set of service classes this service module depends on
 	 */
 	Set<Class<? extends ProxyService>> getDependencies();
-	
-	/**
-	 * Returns set of service classes which this service module is able to provide
-	 * implementation for, depending on particular messages context. 
-	 * @return set of service classes this service module provides implementation for
-	 */
-	Set<Class<? extends ProxyService>> getProvidedServices();
 }

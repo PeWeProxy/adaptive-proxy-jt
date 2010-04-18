@@ -1,12 +1,14 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins.services;
 
-import java.util.List;
+import java.util.Set;
 
 import sk.fiit.rabbit.adaptiveproxy.messages.HttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.ResponsePlugin;
+import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceUnavailableException;
 
 /**
- * Interface for response service modules. Response service plugin is a service module
+ * Interface for response service modules. Response service module is a service module
  * that provides implementations of services over particular HTTP responses.
  * <br><br>
  * <b>Proxy plugin interafce</b><br>
@@ -17,10 +19,23 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.ResponsePlugin;
  */
 public interface ResponseServiceModule extends ServiceModule, ResponsePlugin {
 	/**
-	 * Returns list of response service providers that provide implementation
-	 * of particular services over passed response message.
-	 * @param response response message to provide request service providers for
-	 * @return list of request service implementation providers
+	 * Returns set of service classes which this response service module is able to provide
+	 * implementation for, depending on particular response messages context. 
+	 * @return set of service classes this response service module provides implementation for
 	 */
-	List<ResponseServiceProvider> provideResponseServices(HttpResponse response);
+	Set<Class<? extends ProxyService>> getProvidedResponseServices();
+	
+	/**
+	 * Returns service provider that provide implementation of requested service
+	 * identified by passed <code>serviceClass</code> over passed response message.
+	 * If this response service module is unable to provide the service over this
+	 * response message, returns <code>null</code>.
+	 * @param response response message to provide response service provider for
+	 * @param serviceClass class of the service to provide implementation for
+	 * @return service provider providing requested service over passed request
+	 * or <code>null</code> if this service module is unable to provide the service
+	 * for this response
+	 */
+	<Service extends ProxyService> ServiceProvider<Service> provideResponseService(HttpResponse response,
+				Class<Service> serviceClass) throws ServiceUnavailableException;
 }
