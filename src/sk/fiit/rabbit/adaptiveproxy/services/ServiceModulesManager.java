@@ -20,7 +20,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 
 public class ServiceModulesManager {
 	private static final Logger log = Logger.getLogger(ServiceModulesManager.class);
-	public static final String DEF_PATTERN_TEXTMSGS = "^text/(.*)|^application/xhtml(\\+xml)?";
+	public static final String DEF_PATTERN_TEXTMSGS = "^text/html|^application/xhtml(\\+xml)?";
 	
 	private final AdaptiveEngine adaptiveEngine;
 	private final List<RequestServiceModule> rqModules;
@@ -127,6 +127,12 @@ public class ServiceModulesManager {
 	
 	public boolean matchesStringServicePattern(ReadableHeader header) {
 		String contentType = header.getField("Content-Type");
-		return (contentType != null && stringServicesPattern.matcher(contentType).matches());
+		if (contentType == null)
+			return false;
+		int index = contentType.indexOf(';');
+		if (index != -1)
+			contentType = contentType.substring(0, index);
+		contentType = contentType.trim();
+		return stringServicesPattern.matcher(contentType).matches();
 	}
 }
