@@ -1,22 +1,23 @@
 package sk.fiit.rabbit.adaptiveproxy.messages;
 
-import java.net.InetSocketAddress;
-
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.WritableResponseHeader;
 import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
 
-public final class ModifiableHttpResponseImpl extends HttpMessageImpl implements ModifiableHttpResponse {
+public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
+		implements ModifiableHttpResponse {
 	private final ModifiableHttpRequestImpl request;
 	private final HeaderWrapper webRPHeaders;
 	private final HeaderWrapper proxyRPHeaders;
-	private final ResponseServiceHandleImpl serviceHandle;
 	
-	public ModifiableHttpResponseImpl(HeaderWrapper webRPHeaders, ModifiableHttpRequestImpl request) {
+	public ModifiableHttpResponseImpl(ServiceModulesManager modulesManager, HeaderWrapper webRPHeaders, ModifiableHttpRequestImpl request) {
 		this.request = request;
 		this.webRPHeaders = new HeaderWrapper(webRPHeaders.getBackedHeader().clone());
 		// webRPHeaders are those that are going to be modified by RabbIT code
 		this.proxyRPHeaders = webRPHeaders;
-		serviceHandle = new ResponseServiceHandleImpl(this);
+		setServiceHandle(new ResponseServiceHandleImpl(this,modulesManager));
 	}
 	
 	@Override
@@ -30,22 +31,17 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl implements
 	}
 	
 	@Override
-	public ResponseServiceHandleImpl getServiceHandle() {
-		return serviceHandle;
+	public HttpRequest getRequest() {
+		return request;
 	}
 
 	@Override
-	public HeaderWrapper getProxyRequestHeader() {
-		return request.getProxyRequestHeader();
+	public ResponseHeader getOriginalHeader() {
+		return webRPHeaders;
 	}
 
 	@Override
-	public HeaderWrapper getClientRequestHeader() {
-		return request.getClientRequestHeader();
-	}
-	
-	@Override
-	public InetSocketAddress getClientSocketAddress() {
-		return request.getClientSocketAddress();
+	public WritableResponseHeader getProxyHeader() {
+		return proxyRPHeaders;
 	}
 }

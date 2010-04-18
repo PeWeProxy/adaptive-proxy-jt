@@ -7,7 +7,9 @@ import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface HttpResponse extends HttpRequest {
+public interface HttpResponse extends HttpMessage {
+	
+	HttpRequest getRequest();
 
 	/**
 	 * Returns read-only HTTP response header received from the web source.

@@ -6,18 +6,21 @@ import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
+import sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine;
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
 import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
-import sk.fiit.rabbit.adaptiveproxy.utils.ContentHeadersRemover;
+import sk.fiit.rabbit.adaptiveproxy.utils.HeaderUtils;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	private static final Logger log = Logger.getLogger(HttpMessageFactoryImpl.class.getName());
 	
+	private final AdaptiveEngine adaptiveEngine;
 	private final Connection con;
 	private final ModifiableHttpRequestImpl request;
 	
-	public HttpMessageFactoryImpl(Connection con, ModifiableHttpRequestImpl request) {
+	public HttpMessageFactoryImpl(AdaptiveEngine adaptiveEngine, Connection con, ModifiableHttpRequestImpl request) {
+		this.adaptiveEngine = adaptiveEngine;
 		this.con = con;
 		this.request = request;
 	}
@@ -31,10 +34,10 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		} else {
 			clientHeaders = new HeaderWrapper(new HttpHeader());
 		}
-		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(clientHeaders,(request != null) ? request.getClientSocketAddress() : null);
+		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager()
+					,clientHeaders,(request != null) ? request.getClientSocketAddress() : null);
 		if (withContent)
 			retVal.setData(new byte[0]);
-		retVal.getServiceHandle().doServiceDiscovery();
 		return retVal;
 	}
 
@@ -45,7 +48,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			fromHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
 		if (fromHeaders != null) {
 			if (!withContent) {
-				ContentHeadersRemover.removeContentHeaders(fromHeaders.getBackedHeader());
+				HeaderUtils.removeContentHeaders(fromHeaders.getBackedHeader());
 			}
 		} else {
 			fromHeaders = new HeaderWrapper(new HttpHeader());
@@ -63,10 +66,10 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 				log.debug("If this was a normaly received response, it would have been blocked by header filters");
 				// but now we don't care
 		}
-		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(fromHeaders,request);
+		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
+				,fromHeaders,request);
 		if (withContent)
 			retVal.setData(new byte[0]);
-		retVal.getServiceHandle().doServiceDiscovery();
 		return retVal;
 	}
 }

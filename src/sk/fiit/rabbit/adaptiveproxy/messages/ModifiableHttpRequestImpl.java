@@ -3,19 +3,22 @@ package sk.fiit.rabbit.adaptiveproxy.messages;
 import java.net.InetSocketAddress;
 
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
+import sk.fiit.rabbit.adaptiveproxy.headers.ReadableHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.WritableRequestHeader;
 import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
 
-public final class ModifiableHttpRequestImpl extends HttpMessageImpl implements ModifiableHttpRequest {
+public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl>
+		implements ModifiableHttpRequest {
 	private InetSocketAddress clientSocketAdr;
 	private HeaderWrapper clientRQHeaders;
 	private HeaderWrapper proxyRQHeaders;
-	private RequestServiceHandleImpl serviceHandle = null;
 	
-	public ModifiableHttpRequestImpl(HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
+	public ModifiableHttpRequestImpl(ServiceModulesManager modulesManager, HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
 		this.clientSocketAdr = clientSocketAdr;
 		this.clientRQHeaders = clientRQHeaders;
 		this.proxyRQHeaders = new HeaderWrapper(clientRQHeaders.getBackedHeader().clone());
-		serviceHandle = new RequestServiceHandleImpl(this);
+		setServiceHandle(new RequestServiceHandleImpl(this,modulesManager));
 	}
 	
 	@Override
@@ -29,12 +32,17 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl implements 
 	}
 
 	@Override
-	public RequestServiceHandleImpl getServiceHandle() {
-		return serviceHandle;
-	}
-	
-	@Override
 	public InetSocketAddress getClientSocketAddress() {
 		return clientSocketAdr;
+	}
+
+	@Override
+	public ReadableHeader getOriginalHeader() {
+		return clientRQHeaders;
+	}
+
+	@Override
+	public WritableRequestHeader getProxyHeader() {
+		return proxyRQHeaders;
 	}
 }

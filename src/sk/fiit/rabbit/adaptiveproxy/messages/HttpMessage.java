@@ -15,4 +15,6 @@ public interface HttpMessage {
 	 * @return service handle for this HTTP message
 	 */
 	ServicesHandle getServiceHandle();
+	
+	boolean hasBody();
 }
