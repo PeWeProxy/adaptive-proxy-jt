@@ -6,7 +6,7 @@ package sk.fiit.rabbit.adaptiveproxy.services;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public final class ServiceUnavailableException extends Exception {
+public final class ServiceUnavailableException extends RuntimeException {
 	private static final long serialVersionUID = 7393269656517250304L;
 	final Class<? extends ProxyService> clazz;
 	
@@ -15,7 +15,8 @@ public final class ServiceUnavailableException extends Exception {
 	 * class set to <code>serviceClass</code>.
 	 * @param serviceClass class of the unavailable service
 	 */
-	public ServiceUnavailableException(Class<? extends ProxyService> serviceClass) {
+	public ServiceUnavailableException(Class<? extends ProxyService> serviceClass, String message, Throwable cause) {
+		super(message,cause);
 		clazz = serviceClass;
 	}
 	
