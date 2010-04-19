@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -253,11 +254,13 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		Service realService;
 		ServiceProvider<Service> provider;
 		ModuleType module;
+		final Map<Method, Boolean> readonlyFlags;
 		
 		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module) {
 			this.realService = realService;
 			this.provider = provider;
 			this.module = module;
+			readonlyFlags = new HashMap<Method, Boolean>();
 		}
 		
 		@Override
@@ -293,11 +296,16 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 	}
 	
-	private boolean isReadOnlyMethod(Method method, ProxyService realService) {
+	private boolean isReadOnlyMethod(Method method, ServiceRealization<?> realization) {
 		if (method.isAnnotationPresent(readonly.class))
 			return true;
 		try {
-			return realService.getClass().getMethod(method.getName(), method.getParameterTypes()).isAnnotationPresent(readonly.class);
+			Boolean readOnly = realization.readonlyFlags.get(method);
+			if (readOnly == null) {
+				readOnly = realization.realService.getClass().getMethod(method.getName(), method.getParameterTypes()).isAnnotationPresent(readonly.class);
+				realization.readonlyFlags.put(method, readOnly);
+			}
+			return readOnly;
 		} catch (Exception ignored) {}
 		return false;
 	}
@@ -315,9 +323,11 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						return method.invoke(binding.realization.realService, args);
 					else
 						return method.invoke(binding, args);
-				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization.realService);
+				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
 				if (log.isTraceEnabled())
-					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method of a service provided by "+realization.realService+" called");
+					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method "+method.getName()+"("
+								+Arrays.toString(method.getParameterTypes())
+								+") of a service provided by "+realization.realService+" called");
 				if (changedModelBinding != binding) {
 					if (!actualServicesBindings.contains(binding)) {
 						// usable service realization is not initialized (within group of others)

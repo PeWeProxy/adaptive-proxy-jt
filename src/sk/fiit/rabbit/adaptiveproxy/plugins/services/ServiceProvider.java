@@ -17,8 +17,9 @@ public interface ServiceProvider<Service extends ProxyService> {
 	
 	/**
 	 * Returns whether initialization of service implementation this provider provides
-	 * changes realization's inner model. This value is used to determine if this provider
-	 * should be considered only one with up-to-date inner model after it's creation.
+	 * changes realization's inner model in a way that it does not correspond to actual
+	 * message. This value is used to determine if this provider should be considered
+	 * only one with up-to-date inner model after it's creation.
 	 * @return <code>true</code> if creation of this provider's service implementation
 	 * changed it's inner model, <code>false</code> otherwise 
 	 */
