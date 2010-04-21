@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<website xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="WebpageStructure.xsd">
+  <menuRight>
+  	<tag>div</tag>
+  	<type>id</type>
+  	<value>content_right</value>
+  </menuRight>
+  <print>
+  	<tag>div</tag>
+  	<type>class</type>
+  	<value>print_button</value>
+  </print>
+  <content>
+    <tag>div</tag>
+    <type>class</type>
+    <value>content_text</value>
+  </content>  
+</website>
