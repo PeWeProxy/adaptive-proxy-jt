@@ -5,6 +5,7 @@ import java.util.Set;
 import sk.fiit.rabbit.adaptiveproxy.messages.HttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.plugins.RequestPlugin;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
+import sk.fiit.rabbit.adaptiveproxy.services.ServiceUnavailableException;
 
 /**
  * Interface for request service modules. Request service module is a service module
@@ -36,5 +37,5 @@ public interface RequestServiceModule extends ServiceModule, RequestPlugin {
 	 * for this request
 	 */
 	<Service extends ProxyService> ServiceProvider<Service> provideRequestService(HttpRequest request,
-				Class<Service> serviceClass);
+				Class<Service> serviceClass) throws ServiceUnavailableException;
 }

@@ -60,7 +60,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				ResponseHeader webRPHeaders) {return null;}
 		@Override
 		public <Service extends ProxyService> ServiceProvider<Service> provideRequestService(
-				HttpRequest request, Class<Service> serviceClass) {return null;}
+				HttpRequest request, Class<Service> serviceClass)
+				throws ServiceUnavailableException {return null;}
 		@Override
 		public <Service extends ProxyService> ServiceProvider<Service> provideResponseService(
 				HttpResponse response, Class<Service> serviceClass)
