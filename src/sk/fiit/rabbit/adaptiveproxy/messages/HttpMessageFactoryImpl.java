@@ -36,6 +36,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		}
 		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager()
 					,clientHeaders,(request != null) ? request.getClientSocketAddress() : null);
+		retVal.setAllowedThread();
 		if (contentType != null) {
 			clientHeaders.setField ("Content-Type", contentType);
 			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
@@ -73,6 +74,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		}
 		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
 				,fromHeaders,request);
+		retVal.setAllowedThread();
 		if (withContent)
 			retVal.setData(new byte[0]);
 		return retVal;

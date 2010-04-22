@@ -44,4 +44,10 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	public WritableResponseHeader getProxyHeader() {
 		return proxyRPHeaders;
 	}
+	
+	@Override
+	public void setAllowedThread() {
+		super.setAllowedThread();
+		request.setAllowedThread();
+	}
 }

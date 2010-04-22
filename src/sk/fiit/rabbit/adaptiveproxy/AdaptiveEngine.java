@@ -150,7 +150,7 @@ public class AdaptiveEngine  {
 		con.setProxyRHeader(conHandle.request.getProxyRequestHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
-					+conHandle.request.getClientRequestHeader().getRequestLine()+")");
+					+conHandle.request.getClientRequestHeader().getRequestLine()+") - "+conHandle.request);
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -229,6 +229,7 @@ public class AdaptiveEngine  {
 	}
 	
 	private boolean runRequestAdapters(ConnectionHandle conHandle) {
+		conHandle.request.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Running request adapters");
 		boolean again = false;
@@ -274,6 +275,7 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
+				conHandle.request.setAllowedThread();
 				if (log.isTraceEnabled()) {
 					log.trace("RQ: "+conHandle+" | Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
 					log.trace("RQ: "+conHandle+" | Proceeding in processing request");
@@ -287,10 +289,11 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
+		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
-					+response.getReasonPhrase()+" | requested "
-					+conHandle.request.getProxyRequestHeader().getRequestLine()+")");
+					+response.getStatusLine()+" | requested "
+					+conHandle.request.getProxyRequestHeader().getRequestLine()+") - "+conHandle.response);
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
@@ -332,6 +335,7 @@ public class AdaptiveEngine  {
 
 	public void processResponse(final Connection con, final Runnable proceedTask) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
+		conHandle.response.setAllowedThread();
 		if (!conHandle.adaptiveHandling && !proxyDying) {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
@@ -378,6 +382,7 @@ public class AdaptiveEngine  {
 	}
 	
 	private void runResponseAdapters(ConnectionHandle conHandle) {
+		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Running response adapters");
 		boolean again = false;
@@ -412,6 +417,7 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
+				conHandle.response.setAllowedThread();
 				if (log.isTraceEnabled()) {
 					log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
 					log.trace("RQ: "+conHandle+" | Proceeding in processing response");
@@ -634,9 +640,10 @@ public class AdaptiveEngine  {
 
 	public void responseHandlerUsed(Connection connection, Handler handler) {
 		ConnectionHandle conHandle = requestHandles.get(connection);
+		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
-			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response on "
-					+conHandle.request.getProxyRequestHeader().getRequestLine());
+			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
+					+" on " +conHandle.request.getProxyRequestHeader().getRequestLine());
 	}
 
 	public ServiceModulesManager getModulesManager() {

@@ -13,6 +13,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
@@ -74,13 +75,16 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	private final ClassLoader servicesCLoader;
 	private final List<ModuleType> modules;
 	private final Map<ProxyService, ServiceBinding<?>> serviceBindings;
+	private final Queue<ServiceBinding<?>> inCodeOfStack;
 	private final List<ServiceBinding<?>> actualServicesBindings;
 	private ServiceBinding<?> changedModelBinding;
+	private ServiceBinding<?> bindingDoingChanges;
 	
 	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ServiceModulesManager manager) {
 		this.httpMessage = httpMessage;
 		this.modules = modules;
 		this.serviceBindings = new HashMap<ProxyService, ServiceBinding<?>>();
+		this.inCodeOfStack = new LinkedList<ServiceBinding<?>>();
 		this.actualServicesBindings = new LinkedList<ServiceBinding<?>>();
 		this.changedModelBinding = null;
 		this.manager = manager;
@@ -97,7 +101,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				try {
 					plgDesiredSvcs = discoverDesiredServices(module);
 				} catch (Throwable t) {
-					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
+					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "
+								+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
 				}
 				if (plgDesiredSvcs == null)
 					plgDesiredSvcs = Collections.emptySet();
@@ -266,7 +271,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		
 		@Override
 		public String toString() {
-			return getClass().getSimpleName()+"(realService:"+realService.toString()+", provider:"+provider.toString()+", module:"+module.toString()+")";
+			return getClass().getSimpleName()+"(realService:"+realService.toString()+", provider:"
+				+provider.toString()+", module:"+module.toString()+")";
 		}
 	}
 	
@@ -324,6 +330,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						return method.invoke(binding.realization.realService, args);
 					else
 						return method.invoke(binding, args);
+				httpMessage.checkThreadAccess();
 				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
 				if (log.isTraceEnabled())
 					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method "+method.getName()+"("
@@ -344,7 +351,9 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						log.trace(getLogTextHead()+"Same service used as last time");
 				}
 				// binding is actual
+				inCodeOfStack.add(binding);
 				Object retVal = method.invoke(binding.realization.realService, args);
+				inCodeOfStack.poll();
 				if (!readOnlyMethod) {
 					modifyingAttempt(binding);
 				}
@@ -365,14 +374,14 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 	}
 	
-	public void headerBeingRead(Object obj) {
+	private ServiceBinding<?> getExecutingBinding() {
+		return inCodeOfStack.peek();
+	}
+	
+	public void headerBeingRead() {
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"An attempt to read message header");
-		ServiceBinding<?> binding = null;
-		if (obj instanceof ProxyService) {
-			// TODO zistit binding z proxyInstance = obj
-		}
-		readingAttempt(binding);
+		readingAttempt(getExecutingBinding());
 	}
 	
 	private void modifyingAttempt(ServiceBinding<?> binding) {
@@ -384,14 +393,13 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		changedModelBinding = binding;
 	}
 	
-	public void headerBeingModified(Object obj) {
+	public void headerBeingModified() {
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"An attempt to modify message header");
-		headerBeingRead(obj);
-		ServiceBinding<?> binding = null;
-		if (obj instanceof ProxyService) {
-			// TODO zistit binding z proxyInstance = obj
-		}
+		ServiceBinding<?> binding = getExecutingBinding();
+		if (binding != bindingDoingChanges)
+			throw new UnsupportedOperationException("Service module is not allowed to modify header outside doChanges() method");
+		readingAttempt(binding);
 		modifyingAttempt(binding);
 	}
 	
@@ -540,8 +548,12 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (log.isDebugEnabled())
 			log.debug(getLogTextHead()+"Aplying changes made in inner model of "+changedModelBinding.realization.realService);
 		ServiceProvider<?> svcProvider = changedModelBinding.realization.provider;
+		inCodeOfStack.add(changedModelBinding);
+		bindingDoingChanges = changedModelBinding;
 		changedModelBinding = null;
 		callDoChanges(svcProvider);
+		inCodeOfStack.poll();
+		bindingDoingChanges = null;
 	}
 	
 	public void finalize() {
