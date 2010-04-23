@@ -170,7 +170,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	private boolean hasTextutalContent () {
 		if (!httpMessage.hasBody())
 			return false;
-		return manager.matchesStringServicePattern(httpMessage.getOriginalHeader());
+		return manager.matchesStringServicePattern(httpMessage.getProxyHeader());
 	}
 	
 	private ServiceProvider<StringContentService> getStringService() {
@@ -560,6 +560,10 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (changedModelBinding != null) {
 			applyLastChanges();
 		}
+	}
+	
+	public ServiceModulesManager getManager() {
+		return manager;
 	}
 	
 	@Override
