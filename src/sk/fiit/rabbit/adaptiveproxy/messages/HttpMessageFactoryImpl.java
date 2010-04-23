@@ -1,6 +1,5 @@
 package sk.fiit.rabbit.adaptiveproxy.messages;
 
-import java.net.InetSocketAddress;
 import java.util.Date;
 import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
@@ -8,8 +7,6 @@ import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
 import sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine;
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.headers.RequestHeader;
-import sk.fiit.rabbit.adaptiveproxy.headers.ResponseHeader;
 import sk.fiit.rabbit.adaptiveproxy.utils.HeaderUtils;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
@@ -26,45 +23,36 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	}
 	
 	@Override
-	public ModifiableHttpRequest constructHttpRequest(InetSocketAddress clientSocket,
-			RequestHeader baseHeader, String contentType) {
-		HeaderWrapper clientHeaders = null;
-		if (baseHeader != null) {
-			clientHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
+	public ModifiableHttpRequest constructHttpRequest(ModifiableHttpRequest baseRequest, String contentType) {
+		ModifiableHttpRequestImpl retVal = null;
+		if (baseRequest != null) {
+			retVal = ((ModifiableHttpRequestImpl)baseRequest).clone();
 		} else {
-			clientHeaders = new HeaderWrapper(new HttpHeader());
+			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(new HttpHeader())
+			,(request != null) ? request.getClientSocketAddress() : null);
 		}
-		ModifiableHttpRequestImpl retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager()
-					,clientHeaders,(request != null) ? request.getClientSocketAddress() : null);
 		retVal.setAllowedThread();
+		HttpHeader proxyHeader = retVal.getProxyHeader().getBackedHeader();
 		if (contentType != null) {
-			clientHeaders.setField ("Content-Type", contentType);
+			proxyHeader.setHeader ("Content-Type", contentType);
 			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
-			clientHeaders.setField ("Content-Length", "0");
+			proxyHeader.setHeader ("Content-Length", "0");
 			retVal.setData(new byte[0]);
-		}
+		} else
+			HeaderUtils.removeContentHeaders(proxyHeader);
 		return retVal;
 	}
 
 	@Override
-	public ModifiableHttpResponse constructHttpResponse(ResponseHeader baseHeader, String contentType) {
-		boolean withContent = (contentType != null);
-		HeaderWrapper fromHeaders = null;
-		if (baseHeader != null)
-			fromHeaders = new HeaderWrapper(((HeaderWrapper) baseHeader).getBackedHeader().clone());
-		if (fromHeaders != null) {
-			if (!withContent) {
-				HeaderUtils.removeContentHeaders(fromHeaders.getBackedHeader());
-			}
-		} else {
-			fromHeaders = new HeaderWrapper(new HttpHeader());
-			HttpHeader header = fromHeaders.getBackedHeader();
+	public ModifiableHttpResponse constructHttpResponse(ModifiableHttpResponse baseResponse, String contentType) {
+		ModifiableHttpResponseImpl retVal = null;
+		if (baseResponse != null)
+			retVal = ((ModifiableHttpResponseImpl)baseResponse).clone();
+		else {
+			retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
+						,new HeaderWrapper(new HttpHeader()),request);
+			HttpHeader header = retVal.getProxyHeader().getBackedHeader();
 			header.setStatusLine("HTTP/1.1 200 OK");
-			if (withContent) {
-				header.setHeader ("Content-Type", contentType);
-				// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
-				header.setHeader ("Content-Length", "0");
-			}
 			header.setHeader("Date", HttpDateParser.getDateString(new Date()));
 			header.setHeader("Via", con.getProxy().getProxyIdentity());
 			HttpHeader filteredHeaders =  con.filterConstructedResponse(header);
@@ -72,11 +60,16 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 				log.debug("If this was a normaly received response, it would have been blocked by header filters");
 				// but now we don't care
 		}
-		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
-				,fromHeaders,request);
 		retVal.setAllowedThread();
-		if (withContent)
+		HttpHeader proxyHeader = retVal.getProxyHeader().getBackedHeader();
+		if (contentType != null) {
+			proxyHeader = retVal.getProxyHeader().getBackedHeader();
+			proxyHeader.setHeader ("Content-Type", contentType);
+			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
+			proxyHeader.setHeader ("Content-Length", "0");
 			retVal.setData(new byte[0]);
+		} else
+			HeaderUtils.removeContentHeaders(proxyHeader);
 		return retVal;
 	}
 }

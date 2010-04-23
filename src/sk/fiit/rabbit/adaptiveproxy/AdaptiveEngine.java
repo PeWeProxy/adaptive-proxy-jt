@@ -246,6 +246,7 @@ public class AdaptiveEngine  {
 					RequestProcessingActions action = requestPlugin.processRequest(conHandle.request);
 					if (action == RequestProcessingActions.NEW_REQUEST || action == RequestProcessingActions.FINAL_REQUEST) {
 						conHandle.request = (ModifiableHttpRequestImpl)requestPlugin.getNewRequest(conHandle.request, conHandle.messageFactory);
+						conHandle.request.setAllowedThread();
 						if (action == RequestProcessingActions.NEW_REQUEST) {
 							pluginsChangedResponse.add(requestPlugin);
 							again = true;
@@ -398,6 +399,7 @@ public class AdaptiveEngine  {
 					ResponseProcessingActions action = responsePlugin.processResponse(conHandle.response);
 					if (action == ResponseProcessingActions.NEW_RESPONSE || action == ResponseProcessingActions.FINAL_RESPONSE) {
 						conHandle.response = (ModifiableHttpResponseImpl)responsePlugin.getNewResponse(conHandle.response, conHandle.messageFactory);
+						conHandle.response.setAllowedThread();
 						if (action == ResponseProcessingActions.NEW_RESPONSE) {
 							pluginsChangedResponse.add(responsePlugin);
 							again = true;

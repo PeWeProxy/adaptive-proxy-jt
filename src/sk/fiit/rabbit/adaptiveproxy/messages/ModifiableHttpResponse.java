@@ -14,4 +14,6 @@ public interface ModifiableHttpResponse extends HttpResponse {
 	 * @return sending HTTP response header
 	 */
 	WritableResponseHeader getProxyResponseHeader();
+	
+	public ModifiableHttpResponse clone();
 }

@@ -3,7 +3,7 @@ package sk.fiit.rabbit.adaptiveproxy.headers;
 import java.util.List;
 import rabbit.http.HttpHeader;
 
-public final class HeaderWrapper implements WritableRequestHeader, WritableResponseHeader {
+public final class HeaderWrapper implements WritableRequestHeader, WritableResponseHeader, Cloneable {
 	enum HTTP_Version {
 		HTTP_11 (HTTPVersion.HTTP_11,"HTTP/1.1"),
 		HTTP_10 (HTTPVersion.HTTP_10,"HTTP/1.0"),
@@ -258,6 +258,11 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	@Override
 	public int size() {
 		return backedHeader.size();
+	}
+	
+	@Override
+	public HeaderWrapper clone() {
+		return new HeaderWrapper(backedHeader.clone());
 	}
 	
 	@Override

@@ -29,4 +29,6 @@ public interface HttpRequest extends HttpMessage {
 	 * @return client's connection endpoint socket address
 	 */
 	InetSocketAddress getClientSocketAddress();
+	
+	public HttpRequest clone();
 }

@@ -14,4 +14,6 @@ public interface ModifiableHttpRequest extends HttpRequest {
 	 * @return sending HTTP request header
 	 */
 	WritableRequestHeader getProxyRequestHeader();
+	
+	public ModifiableHttpRequest clone();
 }

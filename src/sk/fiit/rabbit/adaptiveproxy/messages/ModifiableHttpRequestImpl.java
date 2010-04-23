@@ -3,8 +3,6 @@ package sk.fiit.rabbit.adaptiveproxy.messages;
 import java.net.InetSocketAddress;
 
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.headers.ReadableHeader;
-import sk.fiit.rabbit.adaptiveproxy.headers.WritableRequestHeader;
 import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
 
@@ -15,9 +13,15 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	private HeaderWrapper proxyRQHeaders;
 	
 	public ModifiableHttpRequestImpl(ServiceModulesManager modulesManager, HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
+		this(modulesManager,clientRQHeaders
+			,clientRQHeaders.clone(),clientSocketAdr);
+	}
+	
+	private ModifiableHttpRequestImpl(ServiceModulesManager modulesManager, HeaderWrapper clientRQHeaders,
+			HeaderWrapper proxyRQHeaders, InetSocketAddress clientSocketAdr) {
 		this.clientSocketAdr = clientSocketAdr;
 		this.clientRQHeaders = clientRQHeaders;
-		this.proxyRQHeaders = new HeaderWrapper(clientRQHeaders.getBackedHeader().clone());
+		this.proxyRQHeaders = proxyRQHeaders;
 		setServiceHandle(new RequestServiceHandleImpl(this,modulesManager));
 	}
 	
@@ -37,12 +41,20 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	}
 
 	@Override
-	public ReadableHeader getOriginalHeader() {
+	public HeaderWrapper getOriginalHeader() {
 		return clientRQHeaders;
 	}
 
 	@Override
-	public WritableRequestHeader getProxyHeader() {
+	public HeaderWrapper getProxyHeader() {
 		return proxyRQHeaders;
+	}
+	
+	@Override
+	public ModifiableHttpRequestImpl clone() {
+		ModifiableHttpRequestImpl retVal =  new ModifiableHttpRequestImpl(getServiceHandle().getManager(), clientRQHeaders
+				, new HeaderWrapper(proxyRQHeaders.getBackedHeader().clone()),clientSocketAdr);
+		retVal.disableThreadCheck();
+		return retVal;
 	}
 }

@@ -23,4 +23,6 @@ public interface HttpResponse extends HttpMessage {
 	 * @return sending HTTP response header
 	 */
 	ResponseHeader getProxyResponseHeader();
+	
+	public HttpResponse clone();
 }

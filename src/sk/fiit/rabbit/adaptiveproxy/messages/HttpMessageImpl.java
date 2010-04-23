@@ -2,8 +2,7 @@ package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import org.apache.log4j.Logger;
 
-import sk.fiit.rabbit.adaptiveproxy.headers.ReadableHeader;
-import sk.fiit.rabbit.adaptiveproxy.headers.WritableHeader;
+import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandle;
 
 public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
@@ -38,9 +37,9 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return data != null;
 	}
 	
-	public abstract ReadableHeader getOriginalHeader();
+	public abstract HeaderWrapper getOriginalHeader();
 	
-	public abstract WritableHeader getProxyHeader();
+	public abstract HeaderWrapper getProxyHeader();
 	
 	public void setAllowedThread() {
 		checkThread = true;
@@ -85,4 +84,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	public String toString() {
 		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
+	
+	@Override
+	public abstract HttpMessage clone();
 }
