@@ -61,7 +61,7 @@ public class AdaptiveEngine  {
 	private static final File homeDir = new File(System.getProperty("user.dir"));
 	private static final String ORDERING_REQUEST_TEXT = "[request]";
 	private static final String ORDERING_RESPONSE_TEXT = "[response]";
-	private static final String DE_PATTERN_TEXTMSGS = "^text/(.*)|^application/xhtml(\\+xml)?";
+	private static final String DE_PATTERN_TEXTMSGS = "^text/.*|^application/xhtml(\\+xml)?.*";
 	
 	/*private static AdaptiveEngine instance;
 	
