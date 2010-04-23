@@ -22,6 +22,19 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		this.request = request;
 	}
 	
+	private void setContent(HttpMessageImpl<?> message, String contentType) {
+		HttpHeader proxyHeader = message.getProxyHeader().getBackedHeader();
+		if (contentType != null) {
+			proxyHeader.setHeader ("Content-Type", contentType);
+			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
+			proxyHeader.setHeader ("Content-Length", "0");
+			message.setData(new byte[0]);
+		} else {
+			message.setData(null);
+			HeaderUtils.removeContentHeaders(proxyHeader);
+		}
+	}
+	
 	@Override
 	public ModifiableHttpRequest constructHttpRequest(ModifiableHttpRequest baseRequest, String contentType) {
 		ModifiableHttpRequestImpl retVal = null;
@@ -32,14 +45,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			,(request != null) ? request.getClientSocketAddress() : null);
 		}
 		retVal.setAllowedThread();
-		HttpHeader proxyHeader = retVal.getProxyHeader().getBackedHeader();
-		if (contentType != null) {
-			proxyHeader.setHeader ("Content-Type", contentType);
-			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
-			proxyHeader.setHeader ("Content-Length", "0");
-			retVal.setData(new byte[0]);
-		} else
-			HeaderUtils.removeContentHeaders(proxyHeader);
+		setContent(retVal, contentType);
 		return retVal;
 	}
 
@@ -61,15 +67,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 				// but now we don't care
 		}
 		retVal.setAllowedThread();
-		HttpHeader proxyHeader = retVal.getProxyHeader().getBackedHeader();
-		if (contentType != null) {
-			proxyHeader = retVal.getProxyHeader().getBackedHeader();
-			proxyHeader.setHeader ("Content-Type", contentType);
-			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
-			proxyHeader.setHeader ("Content-Length", "0");
-			retVal.setData(new byte[0]);
-		} else
-			HeaderUtils.removeContentHeaders(proxyHeader);
+		setContent(retVal, contentType);
 		return retVal;
 	}
 }
