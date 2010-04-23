@@ -1,6 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.messages;
 
 import java.net.InetSocketAddress;
+import java.util.Arrays;
 
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
@@ -54,6 +55,7 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	public ModifiableHttpRequestImpl clone() {
 		ModifiableHttpRequestImpl retVal =  new ModifiableHttpRequestImpl(getServiceHandle().getManager(), clientRQHeaders
 				, new HeaderWrapper(proxyRQHeaders.getBackedHeader().clone()),clientSocketAdr);
+		retVal.data = Arrays.copyOf(data, data.length);
 		retVal.disableThreadCheck();
 		return retVal;
 	}

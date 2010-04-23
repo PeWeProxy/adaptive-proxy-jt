@@ -1,5 +1,7 @@
 package sk.fiit.rabbit.adaptiveproxy.messages;
 
+import java.util.Arrays;
+
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
 import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
@@ -57,6 +59,7 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	public ModifiableHttpResponseImpl clone() {
 		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(getServiceHandle().getManager()
 				, webRPHeaders, proxyRPHeaders.clone(),  request);
+		retVal.data = Arrays.copyOf(data, data.length);
 		retVal.disableThreadCheck();
 		return retVal;
 	}
