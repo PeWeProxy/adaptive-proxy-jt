@@ -55,7 +55,8 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	public ModifiableHttpRequestImpl clone() {
 		ModifiableHttpRequestImpl retVal =  new ModifiableHttpRequestImpl(getServiceHandle().getManager(), clientRQHeaders
 				, new HeaderWrapper(proxyRQHeaders.getBackedHeader().clone()),clientSocketAdr);
-		retVal.data = Arrays.copyOf(data, data.length);
+		if (data != null)
+			retVal.data = Arrays.copyOf(data, data.length);
 		retVal.disableThreadCheck();
 		return retVal;
 	}
