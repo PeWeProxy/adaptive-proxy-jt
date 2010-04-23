@@ -15,8 +15,10 @@ import sk.fiit.rabbit.adaptiveproxy.headers.WritableRequestHeader;
 import sk.fiit.rabbit.adaptiveproxy.headers.WritableResponseHeader;
 
 public aspect MessageAccessAspect {
+	@SuppressWarnings("unchecked")
 	private final Map<WritableHeader, ServicesHandleBase> handlesForHeaders;
 	
+	@SuppressWarnings("unchecked")
 	public MessageAccessAspect() {
 		handlesForHeaders = new HashMap<WritableHeader, ServicesHandleBase>();
 	}
