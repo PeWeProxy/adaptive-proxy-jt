@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.URISyntaxException;
+
 import javax.swing.JTextPane;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument;
@@ -60,7 +62,8 @@ public final class DebugWindow extends JFrame {
 					if (e.getButton() == MouseEvent.BUTTON3) {
 						System.out.println(getJTextPane().getDocument().getClass());
 						try {
-							File dir = new File("./bin/");
+							File dir = new File(getClass().getResource("DebugWindow.class").toURI()).getParentFile()
+								.getParentFile().getParentFile().getParentFile().getParentFile();
 							final Process p = Runtime.getRuntime().exec("javaw sk.fiit.redeemer.test.DebugWindow",null,dir);
 							ObjectOutputStream stream = new ObjectOutputStream(p.getOutputStream());
 							stream.flush();
@@ -70,7 +73,8 @@ public final class DebugWindow extends JFrame {
 							stream.flush();
 							System.out.println("Zapisane");
 						} catch (IOException e1) {
-							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						} catch (URISyntaxException e1) {
 							e1.printStackTrace();
 						}
 					}
@@ -91,7 +95,7 @@ public final class DebugWindow extends JFrame {
 
 	static Point lastLoc = new Point(20, 20);
 	
-	public static DebugWindow newWindow(final String title) {
+	public static DebugWindow newWindow(final String title, final boolean factory) {
 		final ReturnObject rObj = new ReturnObject();
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
@@ -102,6 +106,8 @@ public final class DebugWindow extends JFrame {
 				lastLoc.translate(20, 20);
 				thisClass.setLocation(lastLoc);
 				rObj.setReturnObject(thisClass);
+				if (factory)
+					thisClass.setVisible(false);
 			}
 		});
 		synchronized (rObj) {
@@ -115,7 +121,7 @@ public final class DebugWindow extends JFrame {
 		return (DebugWindow)rObj.returnObj;
 	}
 	
-	public void printText(final String text, final Color color, final int headStart, final int headEnd) {
+	public void printText(final String text, final Color color, final int headStart, final int headEnd, final boolean setVisible) {
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
 				Document doc = getJTextPane().getDocument();
@@ -129,9 +135,11 @@ public final class DebugWindow extends JFrame {
 					doc.insertString(doc.getLength(), text.substring(0, headStart), style);
 					doc.insertString(doc.getLength(), text.substring(headStart, headEnd), style2);
 					doc.insertString(doc.getLength(), text.substring(headEnd, text.length()), style);
-					setVisible(true);
-					getJTextPane().requestFocusInWindow();
-					requestFocus();
+					if (setVisible) {
+						setVisible(true);
+						getJTextPane().requestFocusInWindow();
+						requestFocus();
+					}
 				} catch (BadLocationException e) {
 					e.printStackTrace();
 				}

@@ -2,6 +2,7 @@ package sk.fiit.redeemer.test;
 
 import java.awt.Color;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,12 +23,12 @@ import rabbit.zip.GZipPacker;
 public aspect HandlerAspect {
 	
 	public HandlerAspect() {
-		new Thread(new Runnable() {
+		/*new Thread(new Runnable() {
 			
 			@Override
 			public synchronized void run() {
 				try {
-					wait(2000);
+					wait(1000);
 					synchronized (outWindows) {
 						for (DebugWindow window : outWindows.values()) {
 							window.hideWindow();
@@ -37,7 +38,7 @@ public aspect HandlerAspect {
 					e.printStackTrace();
 				}
 			}
-		}).start();
+		}).start();*/
 	}
 	
 	pointcut inHandlersOfInterest() : within(BaseHandler+) && !within(ImageHandler) && !within(MultiPartHandler)
@@ -67,15 +68,15 @@ public aspect HandlerAspect {
 	
 	Map<BaseHandler, WebConnectionResourceSource> lastReadHandlers = new HashMap<BaseHandler, WebConnectionResourceSource>();
 	
-	// Vypis regisrovania poziadavky citat data zo spojenia
+	// Vypis registrovania poziadavky citat data zo spojenia
 	before(BaseHandler handler, WebConnectionResourceSource readHandler): waitForRead(handler,readHandler) {
 		if (!(readHandler instanceof WebConnectionResourceSource))
 			return;
 		WebConnectionResourceSource lastReadHandler = lastReadHandlers.get(handler);
 		if (lastReadHandler == null || lastReadHandler != readHandler)
 			lastReadHandlers.put(handler, readHandler);
-		if (lastReadHandler == readHandler)
-			printOut(handler, "ERROR"+readHandler.toString(), debugTextType.WAITFORREAD, 5);
+		if (lastReadHandler != null && lastReadHandler != readHandler)
+			printOut(handler, "ERROR - "+readHandler.toString(), debugTextType.WAITFORREAD, 8);
 		else
 			printOut(handler, readHandler.toString(), debugTextType.WAITFORREAD, 0);
 	}
@@ -103,13 +104,16 @@ public aspect HandlerAspect {
 	}
 	
 	Map<BaseHandler, DebugWindow> outWindows = new HashMap<BaseHandler, DebugWindow>();
+	Map<BaseHandler, Boolean> factoryInstances = new HashMap<BaseHandler, Boolean>();
 	Map<BaseHandler, String> offsets = new HashMap<BaseHandler, String>();
 	
 	// Zachytenie inicializacie objektov triedy BaseHandler a podtried
 	before(BaseHandler handler): initInHandlerCode(handler) {
 		if (!outWindows.containsKey(handler)) {
 			synchronized (outWindows) {
-				outWindows.put(handler, DebugWindow.newWindow(handler.toString()));
+				boolean isFactoryInstance = (thisJoinPoint.getArgs().length==0);
+				factoryInstances.put(handler, isFactoryInstance);
+				outWindows.put(handler, DebugWindow.newWindow(handler.toString(),isFactoryInstance));
 			}
 			offsets.put(handler, "");
 		}
@@ -120,6 +124,7 @@ public aspect HandlerAspect {
 	void printMethod(JoinPoint jPoint, BaseHandler handler) {
 		Signature sig = jPoint.getSignature();
 		Object[] args = jPoint.getArgs();
+		//System.out.println(sig.getName());
 		StringBuilder sb = new StringBuilder();
 		sb.append(sig.getDeclaringType().getSimpleName());
 		sb.append(".");
@@ -196,6 +201,7 @@ public aspect HandlerAspect {
 		String offset = offsets.get(handler);
 		text = text.replaceAll("\n", "\n"+offset+" ");
 		int headStart = offset.length()+heading.length();
-		window.printText(offset+heading+text+"\n", color, headStart,headStart+headEnd);
+		boolean setVisible = !factoryInstances.get(handler);
+		window.printText(offset+heading+text+"\n", color, headStart,headStart+headEnd,setVisible);
 	}
 }
