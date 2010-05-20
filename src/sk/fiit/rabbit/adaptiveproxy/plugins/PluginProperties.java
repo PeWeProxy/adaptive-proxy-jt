@@ -1,5 +1,6 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins;
 
+import java.io.File;
 import java.util.Scanner;
 
 /**
@@ -12,7 +13,7 @@ import java.util.Scanner;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public abstract class PluginProperties {
+public interface PluginProperties {
 	/**
 	 * Returns <code>String</code> value for a configuration property with the given
 	 * <code>name</code> if it is present, otherwise returns <code>null</code>.
@@ -20,7 +21,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>null</code> if no such
 	 * property is present
 	 */
-	public abstract String getProperty(String name);
+	String getProperty(String name);
 	
 	/**
 	 * Returns <code>String</code> value for a configuration property with the given
@@ -30,7 +31,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or passed <code>defaultValue</code> if no such
 	 * property is present 
 	 */
-	public abstract String getProperty(String name, String defaultValue);
+	String getProperty(String name, String defaultValue);
 	
 	/**
 	 * Returns <code>boolean</code> value for a configuration property with the given
@@ -41,7 +42,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>defaultValue</code> if no such
 	 * property is present or could not be converted
 	 */
-	public abstract boolean getBoolProperty(String name, boolean defaultValue);
+	boolean getBoolProperty(String name, boolean defaultValue);
 	
 	/**
 	 * Returns <code>int</code> value for a configuration property with the given
@@ -52,7 +53,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>defaultValue</code> if no such
 	 * property is present or could not be converted
 	 */
-	public abstract int getIntProperty(String name, int defaultValue);
+	int getIntProperty(String name, int defaultValue);
 	
 	/**
 	 * Returns <code>long</code> value for a configuration property with the given
@@ -63,7 +64,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>defaultValue</code> if no such
 	 * property is present or could not be converted
 	 */
-	public abstract long getLongProperty(String name, long defaultValue);
+	long getLongProperty(String name, long defaultValue);
 	
 	/**
 	 * Returns <code>double</code> value for a configuration property with the given
@@ -74,7 +75,7 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>defaultValue</code> if no such
 	 * property is present or could not be converted
 	 */
-	public abstract double getDoubleProperty(String name, double defaultValue);
+	double getDoubleProperty(String name, double defaultValue);
 	
 	/**
 	 * Returns <code>float</code> value for a configuration property with the given
@@ -85,5 +86,12 @@ public abstract class PluginProperties {
 	 * @return value for the property, or <code>defaultValue</code> if no such
 	 * property is present or could not be converted
 	 */
-	public abstract float getFloatProperty(String name, float defaultValue);
+	float getFloatProperty(String name, float defaultValue);
+	
+	/**
+	 * Returns a <code>File</code> object pointing to plugin's specific deployment directory
+	 * as set in plugin's configuration file.
+	 * @return a file pointing to plugin's deployment directory 
+	 */
+	File getRootDir();
 }

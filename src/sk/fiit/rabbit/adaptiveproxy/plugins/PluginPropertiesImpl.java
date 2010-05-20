@@ -1,19 +1,23 @@
 package sk.fiit.rabbit.adaptiveproxy.plugins;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.InputMismatchException;
 import java.util.Map;
 import java.util.Scanner;
 
-public final class PluginPropertiesImpl extends PluginProperties {
-	private Map<String, String> properties;
+public final class PluginPropertiesImpl implements PluginProperties {
+	private final File rootFile;
+	private final Map<String, String> properties;
 	
-	public PluginPropertiesImpl(Map<String, String> properties) {
+	public PluginPropertiesImpl(File rootFile, Map<String, String> properties) {
+		this(rootFile);
 		this.properties.putAll(properties);
 	}
 	
-	public PluginPropertiesImpl() {
+	public PluginPropertiesImpl(File rootFile) {
 		properties = new HashMap<String, String>();
+		this.rootFile = rootFile;
 	}
 	
 	public void addProperty(String name, String property) {
@@ -97,5 +101,10 @@ public final class PluginPropertiesImpl extends PluginProperties {
 	@Override
 	public String toString() {
 		return properties.toString();
+	}
+
+	@Override
+	public File getRootDir() {
+		return rootFile;
 	}
 }
