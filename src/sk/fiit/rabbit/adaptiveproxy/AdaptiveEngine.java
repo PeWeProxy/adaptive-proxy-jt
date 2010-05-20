@@ -17,8 +17,10 @@ import java.util.Scanner;
 import java.util.Set;
 
 import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 import org.apache.log4j.xml.DOMConfigurator;
 
 import rabbit.handler.AdaptiveHandler;
@@ -517,10 +519,12 @@ public class AdaptiveEngine  {
 			if (loggingLvL == null)
 				loggingLvL = System.getProperty("sk.fiit.adaptiveproxy.logging_level", "INFO").trim();
 			Level lvl = Level.toLevel(loggingLvL);
-			Logger.getRootLogger().setLevel(lvl);
+			Logger root = Logger.getRootLogger();
+			root.setLevel(lvl);
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
 			log.setLevel(lvl);
-			BasicConfigurator.configure();
+		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%t] %-5p %-15c{1} %x - %m%n")));
+			//BasicConfigurator.configure();
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
 		String pluginsHomeProp = prop.getProperty("pluginsHome");
