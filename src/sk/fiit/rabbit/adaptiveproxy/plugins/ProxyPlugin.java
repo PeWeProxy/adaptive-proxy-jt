@@ -9,7 +9,7 @@ package sk.fiit.rabbit.adaptiveproxy.plugins;
  */
 public interface ProxyPlugin {
 	/**
-	 * Returns whether this proxy plugin may be in it's current state reconfigured with
+	 * Returns whether this proxy plugin may be reconfigured in it's current state with
 	 * new configuration properties <code>newProps</code>.
 	 * @return <code>true</code> if this plugin may be reconfigured in it's current state
 	 * with passed properties, <code>false</code> otherwise.

@@ -171,7 +171,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"10%\">Connection</th>\n");
 		sb.append ("<th width=\"10%\">Timeout</th>\n");
 		sb.append ("<th width=\"10%\">Failed</th>\n");
-		List<ConnectionEventPlugin> cePlugins = adaptiveEngine.getEventsHandler().getLoadedCloseEventPlugins();
+		List<ConnectionEventPlugin> cePlugins = adaptiveEngine.getEventsHandler().getLoadedConnectionEventPlugins();
 		List<TimeoutEventPlugin> toPlugins = adaptiveEngine.getEventsHandler().getLoadedTimeoutEventPlugins();
 		List<FailureEventPlugin> flPlugins = adaptiveEngine.getEventsHandler().getLoadedFailureEventPlugins();
 		Set<ProxyPlugin> loadedPlugins = new LinkedHashSet<ProxyPlugin>();

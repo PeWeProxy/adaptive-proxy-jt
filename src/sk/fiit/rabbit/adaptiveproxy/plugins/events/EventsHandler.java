@@ -249,7 +249,7 @@ public class EventsHandler {
 		"Dispatching 'response delivery timeout' message to all TimeoutEventPlugin plugins"));
 	}
 	
-	public List<ConnectionEventPlugin> getLoadedCloseEventPlugins() {
+	public List<ConnectionEventPlugin> getLoadedConnectionEventPlugins() {
 		List<ConnectionEventPlugin> retVal = new LinkedList<ConnectionEventPlugin>();
 		retVal.addAll(connectionEventPlugins);
 		return retVal;
