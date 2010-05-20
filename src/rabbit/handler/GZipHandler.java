@@ -59,7 +59,8 @@ public class GZipHandler extends BaseHandler {
 
     protected void setupHandler () {
 	if (compress) {
-	    isCompressing = doesClientAcceptGzip() && willCompress ();
+		boolean seeUnpacked = seeUnpackedData ();
+	    isCompressing = doesClientAcceptGzip() && seeUnpacked;
 	    if (isCompressing) {
 		response.removeHeader ("Content-Length");
 		response.setHeader ("Content-Encoding", "gzip");
@@ -68,7 +69,8 @@ public class GZipHandler extends BaseHandler {
 	    } else {
 	    // TODO podla vsetkeho by odstranenie tohto riadku malo
 	    // umoznit filtrovat data bez vedlajsich ucinkov
-		mayFilter = false;
+		    if (!seeUnpacked)
+		    	mayFilter = false;
 	    }
 	}
     }
@@ -133,7 +135,7 @@ public class GZipHandler extends BaseHandler {
     	return null;
     }
     
-    protected boolean willCompress () {
+    protected boolean seeUnpackedData () {
 	String ce = response.getHeader ("Content-Encoding");
 	if (ce == null)
 	    return true;

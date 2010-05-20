@@ -207,7 +207,7 @@ public class AdaptiveHandler extends FilterHandler {
 	protected void setupHandler() {
 		super.setupHandler();
 		if (askForCaching) {
-			if (isCompressing || (!compress && super.willCompress())) {
+			if (isCompressing || super.seeUnpackedData()) {
 				// [ignore the method name !]
 				// if this condition is true, this handler will have an access to
 				// not-compressed or uncompressed data passing through it

@@ -134,8 +134,8 @@ public class FilterHandler extends GZipHandler {
     }
 
 	@Override
-	protected boolean willCompress () {
-	return gzu != null || super.willCompress ();
+	protected boolean seeUnpackedData () {
+	return gzu != null || super.seeUnpackedData ();
     }
 
     private class GZListener implements GZipUnpackListener {
