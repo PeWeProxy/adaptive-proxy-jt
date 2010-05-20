@@ -25,7 +25,9 @@ import sk.fiit.rabbit.adaptiveproxy.messages.HttpRequest;
 import sk.fiit.rabbit.adaptiveproxy.messages.HttpResponse;
 import sk.fiit.rabbit.adaptiveproxy.plugins.PluginProperties;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
+import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceProvider;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.content.ByteServiceImpl;
@@ -60,11 +62,11 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		public Set<Class<? extends ProxyService>> desiredResponseServices(
 				ResponseHeader webRPHeaders) {return null;}
 		@Override
-		public <Service extends ProxyService> ServiceProvider<Service> provideRequestService(
+		public <Service extends ProxyService> RequestServiceProvider<Service> provideRequestService(
 				HttpRequest request, Class<Service> serviceClass)
 				throws ServiceUnavailableException {return null;}
 		@Override
-		public <Service extends ProxyService> ServiceProvider<Service> provideResponseService(
+		public <Service extends ProxyService> ResponseServiceProvider<Service> provideResponseService(
 				HttpResponse response, Class<Service> serviceClass)
 				throws ServiceUnavailableException {return null;}
 	}

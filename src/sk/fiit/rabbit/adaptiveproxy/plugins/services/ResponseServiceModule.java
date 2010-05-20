@@ -26,16 +26,16 @@ public interface ResponseServiceModule extends ServiceModule, ResponsePlugin {
 	Set<Class<? extends ProxyService>> getProvidedResponseServices();
 	
 	/**
-	 * Returns service provider that provide implementation of requested service
+	 * Returns response service provider that provide implementation of requested service
 	 * identified by passed <code>serviceClass</code> over passed response message.
 	 * If this response service module is unable to provide the service over this
 	 * response message, returns <code>null</code>.
 	 * @param response response message to provide response service provider for
 	 * @param serviceClass class of the service to provide implementation for
-	 * @return service provider providing requested service over passed request
+	 * @return response service provider providing requested service over passed response
 	 * or <code>null</code> if this service module is unable to provide the service
 	 * for this response
 	 */
-	<Service extends ProxyService> ServiceProvider<Service> provideResponseService(HttpResponse response,
+	<Service extends ProxyService> ResponseServiceProvider<Service> provideResponseService(HttpResponse response,
 				Class<Service> serviceClass) throws ServiceUnavailableException;
 }

@@ -26,16 +26,16 @@ public interface RequestServiceModule extends ServiceModule, RequestPlugin {
 	Set<Class<? extends ProxyService>> getProvidedRequestServices();
 	
 	/**
-	 * Returns service provider that provide implementation of requested service
+	 * Returns request service provider that provide implementation of requested service
 	 * identified by passed <code>serviceClass</code> over passed request message.
 	 * If this request service module is unable to provide the service over this
 	 * request message, returns <code>null</code>.
 	 * @param request request message to provide request service provider for
 	 * @param serviceClass class of the service to provide implementation for
-	 * @return service provider providing requested service over passed request
+	 * @return request service provider providing requested service over passed request
 	 * or <code>null</code> if this service module is unable to provide the service
 	 * for this request
 	 */
-	<Service extends ProxyService> ServiceProvider<Service> provideRequestService(HttpRequest request,
+	<Service extends ProxyService> RequestServiceProvider<Service> provideRequestService(HttpRequest request,
 				Class<Service> serviceClass) throws ServiceUnavailableException;
 }
