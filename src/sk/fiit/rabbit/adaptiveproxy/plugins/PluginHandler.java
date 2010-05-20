@@ -40,6 +40,7 @@ public class PluginHandler {
 	private static final String ELEMENT_NAME = "name";
 	private static final String ELEMENT_CLASSLOC = "classLocation";
 	private static final String ELEMENT_CLASSNAME = "className";
+	private static final String ELEMENT_WORKDIR = "workingDir";
 	private static final String ELEMENT_LIBS = "libraries";
 	private static final String ELEMENT_LIB = "lib";
 	private static final String ELEMENT_TYPES = "types";
@@ -611,7 +612,7 @@ public class PluginHandler {
 			if (document != null) {
 				PluginConfigEntry cfgEntry = null;
 				try {
-					cfgEntry = loadPluginConfig(document, variables);
+					cfgEntry = loadPluginConfig(document,file.getName(), variables);
 				} catch (PluginConfigurationException e) {
 					log.info("Invalid configuration file "+file.getAbsolutePath()+" ("+e.getText()+")");
 					continue;
@@ -656,22 +657,21 @@ public class PluginHandler {
 		return replacedText.toString();
 	}
 	
-	private PluginConfigEntry loadPluginConfig(Document doc, Map<String, String> variables) throws PluginConfigurationException {
+	private PluginConfigEntry loadPluginConfig(Document doc, String xmlName, Map<String, String> variables) throws PluginConfigurationException {
 		Element docRoot = doc.getDocumentElement();
 		if (!ELEMENT_PLUGIN.equals(docRoot.getTagName()))
-			throw new PluginConfigurationException("missing document root element '"+ELEMENT_PLUGIN+"'");
+			throw new PluginConfigurationException("Configuration '"+xmlName+"' - Missing document root element '"+ELEMENT_PLUGIN+"'");
 		
 		NodeList nodeList = docRoot.getElementsByTagName(ELEMENT_NAME);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_NAME+"'");
+			throw new PluginConfigurationException("Configuration '"+xmlName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_NAME+"'");
 		Element pluginNameElement = (Element)nodeList.item(0);
 		String pluginName = pluginNameElement.getTextContent();
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_CLASSLOC);
 		String classLocation = "";
 		if (nodeList.getLength() == 0)
-			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSLOC+"' for plugin with name '"+pluginName
-					+"', using default class location");
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSLOC+"', using default class location");
 		else {
 			Element classLocationElement = (Element)docRoot.getElementsByTagName(ELEMENT_CLASSLOC).item(0);
 			classLocation = classLocationElement.getTextContent();
@@ -679,21 +679,43 @@ public class PluginHandler {
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_CLASSNAME);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSNAME+"'");
+			throw new PluginConfigurationException("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_CLASSNAME+"'");
 		Element classNameElement = (Element)nodeList.item(0);
 		String className = classNameElement.getTextContent();
 		
+		nodeList = docRoot.getElementsByTagName(ELEMENT_WORKDIR);
+		File workDir = null;
+		if (nodeList.getLength() == 0) {
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_WORKDIR+"', no working directory will be used");
+		} else {
+			Element workDirElement = (Element)nodeList.item(0);
+			workDir = new File(pluginRepositoryDir, workDirElement.getTextContent());
+			if (!workDir.exists()) {
+				log.info("Plugin '"+pluginName+"' - Creating working directory '"+workDir.getPath()+"'");
+				if (!workDir.mkdir()) {
+					log.info("Plugin '"+pluginName+"' - Unable to create working directory '"+workDir.getPath()+"', no working directory will be used");
+					throw new PluginConfigurationException("Plugin '"+pluginName+"' - Unable to create missing working directory");
+				}
+			} else if (!workDir.isDirectory())
+				throw new PluginConfigurationException("Plugin '"+pluginName+"' - Working directory path '"+workDir.getPath()+"' is pointing to regular file, not a directory");
+			String path = workDir.getAbsolutePath();
+			try {
+				path = workDir.getCanonicalPath();
+			} catch (IOException e) {
+				log.warn("Plugin '"+pluginName+"' - Unable to get cannonical path for file "+workDir,e);
+			}
+			log.info("Plugin '"+pluginName+"' - plugin will use working directory '"+path+"'");
+			// TODO nastavit prava na read/write cez policy
+		}
 		nodeList = docRoot.getElementsByTagName(ELEMENT_LIBS);
 		List<String> pluginLibs = new LinkedList<String>();
 		if (nodeList.getLength() == 0)
-			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
-					+"', no additional libraries will be loaded");
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"', no additional libraries will be loaded");
 		else {
 			Element libsElement = (Element)nodeList.item(0);
 			NodeList libs = libsElement.getElementsByTagName(ELEMENT_LIB);
 			if (libs.getLength() == 0)
-				log.debug("Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"' for plugin with name '"+pluginName
-						+"', no additional libraries will be loaded");
+				log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_LIB+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_LIBS+"', no additional libraries will be loaded");
 			else {
 				for (int i = 0; i < libs.getLength(); i++) {
 					Element type = (Element)libs.item(i);
@@ -704,29 +726,26 @@ public class PluginHandler {
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_TYPES);
 		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"'");
+			throw new PluginConfigurationException("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"'");
 		Element typesElement = (Element)nodeList.item(0);
 		NodeList types = typesElement.getElementsByTagName(ELEMENT_TYPE);
 		List<String> pluginTypes = new ArrayList<String>(types.getLength());
 		if (types.getLength() == 0)
-			log.debug("Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"' for plugin with name '"+pluginName
-					+"', this plugin won't be used");
+			log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"', this plugin won't be used");
 		for (int i = 0; i < types.getLength(); i++) {
 			Element type = (Element)types.item(i);
 			pluginTypes.add(type.getTextContent());
 		}
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
-		PluginPropertiesImpl properties = new PluginPropertiesImpl();
+		PluginPropertiesImpl properties = new PluginPropertiesImpl(workDir);
 		if (nodeList.getLength() == 0)
-			log.debug("Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
-					+"', no parameters will be provided at plugin configuration");
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at plugin configuration");
 		else {
 			Element parametersElement = (Element)nodeList.item(0);
 			NodeList params = parametersElement.getElementsByTagName(ELEMENT_PARAM);
 			if (params.getLength() == 0)
-				log.debug("Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"' for plugin with name '"+pluginName
-						+"', no parameters will be provided at plugin configuration");
+				log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at plugin configuration");
 			else
 				for (int i = 0; i < params.getLength(); i++) {
 					Element param = (Element)params.item(i);
@@ -809,7 +828,7 @@ public class PluginHandler {
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
 			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
-				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin," +
+				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin, " +
 						"and the proxy server won't be able to reload it on the fly if it changes");
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");
