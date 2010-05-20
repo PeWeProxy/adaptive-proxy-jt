@@ -18,8 +18,8 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 
-public class ServiceModulesManager {
-	private static final Logger log = Logger.getLogger(ServiceModulesManager.class);
+public class ModulesManager {
+	private static final Logger log = Logger.getLogger(ModulesManager.class);
 	public static final String DEF_PATTERN_TEXTMSGS = "^text/html|^application/xhtml(\\+xml)?";
 	
 	private final AdaptiveEngine adaptiveEngine;
@@ -29,7 +29,7 @@ public class ServiceModulesManager {
 	private final Map<ResponseServiceModule, Set<Class<? extends ProxyService>>> providedRpServices;
 	private Pattern stringServicesPattern = Pattern.compile(DEF_PATTERN_TEXTMSGS);
 	
-	public ServiceModulesManager(AdaptiveEngine adaptiveEngine) {
+	public ModulesManager(AdaptiveEngine adaptiveEngine) {
 		this.adaptiveEngine = adaptiveEngine;
 		rqModules = new LinkedList<RequestServiceModule>();
 		rpModules = new LinkedList<ResponseServiceModule>();
@@ -121,7 +121,7 @@ public class ServiceModulesManager {
 			stringServicesPattern = Pattern.compile(patternString);
 		} catch (PatternSyntaxException e) {
 			log.info("Invalid or no pattern for string content services, default one will be used", e);
-			stringServicesPattern = Pattern.compile(ServiceModulesManager.DEF_PATTERN_TEXTMSGS);
+			stringServicesPattern = Pattern.compile(ModulesManager.DEF_PATTERN_TEXTMSGS);
 		}
 	}
 	

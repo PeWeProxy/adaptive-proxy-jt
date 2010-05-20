@@ -72,7 +72,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	}
 	
 	
-	final ServiceModulesManager manager;
+	final ModulesManager manager;
 	final MessageType httpMessage;
 	private final ClassLoader servicesCLoader;
 	private final List<ModuleType> modules;
@@ -82,7 +82,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	private ServiceBinding<?> changedModelBinding;
 	private ServiceBinding<?> bindingDoingChanges;
 	
-	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ServiceModulesManager manager) {
+	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		this.httpMessage = httpMessage;
 		this.modules = modules;
 		this.serviceBindings = new HashMap<ProxyService, ServiceBinding<?>>();
@@ -564,7 +564,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 	}
 	
-	public ServiceModulesManager getManager() {
+	public ModulesManager getManager() {
 		return manager;
 	}
 	

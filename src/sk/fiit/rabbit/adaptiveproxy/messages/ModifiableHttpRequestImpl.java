@@ -5,7 +5,7 @@ import java.util.Arrays;
 
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.services.RequestServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
+import sk.fiit.rabbit.adaptiveproxy.services.ModulesManager;
 
 public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl>
 		implements ModifiableHttpRequest {
@@ -13,12 +13,12 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	private HeaderWrapper clientRQHeaders;
 	private HeaderWrapper proxyRQHeaders;
 	
-	public ModifiableHttpRequestImpl(ServiceModulesManager modulesManager, HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
+	public ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
 		this(modulesManager,clientRQHeaders
 			,clientRQHeaders.clone(),clientSocketAdr);
 	}
 	
-	private ModifiableHttpRequestImpl(ServiceModulesManager modulesManager, HeaderWrapper clientRQHeaders,
+	private ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper clientRQHeaders,
 			HeaderWrapper proxyRQHeaders, InetSocketAddress clientSocketAdr) {
 		this.clientSocketAdr = clientSocketAdr;
 		this.clientRQHeaders = clientRQHeaders;

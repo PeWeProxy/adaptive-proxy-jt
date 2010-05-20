@@ -9,7 +9,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceProvider;
 
 public final class ResponseServiceHandleImpl extends ServicesHandleBase<ModifiableHttpResponseImpl,ResponseServiceModule> {
 	
-	public ResponseServiceHandleImpl(ModifiableHttpResponseImpl response, ServiceModulesManager modulesManager) {
+	public ResponseServiceHandleImpl(ModifiableHttpResponseImpl response, ModulesManager modulesManager) {
 		super(response, modulesManager.getResponseModules(), modulesManager);
 	}
 	

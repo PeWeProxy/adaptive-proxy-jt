@@ -22,7 +22,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.services.RequestServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.plugins.services.ServiceModule;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
-import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
+import sk.fiit.rabbit.adaptiveproxy.services.ModulesManager;
 
 public class AdaptiveProxyStatus extends BaseMetaHandler {
 	AdaptiveEngine adaptiveEngine = null;
@@ -92,7 +92,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"70%\">Provided services</th>\n");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
 		sb.append ("<th width=\"5%\">RP</th>\n");
-		ServiceModulesManager modulesManager = adaptiveEngine.getModulesManager();
+		ModulesManager modulesManager = adaptiveEngine.getModulesManager();
 		List<RequestServiceModule> rqServicePlugins = modulesManager.getLoadedRequestModules();
 		List<ResponseServiceModule> rpServicePlugins = modulesManager.getLoadedResponsetModules();
 		Set<ServiceModule> loadedModules = new LinkedHashSet<ServiceModule>();

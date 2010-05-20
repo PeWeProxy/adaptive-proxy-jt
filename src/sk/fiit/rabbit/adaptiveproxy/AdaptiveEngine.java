@@ -53,7 +53,7 @@ import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.RequestProcessingPlugin.RequestProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions;
 import sk.fiit.rabbit.adaptiveproxy.services.ProxyService;
-import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
+import sk.fiit.rabbit.adaptiveproxy.services.ModulesManager;
 import sk.fiit.rabbit.adaptiveproxy.services.ServicesHandleBase;
 
 public class AdaptiveEngine  {
@@ -66,7 +66,7 @@ public class AdaptiveEngine  {
 	private final HttpProxy proxy;
 	private PluginHandler pluginHandler;
 	private final EventsHandler loggingHandler;
-	private ServiceModulesManager modulesManager;
+	private ModulesManager modulesManager;
 	private final List<RequestProcessingPlugin> requestPlugins;
 	private final List<ResponseProcessingPlugin> responsePlugins;
 	private File pluginsOrderFile = null; 
@@ -98,7 +98,7 @@ public class AdaptiveEngine  {
 		this.proxy = proxy;
 		loggingHandler = new EventsHandler(this);
 		pluginHandler = new PluginHandler();
-		modulesManager = new ServiceModulesManager(this);
+		modulesManager = new ModulesManager(this);
 		requestPlugins = new LinkedList<RequestProcessingPlugin>();
 		responsePlugins = new LinkedList<ResponseProcessingPlugin>();
 	}
@@ -292,6 +292,7 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
+		conHandle.response.getProxyResponseHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
@@ -523,7 +524,7 @@ public class AdaptiveEngine  {
 			root.setLevel(lvl);
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
 			log.setLevel(lvl);
-		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%t] %-5p %-15c{1} %x - %m%n")));
+		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%22t] %-5p %-15c{1} %x - %m%n")));
 			//BasicConfigurator.configure();
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
@@ -652,7 +653,7 @@ public class AdaptiveEngine  {
 					+" on " +conHandle.request.getProxyRequestHeader().getRequestLine());
 	}
 
-	public ServiceModulesManager getModulesManager() {
+	public ModulesManager getModulesManager() {
 		return modulesManager;
 	}
 }

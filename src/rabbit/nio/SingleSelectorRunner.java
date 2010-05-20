@@ -51,7 +51,7 @@ class SingleSelectorRunner implements Runnable {
 	    throw new IllegalStateException ("Already started");
 	running.set (true);
 	synchronized (this) {
-	    selectorThread = new Thread (this, getClass ().getName () + " " + id);
+	    selectorThread = new Thread (this, getClass ().getSimpleName () + " " + id);
 	    selectorThread.start ();
 	}
     }

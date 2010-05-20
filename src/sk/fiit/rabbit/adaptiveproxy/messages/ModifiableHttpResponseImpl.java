@@ -4,7 +4,7 @@ import java.util.Arrays;
 
 import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
 import sk.fiit.rabbit.adaptiveproxy.services.ResponseServiceHandleImpl;
-import sk.fiit.rabbit.adaptiveproxy.services.ServiceModulesManager;
+import sk.fiit.rabbit.adaptiveproxy.services.ModulesManager;
 
 public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
 		implements ModifiableHttpResponse {
@@ -12,12 +12,12 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	private final HeaderWrapper webRPHeaders;
 	private final HeaderWrapper proxyRPHeaders;
 	
-	public ModifiableHttpResponseImpl(ServiceModulesManager modulesManager, HeaderWrapper webRPHeaders, ModifiableHttpRequestImpl request) {
+	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper webRPHeaders, ModifiableHttpRequestImpl request) {
 		// webRPHeaders are those that are going to be modified by RabbIT code
 		this(modulesManager, webRPHeaders.clone(), webRPHeaders, request);
 	}
 	
-	private ModifiableHttpResponseImpl(ServiceModulesManager modulesManager, HeaderWrapper webRPHeaders, HeaderWrapper proxyRPHeaders, ModifiableHttpRequestImpl request) {
+	private ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper webRPHeaders, HeaderWrapper proxyRPHeaders, ModifiableHttpRequestImpl request) {
 		this.request = request;
 		this.webRPHeaders = webRPHeaders;
 		this.proxyRPHeaders = proxyRPHeaders;
