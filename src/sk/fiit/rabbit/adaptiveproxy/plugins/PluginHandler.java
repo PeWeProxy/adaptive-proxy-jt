@@ -21,9 +21,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import sk.fiit.rabbit.adaptiveproxy.utils.MD5ChecksumGenerator;
 import sk.fiit.rabbit.adaptiveproxy.utils.XMLFileParser;
@@ -41,7 +46,11 @@ public class PluginHandler {
 	private static final String ELEMENT_TYPE = "type";
 	private static final String ELEMENT_PARAMS = "parameters";
 	private static final String ELEMENT_PARAM = "param";
+	private static final String ELEMENT_VARIABLES = "variables";
+	private static final String ELEMENT_VARIABLE = "variable";
 	private static final String ATTR_NAME = "name";
+	private static final String ATTR_VARIABLE_NAME = "name";
+	private static final String VARIABLE_CONFIGURATION_FILE = "variables.xml";
 	
 	private static final FilenameFilter jarFilter;
 	private static final FilenameFilter classFilter;
@@ -564,7 +573,43 @@ public class PluginHandler {
 		return false;
 	}
 	
+	private Map<String, String> loadVariablesConfiguration() {
+		Map<String, String> variables = new HashMap<String, String>();
+		
+		Document document = XMLFileParser.parseFile(new File(pluginRepositoryDir.getAbsolutePath() + File.separator + VARIABLE_CONFIGURATION_FILE));
+		
+		if(document != null) {
+			Element docRoot = document.getDocumentElement();
+			if(ELEMENT_VARIABLES.equals(docRoot.getTagName())) {
+				NodeList nodeList = docRoot.getElementsByTagName(ELEMENT_VARIABLE);
+				for(int i = 0; i < nodeList.getLength(); i++) {
+					Node node = nodeList.item(i);
+					
+					NamedNodeMap attributes = node.getAttributes();
+					if(attributes != null) {
+						Node nameNode = attributes.getNamedItem(ATTR_VARIABLE_NAME);
+						if(nameNode != null) {
+							variables.put(nameNode.getTextContent(), node.getTextContent());
+						} else {
+							log.error("The variable configuration file is malformed - expected '" + ATTR_VARIABLE_NAME + "' attribute on tag " + node.getTextContent());
+						}
+					} else {
+						log.error("The variable configuration file is malformed - '" + node.getTextContent() + "' has no attributes");
+					}
+				}
+			} else {
+				log.error("The variable configuration file " + VARIABLE_CONFIGURATION_FILE + " is missing the document root element '" + ELEMENT_VARIABLES + "'");
+			}
+		} else {
+			log.error("Corrupted variables file " + VARIABLE_CONFIGURATION_FILE);
+		}
+
+		return variables;
+	}
+	
 	private synchronized void loadPluginsConfigs() {
+		Map<String, String> variables = loadVariablesConfiguration();
+		
 		configEntries.clear();
 		//excludeFileNames.add("services.xml");
 		File[] configFiles = pluginRepositoryDir.listFiles(new PluginsXMLFileFilter(excludeFileNames));
@@ -574,7 +619,7 @@ public class PluginHandler {
 			if (document != null) {
 				PluginConfigEntry cfgEntry = null;
 				try {
-					cfgEntry = loadPluginConfig(document);
+					cfgEntry = loadPluginConfig(document, variables);
 				} catch (PluginConfigurationException e) {
 					log.info("Invalid configuration file "+file.getAbsolutePath()+" ("+e.getText()+")");
 					continue;
@@ -593,7 +638,33 @@ public class PluginHandler {
 		}
 	}
 	
-	private PluginConfigEntry loadPluginConfig(Document doc) throws PluginConfigurationException {
+	private String replaceVariables(String textWithVariables, Map<String, String> variableValues) {
+		Pattern pattern = Pattern.compile("\\$\\{.*?\\}");
+		Matcher matcher = pattern.matcher(textWithVariables);
+		StringBuffer replacedText = new StringBuffer();
+		while(matcher.find()) {
+			String variableDefinition = matcher.group();
+			String variable = variableDefinition.substring(2, variableDefinition.length() - 1);
+			if(variableValues.containsKey(variable)) {
+				matcher.appendReplacement(replacedText, variableValues.get(variable));
+			} else {
+				String definedVariablesList = "";
+				for(String definedVariable : variableValues.keySet()) {
+					definedVariablesList += definedVariable + ", ";
+				}
+				if(definedVariablesList.length() > 0) {
+					definedVariablesList = definedVariablesList.substring(0, definedVariablesList.length() - 2);
+				}
+				log.error("Undefined variable '" + variable + "'. Defined variables are: '" + definedVariablesList + "'");
+			}
+		}
+		
+		matcher.appendTail(replacedText);
+		
+		return replacedText.toString();
+	}
+	
+	private PluginConfigEntry loadPluginConfig(Document doc, Map<String, String> variables) throws PluginConfigurationException {
 		Element docRoot = doc.getDocumentElement();
 		if (!ELEMENT_PLUGIN.equals(docRoot.getTagName()))
 			throw new PluginConfigurationException("missing document root element '"+ELEMENT_PLUGIN+"'");
@@ -669,7 +740,7 @@ public class PluginHandler {
 					Element param = (Element)params.item(i);
 					String nameAttr = param.getAttribute(ATTR_NAME);
 					if (nameAttr != null && !nameAttr.isEmpty())
-						properties.addProperty(nameAttr, param.getTextContent());
+						properties.addProperty(nameAttr, replaceVariables(param.getTextContent(), variables));
 			}
 		}
 		return new PluginConfigEntry(pluginName,className,classLocation,pluginLibs,pluginTypes,properties);
