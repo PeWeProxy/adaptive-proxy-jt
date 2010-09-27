@@ -126,7 +126,7 @@ public class PluginHandler {
 		} catch (IOException e) {
 			log.info("Error when converting plugins home directory file '"+path+"' to cannonical form");
 		}
-		log.info("Plugins home directory is set to "+path);
+		log.info("Plugins home directory is set to '"+path+"'");
 	}
 	
 	class PluginsXMLFileFilter implements FilenameFilter {
@@ -225,7 +225,7 @@ public class PluginHandler {
 			}
 			if (pluginFile == null || !pluginFile.canRead()) {
 				// unable to locate plugin's binary file (jar/dir)
-				log.info("Can not read classpath file/directory "+pluginFile.getAbsolutePath()+",  Plugin '"+cfgEntry.name
+				log.info("Can not read classpath file/directory '"+pluginFile.getAbsolutePath()+"',  Plugin '"+cfgEntry.name
 					+"' will not be loaded");
 				iterator.remove();
 				continue;
@@ -317,8 +317,7 @@ public class PluginHandler {
 		return retVal;
 	}
 	
-	private URL[] createLibsURLs(File dir, Map<URL, String> newLibChecksums
-			, String logDirDescr, String logEntryDescr) {
+	private URL[] createLibsURLs(File dir, Map<URL, String> newLibChecksums, String logDirDescr, String logEntryDescr) {
 		if (dir != null && dir.isDirectory() && dir.canRead()) {
 			URL sharedDirURL = null;
 			try {
@@ -334,11 +333,11 @@ public class PluginHandler {
 				} catch (IOException e) {
 					log.info("Error when converting "+logDirDescr+" directory file '"+path+"' to cannonical form");
 				}
-				log.info("Using "+logDirDescr+" directory "+path);
+				log.info("Using "+logDirDescr+" directory '"+path+"'");
 				File[] jarFiles = getNestedFiles(dir, jarFilter);
 				URL[] urls = new URL[jarFiles.length+1];
 				urls[0] = sharedDirURL;
-				log.debug("Using "+logEntryDescr+" resource "+sharedDirURL);
+				log.debug("Using "+logEntryDescr+" resource '"+sharedDirURL+"'");
 				int i = 1;
 				for (File lib : jarFiles) {
 					try {
@@ -349,7 +348,7 @@ public class PluginHandler {
 					}
 					try {
 						urls[i++] = lib.toURI().toURL();
-						log.debug("Using "+logEntryDescr+" resource "+urls[i-1]);
+						log.debug("Using "+logEntryDescr+" resource '"+urls[i-1]+"'");
 					} catch (MalformedURLException e) {
 						log.warn("Error when converting valid "+logEntryDescr+" file path '"+lib.getAbsolutePath()
 								+"' to URL, no shared libraries will be used");
@@ -363,7 +362,7 @@ public class PluginHandler {
 				return urls;
 			}
 		} else
-			log.info("Can not access "+logDirDescr+" directory "+dir.getAbsolutePath()+", no "+logDirDescr+" will be used");
+			log.info("Can not access "+logDirDescr+" directory '"+dir.getAbsolutePath()+"', no "+logDirDescr+" will be used");
 		return null;
 	}
 	
@@ -566,10 +565,18 @@ public class PluginHandler {
 		return false;
 	}
 	
+	/**
+	 * @author Tomas Kramar
+	 */
 	private Map<String, String> loadVariablesConfiguration() {
 		Map<String, String> variables = new HashMap<String, String>();
 		
-		Document document = XMLFileParser.parseFile(new File(pluginRepositoryDir.getAbsolutePath() + File.separator + VARIABLE_CONFIGURATION_FILE));
+		File variablesFile = new File(pluginRepositoryDir.getAbsolutePath() + File.separator + VARIABLE_CONFIGURATION_FILE);
+		if (!variablesFile.canRead()) {
+			log.info("Can not read variables file '"+variablesFile.getAbsolutePath()+"', no variables will be loaded");
+			return variables;
+		}
+		Document document = XMLFileParser.parseFile(variablesFile);
 		
 		if(document != null) {
 			Element docRoot = document.getDocumentElement();
@@ -584,19 +591,19 @@ public class PluginHandler {
 						if(nameNode != null) {
 							variables.put(nameNode.getTextContent(), node.getTextContent());
 						} else {
-							log.error("The variable configuration file is malformed - expected '" + ATTR_VARIABLE_NAME + "' attribute on tag " + node.getTextContent());
+							log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - expected '"+ATTR_VARIABLE_NAME+"' attribute on tag "+node.getTextContent());
 						}
 					} else {
-						log.error("The variable configuration file is malformed - '" + node.getTextContent() + "' has no attributes");
+						log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - '"+node.getTextContent()+"' has no attributes");
 					}
 				}
 			} else {
-				log.error("The variable configuration file " + VARIABLE_CONFIGURATION_FILE + " is missing the document root element '" + ELEMENT_VARIABLES + "'");
+				log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is missing the document root element '"+ELEMENT_VARIABLES+"'");
 			}
 		} else {
-			log.error("Corrupted variables file " + VARIABLE_CONFIGURATION_FILE);
+			log.error("Corrupted variables file '"+variablesFile.getAbsolutePath()+"'");
 		}
-
+		
 		return variables;
 	}
 	
@@ -614,7 +621,7 @@ public class PluginHandler {
 				try {
 					cfgEntry = loadPluginConfig(document,file.getName(), variables);
 				} catch (PluginConfigurationException e) {
-					log.info("Invalid configuration file "+file.getAbsolutePath()+" ("+e.getText()+")");
+					log.info("Invalid configuration file '"+file.getAbsolutePath()+"' ("+e.getText()+")");
 					continue;
 				}
 				int num = 1;
@@ -623,14 +630,17 @@ public class PluginHandler {
 					cfgEntry = new PluginConfigEntry(configedName+"#"+Integer.toString(num++), cfgEntry.className, cfgEntry.classLocation, cfgEntry.libraries, cfgEntry.types, cfgEntry.properties);
 				}
 				if (num > 1)
-					log.info("Duplicate plugin name '"+configedName+"', name of the plugin config of which is stored in file "+file.getAbsolutePath()+" is set to '"+cfgEntry.name+"'");
+					log.info("Duplicate plugin name '"+configedName+"', name of the plugin config of which is stored in file '"+file.getAbsolutePath()+"' is set to '"+cfgEntry.name+"'");
 				configEntries.add(cfgEntry);
 				pluginNames.add(cfgEntry.name);
 			} else
-				log.info("Corrupted plugin configuration file "+file.getAbsolutePath());
+				log.info("Corrupted plugin configuration file '"+file.getAbsolutePath()+"'");
 		}
 	}
 	
+	/**
+	 * @author Tomas Kramar
+	 */
 	private String replaceVariables(String textWithVariables, Map<String, String> variableValues) {
 		Pattern pattern = Pattern.compile("\\$\\{.*?\\}");
 		Matcher matcher = pattern.matcher(textWithVariables);
@@ -723,7 +733,6 @@ public class PluginHandler {
 				}
 			}
 		}
-		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_TYPES);
 		if (nodeList.getLength() == 0)
 			throw new PluginConfigurationException("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"'");
@@ -815,7 +824,7 @@ public class PluginHandler {
 			String classPath = clazz.getName().replace(".", filepathSeparator);
 			classFile = new File(codeSourceFile,classPath+".class");
 			if (!classFile.isFile()) {
-				log.info("Unable to find actual class at "+classFile.getAbsolutePath());
+				log.info("Unable to find actual class at '"+classFile.getAbsolutePath()+"'");
 			}
 		}
 		return classFile;
