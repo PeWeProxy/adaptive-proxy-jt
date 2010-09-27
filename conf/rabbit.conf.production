@@ -52,8 +52,9 @@ StrictHTTP=false
 #htdocs_dir=htdocs
 
 [AdaptiveEngine]
-# Points to log4j configuration file to be used to configure Log4j logging
-logging_conf=conf/log4j.xml
+# Points to log4j configuration file to be used to configure Log4j logging. Path is
+# relative to this configuration file parent directory
+logging_conf=log4j.xml
 
 # If 'logging_conf' property is not set, default logging to console
 # configured with this logging level will be used. If no value is set
@@ -70,7 +71,7 @@ logging_level=ALL
 # whole directory is also used for classloading the same way as if it was
 # in JVM classpath. When no value is set, default path 'services' is used.
 # Path is relative to 'pluginsHome' directory.
-#services_folder=services
+#services_folder=../services
 
 # Path to shared libraries directory. This is the directory in which all libraries
 # = jar files in it's subtree, will be accessible by plugins' dynamically created class
@@ -80,9 +81,9 @@ logging_level=ALL
 # directory.
 #shared_libs_folder=
 
-# Regexp matching mime types of messages (Content-Type header) for which String services
-# (StringContentService, ModifiableStringService) should be served. When no value is set,
-# default pattern ^text/(.*)|^application/xhtml(\\+xml)? is used.
+# Regexp matching mime types of messages (Content-Type header, without charset segment) for
+# which String services (StringContentService, ModifiableStringService) should be served.
+# When no value is set, default pattern ^text/html|^application/xhtml(\+xml)? is used.
 stringServicesPattern=^text/html|^application/xhtml(\+xml)?
 
 [logging]

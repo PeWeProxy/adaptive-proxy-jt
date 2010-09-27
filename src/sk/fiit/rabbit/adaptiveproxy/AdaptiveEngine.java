@@ -292,7 +292,7 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
-		conHandle.response.getProxyResponseHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
+		//conHandle.response.getProxyResponseHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "

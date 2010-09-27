@@ -66,18 +66,18 @@ public aspect HandlerAspect {
 	pointcut zippersMethods(BaseHandler handler) : cflow(methodInHandlerCode(handler))
 						&& (execution(* GZipUnpacker.*(..)) || execution(* GZipPacker.*(..)));
 	
-	Map<BaseHandler, WebConnectionResourceSource> lastReadHandlers = new HashMap<BaseHandler, WebConnectionResourceSource>();
+	//Map<BaseHandler, WebConnectionResourceSource> lastReadHandlers = new HashMap<BaseHandler, WebConnectionResourceSource>();
 	
-	// Vypis registrovania poziadavky citat data zo spojenia
+	// Vypis regisrovania poziadavky citat data zo spojenia
 	before(BaseHandler handler, WebConnectionResourceSource readHandler): waitForRead(handler,readHandler) {
 		if (!(readHandler instanceof WebConnectionResourceSource))
 			return;
-		WebConnectionResourceSource lastReadHandler = lastReadHandlers.get(handler);
+		/*WebConnectionResourceSource lastReadHandler = lastReadHandlers.get(handler);
 		if (lastReadHandler == null || lastReadHandler != readHandler)
 			lastReadHandlers.put(handler, readHandler);
-		if (lastReadHandler != null && lastReadHandler != readHandler)
-			printOut(handler, "ERROR - "+readHandler.toString(), debugTextType.WAITFORREAD, 8);
-		else
+		if (lastReadHandler == readHandler)
+			printOut(handler, "ERROR "+readHandler.toString(), debugTextType.WAITFORREAD, 5);
+		else*/
 			printOut(handler, readHandler.toString(), debugTextType.WAITFORREAD, 0);
 	}
 	
@@ -161,22 +161,30 @@ public aspect HandlerAspect {
 	
 	// PO vykonavani metody objektu triedy BaseHandler a podtried
 	after(BaseHandler handler): methodInHandlerCode(handler) {
-		offsets.put(handler, offsets.get(handler).substring(3));
+		methodReturned(handler);
 	}
 
 	// PO vykonavani metody objektu triedy vnorenej triede BaseHandler a podtriedam
 	after(BaseHandler handler): methodInHandlersInnerClassCode(handler) {
-		offsets.put(handler, offsets.get(handler).substring(3));
+		methodReturned(handler);
 	}
 	
 	// PO vykonavani metody objektu packera alebo unpackera
 	after(BaseHandler handler): zippersMethods(handler) {
+		methodReturned(handler);
+	}
+	
+	private void methodReturned(BaseHandler handler) {
 		offsets.put(handler, offsets.get(handler).substring(3));
+		if (offsets.get(handler).isEmpty()) {
+			String text = "NO_METHOD_ON_STACK";
+			printOut(handler, text, debugTextType.INFO,text.length());
+		}
 	}
 	
 	//before(BaseHandler handler): 
 	
-	enum debugTextType { METHOD, VARIABLE, BUFFER_USED, BUFFER_OP, WAITFORREAD }
+	enum debugTextType { METHOD, VARIABLE, BUFFER_USED, BUFFER_OP, WAITFORREAD, INFO }
 	
 	void printOut(BaseHandler handler, String text, debugTextType type, int headEnd) {
 		DebugWindow window = outWindows.get(handler);

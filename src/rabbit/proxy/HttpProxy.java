@@ -420,7 +420,8 @@ public class HttpProxy implements Resolver {
     public void stop () {
 	// TODO: what level do we want here?
 	logger.severe ("HttpProxy.stop() called, shutting down");
-	adaptiveEngine.setProxyIsDying();
+	if (adaptiveEngine != null)
+		adaptiveEngine.setProxyIsDying();
 	synchronized (this) {
 	    closeSocket ();
 	    // TODO: wait for remaining connections.
