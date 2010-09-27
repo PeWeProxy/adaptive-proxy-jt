@@ -11,9 +11,9 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import sk.fiit.rabbit.adaptiveproxy.utils.BytesChunker;
-import sk.fiit.rabbit.adaptiveproxy.utils.HeaderUtils;
-import sk.fiit.rabbit.adaptiveproxy.utils.InMemBytesStore;
+import sk.fiit.peweproxy.utils.BytesChunker;
+import sk.fiit.peweproxy.utils.HeaderUtils;
+import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class AdaptiveHandler extends FilterHandler {
 	private static final org.apache.log4j.Logger log

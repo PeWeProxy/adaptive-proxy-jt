@@ -21,8 +21,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import rabbit.http.HttpHeader;
-import sk.fiit.rabbit.adaptiveproxy.headers.HeaderWrapper;
-import sk.fiit.rabbit.adaptiveproxy.headers.ReadableHeader;
+import sk.fiit.peweproxy.headers.HeaderWrapper;
+import sk.fiit.peweproxy.headers.ReadableHeader;
 
 public abstract class CharsetUtils {
 	public static final Charset defaultCharset = Charset.forName("ISO-8859-1");

@@ -3,7 +3,7 @@ package rabbit.httpio.request;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import rabbit.io.SimpleBufferHandle;
-import sk.fiit.rabbit.adaptiveproxy.utils.BytesChunker;
+import sk.fiit.peweproxy.utils.BytesChunker;
 
 public class PrefetchedContentSource extends ContentSource {
 	private final ByteBuffer contentByffer; 

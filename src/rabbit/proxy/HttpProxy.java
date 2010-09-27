@@ -43,7 +43,7 @@ import rabbit.nio.TaskIdentifier;
 import rabbit.util.Config;
 import rabbit.util.Counter;
 import rabbit.util.SProperties;
-import sk.fiit.rabbit.adaptiveproxy.AdaptiveEngine;
+import sk.fiit.peweproxy.AdaptiveEngine;
 
 /** A filtering and caching http proxy.
  *

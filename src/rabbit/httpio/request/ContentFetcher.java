@@ -4,7 +4,7 @@ import rabbit.httpio.BlockListener;
 import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import sk.fiit.rabbit.adaptiveproxy.utils.InMemBytesStore;
+import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class ContentFetcher implements BlockListener {
 	private final ContentCachingListener listener;
