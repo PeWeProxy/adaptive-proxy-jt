@@ -40,12 +40,12 @@ public class DirectContentSource extends ContentSource {
 	}
 	
 	private class Reader implements ReadHandler {
-	private Long timeout = con.getNioHandler ().getDefaultTimeout ();
+	private final Long timeout = con.getNioHandler ().getDefaultTimeout ();
 	
 	public void read () {
 	    try {
 		ByteBuffer buffer = bufHandle.getBuffer ();
-		buffer.limit (buffer.capacity ());
+		//buffer.limit (buffer.capacity ());
 		int read = con.getChannel ().read (buffer);
 		if (read == 0) {
 		    waitForRead ();

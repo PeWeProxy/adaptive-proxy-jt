@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
@@ -27,6 +28,7 @@ import rabbit.httpio.HttpHeaderSentListener;
 import rabbit.httpio.RequestLineTooLongException;
 import rabbit.httpio.request.ChunkSeparator;
 import rabbit.httpio.request.ClientResourceHandler;
+import rabbit.httpio.request.ClientResourceListener;
 import rabbit.httpio.request.ContentSeparator;
 import rabbit.httpio.request.FixedLengthSeparator;
 import rabbit.httpio.request.MultiPipeSeparator;
@@ -97,6 +99,7 @@ public class Connection {
     private String contentLength = null;
 
     private ClientResourceHandler clientResourceHandler;
+    private List<ClientResourceListener> clientResourceListeners;
 
     private final HttpGenerator responseHandler;
 
@@ -264,6 +267,20 @@ public class Connection {
 	if (ct != null && ct.startsWith ("multipart/byteranges"))
 	    return false;
 	return dataSize > -1;
+    }
+    
+    public void addClientResourceListener (ClientResourceListener crl) {
+    	if (clientResourceListeners == null)
+    		clientResourceListeners = new ArrayList<ClientResourceListener> ();
+    	clientResourceListeners.add (crl);
+    }
+    
+    public void fireResouceDataRead (BufferHandle bufHandle) {
+		if (clientResourceListeners == null)
+		    return;
+		for (ClientResourceListener crl : clientResourceListeners) {
+		    crl.resourceDataRead (bufHandle);
+		}
     }
 
     /** Filter the request and handle it.

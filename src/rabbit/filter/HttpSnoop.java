@@ -5,8 +5,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import rabbit.http.HttpHeader;
 import rabbit.io.BufferHandle;
-import rabbit.proxy.ClientResourceHandler;
-import rabbit.proxy.ClientResourceListener;
+import rabbit.httpio.request.ClientResourceListener;
 import rabbit.proxy.Connection;
 import rabbit.util.SProperties;
 
@@ -28,11 +27,8 @@ public class HttpSnoop implements HttpFilter {
 	    System.out.println (con.getRequestLine ());
 	} else {
 	    System.out.print (header.toString ());
-	    if (mode == SnoopMode.FULL) {
-		ClientResourceHandler crh = con.getClientResourceHandler ();
-		if (crh != null)
-		    crh.addContentListener (new ContentLogger (header));
-	    }
+	    if (mode == SnoopMode.FULL)
+	    	con.addClientResourceListener(new ContentLogger (header));
 	}
 	return null;
     }

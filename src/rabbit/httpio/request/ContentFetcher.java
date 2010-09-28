@@ -7,6 +7,7 @@ import rabbit.proxy.TrafficLoggerHandler;
 import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class ContentFetcher implements BlockListener {
+	private final Connection con;
 	private final ContentCachingListener listener;
 	private final DirectContentSource directSource;
 	private final InMemBytesStore memStore;
@@ -14,6 +15,7 @@ public class ContentFetcher implements BlockListener {
 	public ContentFetcher(Connection con, BufferHandle bufHandle, 
 			TrafficLoggerHandler tlh, ContentSeparator separator,
 			ContentCachingListener listener, long dataSize) {
+		this.con = con;
 		this.listener = listener;
 		if (dataSize < 0)
 			dataSize = 0;
@@ -26,6 +28,7 @@ public class ContentFetcher implements BlockListener {
 	
 	@Override
 	public void bufferRead(BufferHandle bufHandle) {
+		con.fireResouceDataRead (bufHandle);
 		memStore.writeBuffer(bufHandle.getBuffer());
 		directSource.readNextBytes();
 	}

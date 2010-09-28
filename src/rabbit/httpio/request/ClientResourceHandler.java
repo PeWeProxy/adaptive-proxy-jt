@@ -18,7 +18,6 @@ public class ClientResourceHandler implements BlockListener {
     protected WebConnection wc;
     protected ClientResourceTransferredListener listener;
     final SendingListener sendingListener;
-    
 
     public ClientResourceHandler(Connection con, ContentSource contentSource,
     		boolean chunking) {
@@ -60,6 +59,7 @@ public class ClientResourceHandler implements BlockListener {
     
     @Override
     public void bufferRead(BufferHandle bufHandle) {
+    	con.fireResouceDataRead (bufHandle);
 		BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
 			     con.getTrafficLoggerHandler().getNetwork (),
 			     bufHandle, chunking, sendingListener);
