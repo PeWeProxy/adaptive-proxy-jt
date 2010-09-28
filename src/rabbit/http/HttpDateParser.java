@@ -13,13 +13,13 @@ import java.util.Locale;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class HttpDateParser {
-    private static SimpleDateFormat sdf1 = 
+    private static final SimpleDateFormat sdf1 =
     new SimpleDateFormat ("EE',' dd MMM yyyy HH:mm:ss 'GMT'", Locale.US);
-    private static SimpleDateFormat sdf2 = 
+    private static final SimpleDateFormat sdf2 =
     new SimpleDateFormat ("EEEE, dd-MMM-yy HH:mm:ss 'GMT'", Locale.US);
-    private static SimpleDateFormat sdf3 = 
+    private static final SimpleDateFormat sdf3 =
     new SimpleDateFormat ("EE MMM d HH:mm:ss yyyy", Locale.US);
-    private static SimpleDateFormat sdf4 = 
+    private static final SimpleDateFormat sdf4 = 
     new SimpleDateFormat ("EE MMM  d HH:mm:ss yyyy", Locale.US);
 
     private static long offset;
@@ -27,9 +27,11 @@ public class HttpDateParser {
     /** The default constructor.
      */
     public HttpDateParser (){
+	// empty
     }
 
-    /** Set the time offset relative GMT. 
+    /** Set the time offset relative GMT.
+     * @param offset the time difference in millis
      */
     public static void setOffset (long offset) {
 	HttpDateParser.offset = offset;
@@ -44,8 +46,7 @@ public class HttpDateParser {
 	if (date == null)
 	    return null;
 
-	Date d = null;
-	d = getDate (date, sdf1, offset);
+	Date d = getDate (date, sdf1, offset);
 	if (d == null) {
 	    d = getDate (date, sdf2, offset);
 	    if (d == null) {
@@ -95,7 +96,9 @@ public class HttpDateParser {
 	}
     }
 
-    /** Simple self test method. */
+    /** Simple self test method.
+     * @param args the command line arguments
+     */
     public static void main (String[] args) {
 	String d1 = "Sat, 07 Feb 2004 22:14:05 GMT";
 	String d2 = "Sun, 06 Nov 2043 08:49:37 GMT - 49 years (1994)";

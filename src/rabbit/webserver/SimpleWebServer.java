@@ -7,8 +7,10 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import rabbit.nio.NioHandler;
-import rabbit.nio.MultiSelectorNioHandler;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.StatisticsHolder;
+import org.khelekore.rnio.impl.BasicStatisticsHolder;
+import org.khelekore.rnio.impl.MultiSelectorNioHandler;
 import rabbit.httpio.Acceptor;
 import rabbit.httpio.AcceptorListener;
 import rabbit.io.BufferHandler;
@@ -22,7 +24,7 @@ import rabbit.util.TrafficLogger;
  */
 public class SimpleWebServer {
     private File dir;
-    private int port;
+    private final int port;
     private final NioHandler nioHandler;
     private final TrafficLogger trafficLogger = new SimpleTrafficLogger ();
     private final BufferHandler bufferHandler = new CachingBufferHandler ();
@@ -59,7 +61,9 @@ public class SimpleWebServer {
 	    throw new IOException (dir + " is not an existing directory");
 	dir = dir.getCanonicalFile ();
 	ExecutorService es = Executors.newCachedThreadPool ();
-	nioHandler = new MultiSelectorNioHandler (es, 4);
+	StatisticsHolder sh = new BasicStatisticsHolder ();
+	nioHandler = 
+	    new MultiSelectorNioHandler (es, sh, 4, 15000L);
     }
 
     /** Start serving requests. 

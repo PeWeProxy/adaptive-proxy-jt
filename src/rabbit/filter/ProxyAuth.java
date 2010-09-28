@@ -76,13 +76,7 @@ public class ProxyAuth implements HttpFilter {
     }
 
     private boolean hasValidCache (String token, AuthUserInfo ce) {
-	if (ce == null)
-	    return false;
-	if (!ce.stillValid ())
-	    return false;
-	if (!ce.correctToken (token))
-	    return false;
-	return true;
+        return ce != null && ce.stillValid() && ce.correctToken(token);
     }
 
     private void storeInCache (String user, String token,
@@ -97,11 +91,12 @@ public class ProxyAuth implements HttpFilter {
 
     private HttpHeader getError (HttpHeader header, Connection con) {
 	HttpGenerator hg = con.getHttpGenerator ();
+	String url = header.getRequestURI ();
 	try {
-	    return hg.get407 ("internet", new URL (header.getRequestURI ()));
+	    return hg.get407 (new URL (url), "internet");
 	} catch (MalformedURLException e) {
 	    logger.log (Level.WARNING, "Bad url: " + header.getRequestURI (), e);
-	    return hg.get407 ("internet", null);
+	    return hg.get400 (e);
 	}
     }
 

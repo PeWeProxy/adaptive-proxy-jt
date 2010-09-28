@@ -8,8 +8,8 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import rabbit.nio.ConnectHandler;
-import rabbit.nio.NioHandler;
+import org.khelekore.rnio.ConnectHandler;
+import org.khelekore.rnio.NioHandler;
 import rabbit.util.Counter;
 
 /** A class to handle a connection to the Internet.
@@ -27,7 +27,7 @@ public class WebConnection implements Closeable {
     private boolean mayPipeline = false;
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
-    private static AtomicInteger idCounter = new AtomicInteger (0);
+    private static final AtomicInteger idCounter = new AtomicInteger (0);
 
     /** Create a new WebConnection to the given InetAddress and port.
      * @param address the computer to connect to.
@@ -90,15 +90,14 @@ public class WebConnection implements Closeable {
 
     private class ConnectListener implements ConnectHandler {
 	private NioHandler nioHandler;
-	private WebConnectionListener wcl;
+	private final WebConnectionListener wcl;
 	private Long timeout;
 
 	public ConnectListener (WebConnectionListener wcl) {
 	    this.wcl = wcl;
 	}
 
-	public void waitForConnection (NioHandler nioHandler) 
-	    throws IOException {
+	public void waitForConnection (NioHandler nioHandler) {
 	    this.nioHandler = nioHandler;
 	    timeout = nioHandler.getDefaultTimeout ();
 	    nioHandler.waitForConnect (channel, this);

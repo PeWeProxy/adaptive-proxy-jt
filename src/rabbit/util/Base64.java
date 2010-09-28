@@ -1,14 +1,12 @@
 package rabbit.util;
 
-import java.io.UnsupportedEncodingException;
-
 /** This class encodes/decodes stuff to/from the web.
  */
-public class Coder {
+public class Base64 {
   
     /** dont construct this
      */
-    private Coder () {
+    private Base64 () {
 	// nah.
     }
   
@@ -43,7 +41,7 @@ public class Coder {
      * @param base64string the String to decode.
      * @return the decoded string.
      */
-    public static String uudecode (String base64string) {
+    public static String decode (String base64string) {
 	StringBuilder ret = new StringBuilder (base64string.length () * 3 / 4);
     
 	while ((base64string.length () % 4) != 0)
@@ -74,7 +72,7 @@ public class Coder {
      * @param str the String to encode.
      * @return the encoded string.
      */ 
-    public static String uuencode (String str) {
+    public static String encode (String str) {
 	StringBuilder ret = new StringBuilder (str.length () * 4 / 3);
 	char ch, ch1, ch2, ch3;
 	int i;
@@ -118,40 +116,6 @@ public class Coder {
 	}
 	ret.append ('=');
 	return ret.toString ();
-    }
-
-    /** URLDecode a string. This is useful when your handling CGI-arguments..
-     * @param enc the encoded String.
-     * @return an unescaped String. ('%dd' => 'c', '+' => ' ')
-     */
-    public static String URLdecode (String enc) {
-	enc = enc.replace ('+', ' ');
-	int i = 0;
-	while (true) {
-	    i = enc.indexOf ('%', i);
-	    if (i < 0) 
-		break;
-	    try {
-		char c = (char) Integer.parseInt (enc.substring (i + 1,i + 3), 16);
-		enc = enc.substring (0, i) + c + enc.substring (i + 3);
-	    } catch (NumberFormatException e) {
-		// ignore
-	    }
-	}
-	return enc;
-    }
-
-    /** URLEncode a string. Only a convenience function for 
-     *  java.net.URLEncoder.encode ()
-     * @param str the String to URLEncode.
-     */ 
-    public static String URLEncode (String str) {
-	try {
-	    return java.net.URLEncoder.encode (str, "UTF-8");
-	} catch (UnsupportedEncodingException e) {
-	    e.printStackTrace ();
-	} 
-	return str;
     }
 }
 

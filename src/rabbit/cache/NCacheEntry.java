@@ -5,8 +5,12 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
-/** 
- *  A cached object.
+/** A cached object.
+ *
+ * @param <K> the key type of this entry
+ * @param <V> the value type of this entry
+ *
+ * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
     private static final long serialVersionUID = 20050430;
@@ -26,6 +30,7 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
 
     /** Not to be used, for externalizable only. */
     public NCacheEntry () {
+	// empty
     }
 
     /** Create a new CacheEntry for given key and filename
@@ -35,22 +40,26 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
     public NCacheEntry (K key, long id) {
 	this.key = new MemoryKey<K> (key);
 	this.id = id;
-    }    
-    
+    }
+
     /** Set the key were holding data for
      * @param key the key we have data for
      */
     void setKey (FiledKey<K> key) {
 	this.key = key;
     }
-    
+
     /** Get the key were holding data for
      * @return the keyobject
      */
-    public K getKey () {
-	return key.getData ();
-    }   
-    
+    public K getKey () throws CacheException {
+	try {
+	    return key.getData ();
+	} catch (IOException e) {
+	    throw new CacheException ("Failed to get key data", e);
+	}
+    }
+
     /** Get the date this object was cached.
      * @return a date.
      */
@@ -70,9 +79,9 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
      */
     public long getSize () {
 	return size;
-    }  
+    }
 
-    /** Get the size of the key 
+    /** Get the size of the key
      */
     public long getKeySize () {
 	return key != null ? key.getFileSize () : 0;
@@ -96,7 +105,7 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
      */
     public long getExpires () {
 	return expires;
-    }  
+    }
 
     /** Sets the expirydate of our data
      * @param d the new expiry-date.
@@ -104,7 +113,7 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
     public void setExpires (long d) {
 	this.expires = d;
     }
-    
+
     /** Get the id of our entry.
      * @return the id of the entry.
      */
@@ -112,18 +121,23 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
 	return id;
     }
 
-    /** Get the real data hook
+    /** Get the real data hook.
+     * @return the FiledHook for the value
      */
     protected FiledHook<V> getRealDataHook () {
 	return datahook;
     }
 
     /** Get the hooked data.
-     * @param cache the NCache this entry lives in. 
+     * @param cache the NCache this entry lives in.
      * @return the the hooked data.
      */
-    public V getDataHook (Cache<K, V> cache) {
-	return datahook.getData (cache, this);
+    public V getDataHook (Cache<K, V> cache) throws CacheException {
+	try {
+	    return datahook.getData (cache, this, cache.getLogger ());
+	} catch (IOException e) {
+	    throw new CacheException ("Failed to get data hook", e);
+	}
     }
 
     /** Set the hooked data.
@@ -143,8 +157,8 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
 
     /** Read the cache entry from the object input.
      */
-    @SuppressWarnings( "unchecked" )    
-    public void readExternal (ObjectInput in) 
+    @SuppressWarnings( "unchecked" )
+    public void readExternal (ObjectInput in)
 	throws IOException, ClassNotFoundException {
 	key = (FiledKey<K>)in.readObject ();
 	cachetime = in.readLong ();
@@ -153,7 +167,7 @@ class NCacheEntry<K, V> implements Externalizable, CacheEntry<K, V> {
 	id = in.readLong ();
 	datahook = (FiledHook<V>)in.readObject ();
     }
-    
+
     /** Write the object to the object output.
      */
     public void writeExternal (ObjectOutput out) throws IOException {

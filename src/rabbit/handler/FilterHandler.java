@@ -42,7 +42,6 @@ public class FilterHandler extends GZipHandler {
     protected Iterator<ByteBuffer> sendBlocks = null;
 
     protected GZipUnpacker gzu = null;
-    private GZListener gzListener = null;
 
     // For creating the factory.
     public FilterHandler () {
@@ -50,28 +49,28 @@ public class FilterHandler extends GZipHandler {
 
     /** Create a new FilterHandler for the given request.
      * @param con the Connection handling the request.
+     * @param tlh the TrafficLoggerHandler to update with traffic information
      * @param request the actual request made.
-     * @param clientHandle the client side buffer handle.
      * @param response the actual response.
      * @param content the resource.
-     * @param mayCache May we cache this request? 
+     * @param mayCache May we cache this request?
      * @param mayFilter May we filter this request?
      * @param size the size of the data beeing handled.
      * @param compress if we want this handler to compress or not.
      */
     public FilterHandler (Connection con, TrafficLoggerHandler tlh,
-			  HttpHeader request, BufferHandle clientHandle,
-			  HttpHeader response, ResourceSource content,
-			  boolean mayCache, boolean mayFilter, long size,
+			  HttpHeader request, HttpHeader response,
+			  ResourceSource content, boolean mayCache,
+			  boolean mayFilter, long size,
 			  boolean compress, boolean repack,
 			  List<HtmlFilterFactory> filterClasses) {
-	super (con, tlh, request, clientHandle, response, content,
+	super (con, tlh, request, response, content,
 	       mayCache, mayFilter, size, compress);
 	this.repack = repack;
 	this.filterClasses = filterClasses;
     }
 
-    @Override 
+    @Override
     protected void setupHandler () {
 	String ce = response.getHeader ("Content-Encoding");
 	if (repack && ce != null) {
@@ -91,17 +90,17 @@ public class FilterHandler extends GZipHandler {
 	    	if (cs == null)
 	    		cs = defaultCharSet;
 	    }
-	    // There are lots of other charsets, and it could be specified by a 
-	    // HTML Meta tag.  
+	    // There are lots of other charsets, and it could be specified by a
+	    // HTML Meta tag.
 	    // And it might be specified incorrectly for the actual page.
 	    // http://www.w3.org/International/O-HTTP-charset
-	    
- 	    // default fron conf file 
+
+ 	    // default fron conf file
  	    //	    then look for HTTP charset
  	    //	    then look for HTML Meta charset, maybe re-decode
 	    // <META content="text/html; charset=gb2312" http-equiv=Content-Type>
 	    // <meta http-equiv="content-type" content="text/html;charset=Shift_JIS" />
-	    
+
 	    Charset charSet = null;
 	    if (cs != null) {
 	    	try {
@@ -116,42 +115,38 @@ public class FilterHandler extends GZipHandler {
 	    filters = initFilters ();
 	}
     }
-    
+
     private void setupRepacking (String ce) {
-   	ce = ce.toLowerCase ();
-   	if (ce.equals ("gzip")) {
-   	    gzListener = new GZListener ();
-   	    gzu = new GZipUnpacker (gzListener, false);
-   	} else if (ce.equals("deflate")) {
-   	    gzListener = new GZListener ();
-   	    gzu = new GZipUnpacker (gzListener, true);
-   	} else {
-   	    getLogger ().warning ("Do not know how to handle encoding: " + ce);
-   	}
-   	if (gzu != null && !compress) {
-   	    response.removeHeader ("Content-Encoding");
-   	}
+	ce = ce.toLowerCase ();
+	if (ce.equals ("gzip")) {
+	    gzu = new GZipUnpacker (new GZListener (), false);
+	} else if (ce.equals("deflate")) {
+	    gzu = new GZipUnpacker (new GZListener (), true);
+	} else {
+	    getLogger ().warning ("Do not know how to handle encoding: " + ce);
+	}
+	if (gzu != null && !compress) {
+	    response.removeHeader ("Content-Encoding");
+	}
     }
 
-	@Override
-	protected boolean seeUnpackedData () {
+    @Override
+    protected boolean seeUnpackedData () {
 	return gzu != null || super.seeUnpackedData ();
     }
 
     private class GZListener implements GZipUnpackListener {
-	private byte[] buffer;
+	private final byte[] buffer = new byte[4096];
 	public void unpacked (byte[] buf, int off, int len) {
 	    handleArray (buf, off, len);
 	}
-	
+
 	public void finished () {
 	    gzu = null;
 	    finishData ();
 	}
 
 	public byte[] getBuffer () {
-	    if (buffer == null)
-		buffer = new byte[4096];
 	    return buffer;
 	}
 
@@ -159,16 +154,15 @@ public class FilterHandler extends GZipHandler {
 	    FilterHandler.this.failed (e);
 	}
     }
-    
+
     @Override
     public Handler getNewInstance (Connection con, TrafficLoggerHandler tlh,
-				   HttpHeader header, BufferHandle bufHandle,
-				   HttpHeader webHeader,
+				   HttpHeader header, HttpHeader webHeader,
 				   ResourceSource content, boolean mayCache,
 				   boolean mayFilter, long size) {
-	FilterHandler h = 
-	    new FilterHandler (con, tlh, header, bufHandle, webHeader, 
-			       content, mayCache, mayFilter, size, 
+	FilterHandler h =
+	    new FilterHandler (con, tlh, header, webHeader,
+			       content, mayCache, mayFilter, size,
 			       compress, repack, filterClasses);
 	h.defaultCharSet = defaultCharSet;
 	h.overrideCharSet = overrideCharSet;
@@ -189,19 +183,19 @@ public class FilterHandler extends GZipHandler {
 	}
 	ByteBuffer buf = bufHandle.getBuffer ();
 	byte[] arr;
-	if (buf.isDirect ()) {
-	    arr = new byte[buf.remaining ()];
-	    buf.get (arr);
-	} else {
+	int off = 0;
+	int len = buf.remaining ();
+	if (buf.hasArray ()) {
 	    arr = buf.array ();
+	    off = buf.position ();
+	} else {
+	    arr = new byte[len];
+	    buf.get (arr);
 	}
 	bufHandle.possiblyFlush ();
-	//** REDEEMER ** Are we sure with offset = 0 ?! buffer.position() can be gr8ter
-	// and buf.array () returns >whole< backed buffer, not just a part marked as buffer's
-	// remaining section
-	forwardArrayToHandler (arr, 0, arr.length);
+	forwardArrayToHandler (arr, off, len);
     }
-    
+
     // added by Redeemer ************
     private boolean dataRequested = false;
     
@@ -242,7 +236,7 @@ public class FilterHandler extends GZipHandler {
 	    restBlock = null;
 	}
 	parser.setText (arr, off, len);
-	HtmlBlock currentBlock = null;
+	HtmlBlock currentBlock;
 	try {
 	    currentBlock = parser.parse ();
 	    for (HtmlFilter hf : filters) {
@@ -252,10 +246,10 @@ public class FilterHandler extends GZipHandler {
 		    removeCache ();
 		}
 	    }
-	    
-	    List<ByteBuffer> ls = currentBlock.getBlocks (); 
+
+	    List<ByteBuffer> ls = currentBlock.getBlocks ();
 	    if (currentBlock.hasRests ()) {
-		// since the unpacking buffer is re used we need to store the 
+		// since the unpacking buffer is re used we need to store the
 		// rest in a separate buffer.
 		restBlock = currentBlock.getRestBlock ();
 	    }
@@ -263,7 +257,6 @@ public class FilterHandler extends GZipHandler {
 	} catch (HtmlParseException e) {
 	    getLogger ().info ("Bad HTML: " + e.toString ());
 	    // out.write (arr);
-	    currentBlock = null;
 	    ByteBuffer buf = ByteBuffer.wrap (arr, off, len);
 	    sendBlocks = Arrays.asList (buf).iterator ();
 	}

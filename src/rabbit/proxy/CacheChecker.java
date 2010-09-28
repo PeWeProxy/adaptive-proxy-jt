@@ -9,6 +9,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import rabbit.cache.Cache;
 import rabbit.cache.CacheEntry;
+import rabbit.cache.CacheException;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
@@ -18,11 +19,11 @@ import sk.fiit.peweproxy.headers.HeaderWrapper;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 class CacheChecker {
-    
+
     private static final String EXP_ERR = "No expected header found";
-    
-    HttpHeader checkExpectations (Connection con, 
-				  HttpHeader header, 
+
+    HttpHeader checkExpectations (Connection con,
+				  HttpHeader header,
 				  HttpHeader webheader) {
 	String exp = header.getHeader ("Expect");
 	if (exp == null)
@@ -37,7 +38,7 @@ class CacheChecker {
 	String[] sts = exp.split (";");
 	for (String e : sts) {
 	    int i = e.indexOf ('=');
-	    if (i == -1 || i == e.length () -1) 
+	    if (i == -1 || i == e.length () -1)
 		return con.getHttpGenerator ().get417 (e);
 	    String type = e.substring (0, i);
 	    String value = e.substring (i + 1);
@@ -47,12 +48,12 @@ class CacheChecker {
 		    return con.getHttpGenerator ().get417 (EXP_ERR);
 	    }
 	}
-	
+
 	return con.getHttpGenerator ().get417 (exp);
     }
 
-    private HttpHeader checkIfMatch (Connection con, 
-				     HttpHeader header, 
+    private HttpHeader checkIfMatch (Connection con,
+				     HttpHeader header,
 				     RequestHandler rh) {
 	CacheEntry<HttpHeader, HttpHeader> entry = rh.getEntry ();
 	if (entry == null)
@@ -68,14 +69,14 @@ class CacheChecker {
 	if (!ETagUtils.checkStrongEtag (et, im))
 	    return con.getHttpGenerator ().get412 ();
 	return null;
-    }    
+    }
 
     /** Check if we can use the cached entry.
      * @param header the reques.
      * @param rh the RequestHandler
      * @return true if the request was handled, false otherwise.
      */
-    public boolean checkCachedEntry (Connection con, 
+    public boolean checkCachedEntry (Connection con,
 				     HttpHeader header,
 				     RequestHandler rh) {
 	con.getCounter ().inc ("Cache hits");
@@ -86,12 +87,12 @@ class CacheChecker {
 	    resp = nmh.is304 (header, con.getHttpGenerator (), rh);
 	}
 	if (resp != null) {
-		con.sendAndRestart (resp);
+	    con.sendAndRestart (resp);
 	    return true;
-	}		
+	}
 	con.setMayCache (false);
-	try {		    
-	    resp = con.setupCachedEntry (rh); 
+	try {
+	    resp = con.setupCachedEntry (rh);
 	    if (resp != null) { {
 	    	final Connection conn = con;
 	    	con.getProxy().getAdaptiveEngine().newResponse(conn, resp, new Runnable() {
@@ -107,7 +108,7 @@ class CacheChecker {
 	    }
 	} catch (FileNotFoundException e) {
 	    // ignore sorta, to pull resource from the web.
-	    rh.setContent (null); 
+	    rh.setContent (null);
 	    rh.setEntry (null);
 	} catch (IOException e) {
 	    rh.setContent (null);
@@ -129,12 +130,12 @@ class CacheChecker {
 
     */
     public boolean checkConditions (HttpHeader header, HttpHeader webheader) {
-   	String inm = header.getHeader ("If-None-Match");
-   	if (inm != null) {
-   	    String etag = webheader.getHeader ("ETag");
-   	    if (!ETagUtils.checkWeakEtag (inm, etag))
-   		return false;
-   	}
+	String inm = header.getHeader ("If-None-Match");
+	if (inm != null) {
+	    String etag = webheader.getHeader ("ETag");
+	    if (!ETagUtils.checkWeakEtag (inm, etag))
+		return false;
+	}
 	Date dm = null;
 	String sims = header.getHeader ("If-Modified-Since");
 	if (sims != null) {
@@ -157,15 +158,15 @@ class CacheChecker {
 		if (lm != null) {
 		    dm = HttpDateParser.getDate (lm);
 		    if (dm.after (ums))
-			return false;		
-		} 
+			return false;
+		}
 	    }
 	}
 	return true;
     }
 
-    private void removeCaches (HttpHeader request, 
-			       HttpHeader webHeader, String type, 
+    private void removeCaches (HttpHeader request,
+			       HttpHeader webHeader, String type,
 			       Cache<HttpHeader, HttpHeader> cache) {
 	String loc = webHeader.getHeader (type);
 	if (loc == null)
@@ -188,11 +189,17 @@ class CacheChecker {
 	    HttpHeader h = new HttpHeader ();
 	    h.setRequestURI (u2.toString ());
 	    cache.remove (h);
+	} catch (CacheException e) {
+	    Logger logger = Logger.getLogger (getClass ().getName ());
+	    logger.log (Level.WARNING,
+			"RemoveCaches failed to remove cache entry: " +
+			request.getRequestURI () + ", " + loc,
+			e);
 	} catch (MalformedURLException e) {
 	    Logger logger = Logger.getLogger (getClass ().getName ());
 	    logger.log (Level.WARNING,
 			"RemoveCaches got bad url: " +
-			request.getRequestURI () + ", " + loc, 
+			request.getRequestURI () + ", " + loc,
 			e);
 	}
     }
@@ -203,11 +210,11 @@ class CacheChecker {
 	removeCaches (request, webHeader, "Content-Location", cache);
     }
 
-    void removeOtherStaleCaches (HttpHeader request, HttpHeader webHeader, 
+    void removeOtherStaleCaches (HttpHeader request, HttpHeader webHeader,
 				 Cache<HttpHeader, HttpHeader> cache) {
 	String method = request.getMethod ();
 	String status = webHeader.getStatusCode ();
-	if ((method.equals ("PUT") || method.equals ("POST")) 
+	if ((method.equals ("PUT") || method.equals ("POST"))
 	    && status.equals ("201")) {
 	    removeCaches (request, webHeader, cache);
 	} else if (method.equals ("DELETE") && status.equals ("200")) {

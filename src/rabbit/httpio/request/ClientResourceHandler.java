@@ -1,6 +1,5 @@
 package rabbit.httpio.request;
 
-import java.io.IOException;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.BlockListener;
 import rabbit.httpio.BlockSender;
@@ -61,30 +60,23 @@ public class ClientResourceHandler implements BlockListener {
     
     @Override
     public void bufferRead(BufferHandle bufHandle) {
-    	try {
-    		BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
-    			     con.getTrafficLoggerHandler().getNetwork (),
-    			     bufHandle, chunking, sendingListener);
-    		bs.write();
-    	} catch (IOException e) {
-    	    failed (e);
-    	}
+		BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
+			     con.getTrafficLoggerHandler().getNetwork (),
+			     bufHandle, chunking, sendingListener);
+		bs.write();
     }
     
     @Override
     public void finishedRead() {
     	if (!chunking)
 			listener.clientResourceTransferred();
-    	else
-    		try {
-				ChunkEnder ce = new ChunkEnder ();
-				sentEndChunk = true;	
-				ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
-						con.getTrafficLoggerHandler().getNetwork(),
-						sendingListener);
-			} catch (IOException e) {
-				failed(e);
-			}
+    	else {
+			ChunkEnder ce = new ChunkEnder ();
+			sentEndChunk = true;	
+			ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
+					con.getTrafficLoggerHandler().getNetwork(),
+					sendingListener);
+    	}
     }
     
     class SendingListener implements BlockSentListener {

@@ -3,10 +3,10 @@ package rabbit.httpio;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.channels.SocketChannel;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.WriteHandler;
+import org.khelekore.rnio.impl.DefaultTaskIdentifier;
 import rabbit.io.Address;
-import rabbit.nio.DefaultTaskIdentifier;
-import rabbit.nio.NioHandler;
-import rabbit.nio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that transfers data from a Transferable to a socket channel. 
@@ -70,7 +70,7 @@ public class TransferHandler implements Runnable {
     }
 
     private class WriteWaiter implements WriteHandler {
-	private Long timeout = nioHandler.getDefaultTimeout ();
+	private final Long timeout = nioHandler.getDefaultTimeout ();
 
 	public void closed () {
 	    listener.failed (new IOException ("channel closed"));

@@ -4,7 +4,7 @@ import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 import org.apache.log4j.Logger;
-import rabbit.nio.DefaultTaskIdentifier;
+import org.khelekore.rnio.impl.DefaultTaskIdentifier;
 import rabbit.proxy.Connection;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;

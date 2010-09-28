@@ -16,7 +16,6 @@ import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 
-import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -34,7 +33,7 @@ import rabbit.httpio.request.DirectContentSource;
 import rabbit.httpio.request.PrefetchedContentSource;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
-import rabbit.nio.DefaultTaskIdentifier;
+import org.khelekore.rnio.impl.DefaultTaskIdentifier;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.proxy.TrafficLoggerHandler;
@@ -442,14 +441,13 @@ public class AdaptiveEngine  {
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Sending response");
 		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
-		BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(new byte[4096]));
 		Connection con = conHandle.con;
 		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
 		HttpHeader requestHeaders = conHandle.request.getProxyRequestHeader().getBackedHeader();
 		final HttpHeader responseHeaders = conHandle.response.getProxyResponseHeader().getBackedHeader();
 		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
 		handlerFactory.nextInstanceWillNotCache();
-		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, bufHandle, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
+		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
 		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {

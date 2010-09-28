@@ -14,7 +14,7 @@ public class ChunkSeparator implements ContentSeparator, ChunkDataFeeder {
 	
 	public ChunkSeparator (boolean strictHTTP) {
 		chunkHandler = new ChunkHandler(this, strictHTTP);
-		chunkHandler.addBlockListener(new ChunkBlockListener());
+		chunkHandler.setBlockListener(new ChunkBlockListener());
 	}
 	
 	@Override

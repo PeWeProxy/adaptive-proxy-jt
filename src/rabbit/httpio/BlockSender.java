@@ -6,8 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import rabbit.io.BufferHandle;
-import rabbit.nio.NioHandler;
-import rabbit.nio.WriteHandler;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that writes data blocks.
@@ -16,16 +16,24 @@ import rabbit.util.TrafficLogger;
  */
 public class BlockSender extends BaseSocketHandler implements WriteHandler {
     private ByteBuffer chunkBuffer;
-    private ByteBuffer end;
-    private ByteBuffer[] buffers;
+    private final ByteBuffer end;
+    private final ByteBuffer[] buffers;
     private final TrafficLogger tl;
     private final BlockSentListener sender;
     
+    /** Create a new BlockSender that will write data to the given channel
+     * @param channel the SocketChannel to write the data to
+     * @param nioHandler the NioHandler to use to wait for write ready
+     * @param tl the traffic statistics gatherer
+     * @param bufHandle the data to write
+     * @param chunking if true chunk the data out
+     * @param sender the listener that will be notified when the data has
+     *        been handled.
+     */
     public BlockSender (SocketChannel channel, NioHandler nioHandler, 
 			TrafficLogger tl, 
 			BufferHandle bufHandle, boolean chunking, 
-			BlockSentListener sender) 
-	throws IOException {
+			BlockSentListener sender) {
 	super (channel, bufHandle, nioHandler);
 	this.tl = tl;
 	ByteBuffer buffer = bufHandle.getBuffer ();

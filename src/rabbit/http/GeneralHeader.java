@@ -16,14 +16,16 @@ public class GeneralHeader implements Storable {
 
     /** The headers of this Header in order.
      */
-    protected ArrayList<Header> headers = new ArrayList<Header> ();
+    protected final ArrayList<Header> headers = new ArrayList<Header> ();
 
     /** Create a new HTTPHeader from scratch
      */
-    public GeneralHeader () {    
+    public GeneralHeader () {
+	// empty
     }
 
     /** Get the number of headers set in this header.
+     * @return the number of header lines
      */
     public int size () {
 	return headers.size ();
@@ -39,6 +41,7 @@ public class GeneralHeader implements Storable {
     }
 
     /** Fill the given StringBuilder with text from this header.
+     * @param sb the StringBuilder this header is written to
      */ 
     protected void fillBuffer (StringBuilder sb) {
 	int hsize = headers.size ();
@@ -147,6 +150,7 @@ public class GeneralHeader implements Storable {
 
     /** Get all headers of a specified type...
      * @param type the type of the headers to get, eg. "Cache-Control".
+     * @return all the headers lines of this header
      */
     public List<String> getHeaders (String type) {
 	List<String> ret = null; 
@@ -168,10 +172,9 @@ public class GeneralHeader implements Storable {
      * @param to the GeneralHeader to add headers to.
      */
     public void copyHeader (GeneralHeader to) {
-	for (int i = 0; i < headers.size (); i++) {
-	    Header h = headers.get (i);
-	    to.addHeader (h.getType (), h.getValue ());
-	}
+        for (Header h : headers) {
+            to.addHeader (h.getType (), h.getValue ());
+        }
     }
     
     public void read (DataInput in) throws IOException {

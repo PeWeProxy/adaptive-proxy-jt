@@ -5,31 +5,43 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.ReadHandler;
+import org.khelekore.rnio.WriteHandler;
+import org.khelekore.rnio.impl.Closer;
 import rabbit.io.BufferHandle;
-import rabbit.io.Closer;
-import rabbit.nio.NioHandler;
-import rabbit.nio.ReadHandler;
-import rabbit.nio.WriteHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that just tunnels data.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-class Tunnel {
+public class Tunnel {
     private final NioHandler nioHandler;
     private final Logger logger = Logger.getLogger (getClass ().getName ());
     private final OneWayTunnel fromToTo;
     private final OneWayTunnel toToFrom;
     private final TunnelDoneListener listener;
 
+    /** Create a tunnel that transfers data as fast as possible in full
+     *  duplex.
+     * @param nioHandler the NioHandler to use for waiting on data to read
+     *        as well as waiting for write ready
+     * @param from one end of the tunnel
+     * @param fromHandle the ByteBuffer holder for the data from "from"
+     * @param fromLogger the traffic statistics gatherer for "from"
+     * @param to the other end of the tunnel
+     * @param toHandle the ByteBuffer holder for the data from "from"
+     * @param toLogger the traffic statistics gatherer for "from"
+     * @param listener the listener that will be notified when the tunnel
+     *        is closed
+     */
     public Tunnel (NioHandler nioHandler, SocketChannel from, 
 		   BufferHandle fromHandle,
 		   TrafficLogger fromLogger, 
 		   SocketChannel to, BufferHandle toHandle, 
 		   TrafficLogger toLogger,
-		   TunnelDoneListener listener) 
-	throws IOException {
+		   TunnelDoneListener listener) {
 	if (logger.isLoggable (Level.FINEST))
 	    logger.finest ("Tunnel created from: " + from + " to: " + to);
 	this.nioHandler = nioHandler;
@@ -38,6 +50,8 @@ class Tunnel {
 	this.listener = listener;
     }
 
+    /** Start tunneling data in both directions.
+     */
     public void start () {
 	if (logger.isLoggable (Level.FINEST))
 	    logger.finest ("Tunnel started");
@@ -70,6 +84,7 @@ class Tunnel {
 	}
 
 	private void waitForRead () {
+	    bh.possiblyFlush ();
 	    nioHandler.waitForRead (from, this);
 	}
 
@@ -97,7 +112,7 @@ class Tunnel {
 		}
 		ByteBuffer buf = bh.getBuffer ();
 		if (buf.hasRemaining ()) {
-		    int written = 0;
+		    int written;
 		    do {
 			written = to.write (buf);
 			if (logger.isLoggable (Level.FINEST))
@@ -159,6 +174,7 @@ class Tunnel {
 		}
 	    } catch (IOException e) {
 		logger.warning ("Got exception reading from tunnel: " + e);
+		closeDown ();
 	    }
 	}
 

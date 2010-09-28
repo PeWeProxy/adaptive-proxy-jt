@@ -29,24 +29,27 @@ class HandlerFactoryHandler {
 	handlers = loadHandlers (handlersProps, config);
 	cacheHandlers = loadHandlers (cacheHandlersProps, config);
     }
-    
+
     private static class HandlerInfo {
-   	public final String mime;
-   	public final Pattern pattern;
-   	public final HandlerFactory factory;
-    	public HandlerInfo (String mime, HandlerFactory factory) {
-   	    this.mime = mime;
-   	    this.pattern = Pattern.compile (mime, Pattern.CASE_INSENSITIVE);
-   	    this.factory = factory;
-   	}
-    	public boolean accept (String mime) {
-   	    Matcher m = pattern.matcher (mime);
-   	    return m.matches ();
-   	}
-    	@Override public String toString () {
-   	    return getClass ().getSimpleName () + "{" + mime + ", " +
-   		factory + "}";
-   	}
+	public final String mime;
+	public final Pattern pattern;
+	public final HandlerFactory factory;
+
+	public HandlerInfo (String mime, HandlerFactory factory) {
+	    this.mime = mime;
+	    this.pattern = Pattern.compile (mime, Pattern.CASE_INSENSITIVE);
+	    this.factory = factory;
+	}
+
+	public boolean accept (String mime) {
+	    Matcher m = pattern.matcher (mime);
+	    return m.matches ();
+	}
+
+	@Override public String toString () {
+	    return getClass ().getSimpleName () + "{" + mime + ", " +
+		factory + "}";
+	}
     }
 
     /** load a set of handlers.
@@ -55,8 +58,8 @@ class HandlerFactoryHandler {
      * @return a Map with mimetypes as keys and Handlers as values.
      */
     protected List<HandlerInfo> loadHandlers (SProperties handlersProps,
-    					Config config) {
-    List<HandlerInfo> hhandlers = new ArrayList<HandlerInfo> ();
+					      Config config) {
+	List<HandlerInfo> hhandlers = new ArrayList<HandlerInfo> ();
 	if (handlersProps == null)
 	    return hhandlers;
 	for (String handler : handlersProps.keySet ()) {
@@ -104,19 +107,19 @@ class HandlerFactoryHandler {
     }
 
     HandlerFactory getHandlerFactory (String mime) {
-   	for (HandlerInfo hi : handlers) {
-   	    if (hi.accept (mime))
-   		return hi.factory;
-   	}
-   	return null;
+	for (HandlerInfo hi : handlers) {
+	    if (hi.accept (mime))
+		return hi.factory;
+	}
+	return null;
     }
 
     HandlerFactory getCacheHandlerFactory (String mime) {
-   	for (HandlerInfo hi : cacheHandlers) {
-   	    if (hi.accept (mime))
-   		return hi.factory;
-   	}
-   	return null;
+	for (HandlerInfo hi : cacheHandlers) {
+	    if (hi.accept (mime))
+		return hi.factory;
+	}
+	return null;
     }
     
     HandlerFactory getNamedHandleFactory(String handlerName) {

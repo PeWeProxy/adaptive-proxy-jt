@@ -6,22 +6,25 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.logging.Level;
+import org.khelekore.rnio.TaskIdentifier;
+import org.khelekore.rnio.impl.Closer;
+import org.khelekore.rnio.impl.DefaultTaskIdentifier;
+import rabbit.handler.convert.ExternalProcessConverter;
+import rabbit.handler.convert.ImageConverter;
+import rabbit.handler.convert.JavaImageConverter;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.BlockListener;
 import rabbit.httpio.FileResourceSource;
 import rabbit.httpio.ResourceSource;
 import rabbit.io.BufferHandle;
-import rabbit.io.Closer;
 import rabbit.io.FileHelper;
-import rabbit.handler.convert.ExternalProcessConverter;
-import rabbit.handler.convert.ImageConverter;
-import rabbit.handler.convert.JavaImageConverter;
-import rabbit.nio.DefaultTaskIdentifier;
-import rabbit.nio.TaskIdentifier;
+import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.SProperties;
+import rabbit.zip.GZipUnpackListener;
+import rabbit.zip.GZipUnpacker;
 
 /** This handler first downloads the image runs convert on it and
  *  then serves the smaller image.
@@ -39,25 +42,30 @@ public class ImageHandler extends BaseHandler {
     /** For creating the factory.
      */
     public ImageHandler () {
+	// empty
     }
 
     /** Create a new ImageHandler for the given request.
      * @param con the Connection handling the request.
+     * @param tlh the logger for the data traffic
      * @param request the actual request made.
-     * @param clientHandle the client side buffer.
      * @param response the actual response.
      * @param content the resource.
      * @param mayCache May we cache this request?
      * @param mayFilter May we filter this request?
      * @param size the size of the data beeing handled.
+     * @param config the configuration of this handler
+     * @param doConvert image comprssion will only be attempted if true
+     * @param minSizeToConvert images less than this many bytes are not compressed
+     * @param imageConverter the actual converter to use
      */
     public ImageHandler (Connection con, TrafficLoggerHandler tlh,
-			 HttpHeader request, BufferHandle clientHandle,
-			 HttpHeader response, ResourceSource content,
-			 boolean mayCache, boolean mayFilter, long size,
+			 HttpHeader request, HttpHeader response,
+			 ResourceSource content, boolean mayCache,
+			 boolean mayFilter, long size,
 			 SProperties config, boolean doConvert,
 			 int minSizeToConvert, ImageConverter imageConverter) {
-	super (con, tlh, request, clientHandle, response, content,
+	super (con, tlh, request, response, content,
 	       mayCache, mayFilter, size);
 	if (size == -1)
 	    con.setKeepalive (false);
@@ -70,11 +78,10 @@ public class ImageHandler extends BaseHandler {
 
     @Override
     public Handler getNewInstance (Connection con, TrafficLoggerHandler tlh,
-				   HttpHeader header, BufferHandle bufHandle,
-				   HttpHeader webHeader,
+				   HttpHeader header, HttpHeader webHeader,
 				   ResourceSource content, boolean mayCache,
 				   boolean mayFilter, long size) {
-	return new ImageHandler (con, tlh, header, bufHandle, webHeader,
+	return new ImageHandler (con, tlh, header, webHeader,
 				 content, mayCache, mayFilter, size,
 				 getConfig (), getDoConvert (), 
 				 getMinSizeToConvert (), imageConverter);
@@ -105,11 +112,7 @@ public class ImageHandler extends BaseHandler {
     /** Try to convert the image before letting the superclass handle it.
      */
     @Override public void handle () {
-	try {
-	    tryconvert ();
-	} catch (IOException e) {
-	    failed (e);
-	}
+	tryconvert ();
     }
 
     @Override protected void addCache () {
@@ -119,14 +122,18 @@ public class ImageHandler extends BaseHandler {
 	// and do not want a cache...
     }
 
+    private void removeConvertedFile () {
+	if (convertedFile != null && convertedFile.exists ()) {
+	    deleteFile (convertedFile);
+	    convertedFile = null;
+	}
+    }
+
     /** clear up the mess we made (remove intermediate files etc).
      */
     @Override protected void finish (boolean good) {
 	try {
-	    if (convertedFile != null) {
-		deleteFile (convertedFile);
-		convertedFile = null;
-	    }
+	    removeConvertedFile ();
 	} finally {
 	    super.finish (good);
 	}
@@ -136,10 +143,7 @@ public class ImageHandler extends BaseHandler {
      */
     @Override protected void removeCache () {
 	super.removeCache ();
-	if (convertedFile != null) {
-	    deleteFile (convertedFile);
-	    convertedFile = null;
-	}
+	removeConvertedFile ();
     }
 
 
@@ -154,7 +158,7 @@ public class ImageHandler extends BaseHandler {
      *  convert it we dont want to write the file to the cache later
      *  on.
      */
-    protected void tryconvert () throws IOException {
+    protected void tryconvert () {
 	if (getLogger ().isLoggable (Level.FINER))
 	    getLogger ().finer (request.getRequestURI () + 
 				": doConvert: " + doConvert + ", mayFilter: " + 
@@ -178,20 +182,73 @@ public class ImageHandler extends BaseHandler {
     /** Read in the image
      * @throws IOException if reading of the image fails.
      */
-    protected void readImage () throws IOException {
-	content.addBlockListener (new ImageReader ());
+    protected void readImage ()  {
+	String enc = response.getHeader ("Content-Encoding");
+	boolean unzip = "gzip".equalsIgnoreCase (enc); 
+	if (unzip)
+	    response.removeHeader ("Content-Encoding");
+	content.addBlockListener (new ImageReader (unzip));
     }
 
-    private class ImageReader implements BlockListener {
+    private TaskIdentifier getTaskIdentifier (Object o, String method) {
+	String gid = o.getClass ().getSimpleName () + "." + method;
+	return new DefaultTaskIdentifier (gid, request.getRequestURI ());
+    }
+
+    private class ImageReader implements BlockListener, GZipUnpackListener {
+	private boolean unzip;
+	private GZipUnpacker gzu;
+	private byte[] buffer;
+
+	public ImageReader (boolean unzip) {
+	    this.unzip = unzip;
+	    if (unzip) {
+		gzu = new GZipUnpacker (this, false);
+		buffer = new byte[4096];
+	    }
+	}
+
 	public void bufferRead (final BufferHandle bufHandle) {
-	    TaskIdentifier ti =
-		new DefaultTaskIdentifier (getClass ().getSimpleName (),
-					   request.getRequestURI ());
+	    TaskIdentifier ti = getTaskIdentifier (this, "bufferRead");
 	    con.getNioHandler ().runThreadTask (new Runnable () {
 		    public void run () {
-			writeImageData (bufHandle);
+			if (unzip) {
+			    unpackData (bufHandle);
+			} else {
+			    writeImageData (bufHandle);
+			}
 		    }
 		}, ti);
+	}
+
+	public byte[] getBuffer () {
+	    return buffer;
+	}
+
+	private void unpackData (BufferHandle bufHandle) {
+	    ByteBuffer buf = bufHandle.getBuffer ();
+	    totalRead += buf.remaining ();
+	    byte[] arr;
+	    int off = 0;
+	    int len = buf.remaining ();
+	    if (buf.hasArray ()) {
+		arr = buf.array ();
+		off = buf.position ();
+	    } else {
+		arr = new byte[len];
+		buf.get (arr);
+	    }
+	    gzu.setInput (arr, off, len);
+	}
+
+	public void unpacked (byte[] arr, int off, int len) {
+	    ByteBuffer buf = ByteBuffer.wrap (arr, off, len);
+	    BufferHandle bh = new SimpleBufferHandle (buf);
+	    writeImageData (bh);
+	}
+
+	public void finished () {
+	    finishedRead ();
 	}
 
 	private void writeImageData (BufferHandle bufHandle) {
@@ -201,7 +258,14 @@ public class ImageHandler extends BaseHandler {
 		totalRead += buf.remaining ();
 		buf.position (buf.limit ());
 		bufHandle.possiblyFlush ();
-		content.addBlockListener (this);
+		if (gzu == null) {
+		    content.addBlockListener (this);
+		} else {
+		    if (gzu.needsInput ())
+			content.addBlockListener (this);
+		    else
+			gzu.handleCurrentData ();
+		} 
 	    } catch (IOException e) {
 		failed (e);
 	    }
@@ -210,7 +274,7 @@ public class ImageHandler extends BaseHandler {
 	public void finishedRead () {
 	    try {
 		if (size > 0 && totalRead != size)
-		    setPartialContent (totalRead, size);
+		    setPartialContent (size);
 		cacheChannel.close ();
 		cacheChannel = null;
 		convertImage ();
@@ -232,11 +296,7 @@ public class ImageHandler extends BaseHandler {
      * @throws IOException if conversion fails.
      */
     protected void convertImage () {
-	TaskIdentifier ti =
-	    new DefaultTaskIdentifier (getClass ().getSimpleName () +
-				       ".convertImage",
-				       request.getRequestURI ());
-
+	TaskIdentifier ti = getTaskIdentifier (this, "convertImage");
 	con.getNioHandler ().runThreadTask (new Runnable () {
 		public void run () {
 		    try {
@@ -286,7 +346,7 @@ public class ImageHandler extends BaseHandler {
 					  con.getBufferHandler ());
     }
 
-    public static class ImageConversionResult {
+    private static class ImageConversionResult {
 	public final long origSize;
 	public final long convertedSize;
 	public final File convertedFile;
@@ -313,19 +373,26 @@ public class ImageHandler extends BaseHandler {
     }
 
     /** Perform the actual image conversion. 
+     * @param input the File holding the source image
      * @param entryName the filename of the cache entry to use.
+     * @return the conversion result
+     * @throws IOException if image compression fails
      */
-    protected ImageConversionResult 
+    private ImageConversionResult 
     internalConvertImage (File input, String entryName) throws IOException {
 	long origSize = size;
-	convertedFile = new File (entryName + ".c");
+	File convertedFile = new File (entryName + ".c");
 	File typeFile = new File (entryName + ".type");
 	imageConverter.convertImage (input, convertedFile, 
 				     request.getRequestURI ());
 	return new ImageConversionResult (origSize, convertedFile, typeFile);
     }
 
-    /** Make sure that the cache entry is the smallest image. 
+    /** Make sure that the cache entry is the smallest image.
+     * @param entry the file holding the source image
+     * @param icr the image compression result
+     * @return the File to use
+     * @throws IOException if image selection fails
      */
     private File selectImage (File entry, ImageConversionResult icr) 
 	throws IOException {

@@ -2,10 +2,14 @@ package rabbit.cache;
 
 import java.net.URL;
 import java.util.Collection;
+import java.util.logging.Logger;
 
 /** A cache, mostly works like a map in lookup, insert and delete.
  *  A cache may be persistent over sessions. 
  *  A cache may clean itself over time.
+ *
+ * @param <K> the key type of the cache
+ * @param <V> the data resource
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
@@ -53,21 +57,27 @@ public interface Cache<K, V> {
     /** Get the CacheEntry assosiated with given object.
      * @param k the key.
      * @return the NCacheEntry or null (if not found).
+     * @throws CacheException upon failure to get the key
      */ 
-    CacheEntry<K, V> getEntry (K k);
+    CacheEntry<K, V> getEntry (K k) throws CacheException;
 
     /** Get the file name for a cache entry. 
      * @param id the id of the cache entry
      * @param real false if this is a temporary cache file, 
      *             true if it is a realized entry.
      * @param extension the cache entry extension.
+     * @return the file name of the new entry
      */
     String getEntryName (long id, boolean real, String extension);
 
-    /** Get the file handler for the keys.*/
+    /** Get the file handler for the keys.
+     * @return the FileHandler for the key objects
+     */
     FileHandler<K> getKeyFileHandler ();
 
-    /** Get the file handler for the values.*/
+    /** Get the file handler for the values.
+     * @return the FileHandler for the values
+     */
     FileHandler<V> getHookFileHandler ();
     
     /** Reserve space for a CacheEntry with key o.
@@ -78,26 +88,34 @@ public interface Cache<K, V> {
 
     /** Insert a CacheEntry into the cache.
      * @param ent the CacheEntry to store.
+     * @throws CacheException if adding the entry fails
      */
-    void addEntry (CacheEntry<K, V> ent);
+    void addEntry (CacheEntry<K, V> ent) throws CacheException;
 
     /** Signal that a cache entry have changed.
+     * @param ent the CacheEntry that changed
+     * @param newKey the new key of the entry
+     * @param newValue the new value
+     * @throws CacheException if updating the cache fails
      */
-    void entryChanged (CacheEntry<K, V> ent, K newKey, V newValue);
+    void entryChanged (CacheEntry<K, V> ent, K newKey, V newValue)
+	throws CacheException;
 
     /** Remove the Entry with key o from the cache.
      * @param k the key for the CacheEntry.
+     * @throws CacheException if removal fails
      */
-    void remove (K k);
+    void remove (K k) throws CacheException;
 
-    /** Clear the Cache from files. 
+    /** Clear the Cache from files.
+     * @throws CacheException if the clear operation failed
      */
-    void clear ();
+    void clear () throws CacheException;
 
     /** Get the CacheEntries in the cache.
      * @return an Enumeration of the CacheEntries.
      */    
-    Collection<CacheEntry<K, V>> getEntries ();
+    Collection<? extends CacheEntry<K, V>> getEntries ();
 
     /** Make sure that the cache is written to the disk.
      */
@@ -108,4 +126,9 @@ public interface Cache<K, V> {
      *  to be stopped when this method is called.
      */
     void stop ();
+
+    /** Get the logger of this cache 
+     * @return the Logger used by the cache
+     */
+    Logger getLogger ();
 }

@@ -3,6 +3,7 @@ package rabbit.proxy;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import org.khelekore.rnio.NioHandler;
 import rabbit.cache.Cache;
 import rabbit.http.Header;
 import rabbit.http.HttpHeader;
@@ -10,7 +11,6 @@ import rabbit.http.MultipartHeader;
 import rabbit.httpio.BlockListener;
 import rabbit.io.BufferHandler;
 import rabbit.io.Range;
-import rabbit.nio.NioHandler;
 
 /** A resource that gets ranges from the cache.
  *  This resource will read data from disk so it may block.
@@ -21,12 +21,12 @@ public class RandomCacheResourceSource extends CacheResourceSource {
     private String contentType;
     private List<Range> ranges;
     private int currentRange = 0;
-    private String separator = "THIS_STRING_SEPARATES";
+    private final String separator = "THIS_STRING_SEPARATES";
     private boolean startBlock = true;
     private long currentIndex = 0;
     private long totalSize;
 
-    private enum State { SEND_HEADER, SEND_DATA };
+    private enum State { SEND_HEADER, SEND_DATA }
     private State state = State.SEND_HEADER;
 
     public RandomCacheResourceSource (Cache<HttpHeader, HttpHeader> cache,

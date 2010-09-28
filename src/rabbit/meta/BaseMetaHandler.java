@@ -30,12 +30,12 @@ public abstract class BaseMetaHandler
     protected TrafficLogger tlProxy;
     protected TrafficLogger tlClient;
     private boolean first = true;
-    private final Logger logger = Logger.getLogger (getClass ().getName ());
+    protected final Logger logger = Logger.getLogger (getClass ().getName ());
     
-    private static enum Mode { SEND_HEADER, SEND_DATA, CLEANUP };
+    private static enum Mode { SEND_HEADER, SEND_DATA, CLEANUP }
     private Mode mode = Mode.SEND_HEADER;
 
-    public static enum PageCompletion { PAGE_NOT_DONE, PAGE_DONE };
+    public static enum PageCompletion { PAGE_NOT_DONE, PAGE_DONE }
     
     public void handle (HttpHeader request, 
 			SProperties htab, 
@@ -78,7 +78,7 @@ public abstract class BaseMetaHandler
 	}
     }
 
-    protected void cleanup () throws IOException {
+    protected void cleanup () {
 	con.logAndRestart ();
     }
 

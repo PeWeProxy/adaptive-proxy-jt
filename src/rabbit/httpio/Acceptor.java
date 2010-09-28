@@ -4,18 +4,18 @@ import java.io.IOException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.logging.Logger;
-import rabbit.io.Closer;
-import rabbit.nio.AcceptHandler;
-import rabbit.nio.NioHandler;
+import org.khelekore.rnio.AcceptHandler;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.impl.Closer;
 
 /** A standard acceptor.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class Acceptor implements AcceptHandler {
-    private ServerSocketChannel ssc;
-    private NioHandler nioHandler;
-    private AcceptorListener listener;
+    private final ServerSocketChannel ssc;
+    private final NioHandler nioHandler;
+    private final AcceptorListener listener;
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
@@ -68,7 +68,7 @@ public class Acceptor implements AcceptHandler {
 
     /** Register OP_ACCEPT with the selector. 
      */ 
-    public void register () throws IOException {
+    public void register ()  {
 	nioHandler.waitForAccept (ssc, this);
     }
 }

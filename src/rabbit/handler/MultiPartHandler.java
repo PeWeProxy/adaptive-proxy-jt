@@ -1,6 +1,5 @@
 package rabbit.handler;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.BlockSender;
@@ -18,22 +17,23 @@ import rabbit.proxy.TrafficLoggerHandler;
 public class MultiPartHandler extends BaseHandler {
     private MultiPartPipe mpp = null;
     
-    // For creating the factory.
-    public MultiPartHandler () {	
+    /** Create a new MultiPartHandler factory.
+     */
+    public MultiPartHandler () {
+	// empty
     }
 
     /** Create a new BaseHansler for the given request.
      * @param con the Connection handling the request.
+     * @param tlh the TrafficLoggerHandler to update with traffic information
      * @param request the actual request made.
-     * @param clientHandle the client side buffer.
      * @param response the actual response.
      * @param content the resource.
      */
     public MultiPartHandler (Connection con, TrafficLoggerHandler tlh,
-			     HttpHeader request, BufferHandle clientHandle, 
-			     HttpHeader response, ResourceSource content) {
-	super (con, tlh, request, clientHandle, response, 
-	       content, false, false, -1);
+			     HttpHeader request, HttpHeader response,
+			     ResourceSource content) {
+	super (con, tlh, request, response, content, false, false, -1);
 	con.setChunking (false);
 
 	//Content-Type: multipart/byteranges; boundary=B-mmrokjxyjnwsfcefrvcg\r\n	
@@ -43,12 +43,10 @@ public class MultiPartHandler extends BaseHandler {
 
     @Override
     public Handler getNewInstance (Connection con, TrafficLoggerHandler tlh, 
-				   HttpHeader header, BufferHandle bufHandle, 
-				   HttpHeader webHeader, 
+				   HttpHeader header, HttpHeader webHeader,
 				   ResourceSource content, boolean mayCache, 
 				   boolean mayFilter, long size) {
-	return new MultiPartHandler (con, tlh, header, bufHandle, 
-				     webHeader, content);
+	return new MultiPartHandler (con, tlh, header, webHeader, content);
     }
 
     /** We may remove trailers, so we may modify the content.
@@ -94,16 +92,12 @@ public class MultiPartHandler extends BaseHandler {
      * This is not a fully correct handling, but it seems to work well enough.
      */
     @Override public void bufferRead (BufferHandle bufHandle) {
-	try {
-	    ByteBuffer buf = bufHandle.getBuffer ();
-	    mpp.parseBuffer (buf);
-	    BlockSender bs = 
-		new BlockSender (con.getChannel (), con.getNioHandler (),
-				 tlh.getClient (), bufHandle, 
-				 con.getChunking (), this);
-	    bs.write ();
-	} catch (IOException e) {
-	    failed (e);	    
-	}
+	ByteBuffer buf = bufHandle.getBuffer ();
+	mpp.parseBuffer (buf);
+	BlockSender bs = 
+	    new BlockSender (con.getChannel (), con.getNioHandler (),
+			     tlh.getClient (), bufHandle, 
+			     con.getChunking (), this);
+	bs.write ();
     }
 }

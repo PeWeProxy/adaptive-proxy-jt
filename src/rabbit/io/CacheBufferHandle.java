@@ -7,9 +7,14 @@ import java.nio.ByteBuffer;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class CacheBufferHandle implements BufferHandle {
-    private BufferHandler bh;
+    private final BufferHandler bh;
     private ByteBuffer buffer;
+    private boolean mayBeFlushed = true;
 
+    /** Create a new CacheBufferHandle that uses the given BufferHandler
+     *  for the caching of the ByteBuffer:s
+     * @param bh the BufferHandler that is the actual cache
+     */
     public CacheBufferHandle (BufferHandler bh) {
 	this.bh = bh;
     }
@@ -29,13 +34,24 @@ public class CacheBufferHandle implements BufferHandle {
 	return buffer;
     }
 
+    public boolean isLarge (ByteBuffer buffer) {
+	return bh.isLarge (buffer);
+    }
+
     public void possiblyFlush () {
+	if (!mayBeFlushed)
+	    throw new IllegalStateException ("buffer may not be flushed!: " +
+					     System.identityHashCode (buffer));
 	if (buffer == null)
 	    return;
 	if (!buffer.hasRemaining ()) {
 	    bh.putBuffer (buffer);
 	    buffer = null;
 	}
+    }
+
+    public void setMayBeFlushed (boolean mayBeFlushed) {
+	this.mayBeFlushed = mayBeFlushed;
     }
 
     @Override public String toString () {

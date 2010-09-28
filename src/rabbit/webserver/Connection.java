@@ -7,8 +7,10 @@ import java.nio.channels.SocketChannel;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import rabbit.http.HttpHeader;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.impl.Closer;
 import rabbit.http.HttpDateParser;
+import rabbit.http.HttpHeader;
 import rabbit.httpio.FileResourceSource;
 import rabbit.httpio.HttpHeaderListener;
 import rabbit.httpio.HttpHeaderReader;
@@ -19,8 +21,6 @@ import rabbit.httpio.TransferHandler;
 import rabbit.httpio.TransferListener;
 import rabbit.io.BufferHandle;
 import rabbit.io.CacheBufferHandle;
-import rabbit.nio.NioHandler;
-import rabbit.io.Closer;
 import rabbit.util.MimeTypeMapper;
 import rabbit.util.TrafficLogger;
 
@@ -29,8 +29,8 @@ import rabbit.util.TrafficLogger;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class Connection {
-    private SimpleWebServer sws;
-    private SocketChannel sc;
+    private final SimpleWebServer sws;
+    private final SocketChannel sc;
     private BufferHandle clientBufferHandle;
     private boolean timeToClose = false;
     private ResourceSource resourceSource = null;
@@ -53,7 +53,7 @@ public class Connection {
 	    new HttpHeaderReader (sc, clientBufferHandle, sws.getNioHandler (),
 				  sws.getTrafficLogger (), true, true, 
 				  requestListener);
-	requestReader.readRequest ();
+	requestReader.readHeader ();
     }
 
     private void shutdown () {

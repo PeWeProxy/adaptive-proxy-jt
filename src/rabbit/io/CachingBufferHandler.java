@@ -13,20 +13,21 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class CachingBufferHandler implements BufferHandler {
-    private Queue<BufferHolder> cache = 
+    private final Queue<BufferHolder> cache =
 	new ConcurrentLinkedQueue<BufferHolder> ();
-    private Queue<BufferHolder> largeCache = 
+    private final Queue<BufferHolder> largeCache =
 	new ConcurrentLinkedQueue<BufferHolder> ();
     private int count = 0;
     
     private ByteBuffer getBuffer (Queue<BufferHolder> bufs, int size) {
 	count++;
 	BufferHolder r = bufs.poll ();
-	ByteBuffer b = null;
-	if (r != null)
+	ByteBuffer b;
+	if (r != null) {
 	    b = r.getBuffer ();
-	else
+	} else {
 	    b = ByteBuffer.allocateDirect (size);
+	}
 	b.clear ();
 	return b;
     }
@@ -53,14 +54,20 @@ public class CachingBufferHandler implements BufferHandler {
     public ByteBuffer growBuffer (ByteBuffer buffer) {
 	ByteBuffer lb = getBuffer (largeCache, 128 * 1024);
 	if (buffer != null) {
+	    int position = buffer.position ();
 	    lb.put (buffer);
+	    lb.position (position);
 	    putBuffer (buffer);
 	}
 	return lb;
     }
 
+    public boolean isLarge (ByteBuffer buffer) {
+	return buffer.capacity () > 4096;
+    }
+
     private static final class BufferHolder {
-	private ByteBuffer buffer;
+	private final ByteBuffer buffer;
 	
 	public BufferHolder (ByteBuffer buffer) {
 	    this.buffer = buffer;

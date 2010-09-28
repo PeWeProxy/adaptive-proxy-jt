@@ -2,11 +2,11 @@ package rabbit.httpio;
 
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
+import org.khelekore.rnio.NioHandler;
 import rabbit.http.HttpHeader;
 import rabbit.io.BufferHandle;
 import rabbit.io.BufferHandler;
 import rabbit.io.CacheBufferHandle;
-import rabbit.nio.NioHandler;
 import rabbit.util.TrafficLogger;
 
 /** A handler that write one http header and reads a response
@@ -40,7 +40,7 @@ public class HttpResponseReader
 				       header, fullURI, this);
     }
 
-    public void sendRequestAndWaitForResponse () throws IOException {
+    public void sendRequestAndWaitForResponse () {
 	sender.sendHeader ();
     }
     
@@ -50,7 +50,7 @@ public class HttpResponseReader
 	    HttpHeaderReader reader = 
 		new HttpHeaderReader (channel, bh, nioHandler,
 				      tl, false, strictHttp, this);
-	    reader.readRequest ();
+	    reader.readHeader ();
 	} catch (IOException e) {
 	    failed (e);
 	}

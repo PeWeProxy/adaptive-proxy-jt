@@ -11,31 +11,42 @@ import rabbit.httpio.HttpResponseListener;
 import rabbit.httpio.HttpResponseReader;
 import rabbit.io.BufferHandle;
 import rabbit.io.CacheBufferHandle;
+import rabbit.io.ProxyChain;
+import rabbit.io.Resolver;
 import rabbit.io.WebConnection;
 import rabbit.io.WebConnectionListener;
-import rabbit.util.Coder;
+import rabbit.util.Base64;
 
 /** A handler that shuttles ssl traffic
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-class SSLHandler implements TunnelDoneListener {
+public class SSLHandler implements TunnelDoneListener {
     private final HttpProxy proxy;
     private final Connection con;
     private final HttpHeader request;
     private final TrafficLoggerHandler tlh;
+    private final Resolver resolver;
     private SocketChannel channel;
     private BufferHandle bh;
     private BufferHandle sbh;
     private WebConnection wc;
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
+    /** Create a new SSLHandler
+     * @param proxy the HttpProxy this SSL connection is serving
+     * @param con the Connection to handle
+     * @param request the CONNECT header
+     * @param tlh the traffic statistics gatherer
+     */
     public SSLHandler (HttpProxy proxy, Connection con,
 		       HttpHeader request, TrafficLoggerHandler tlh) {
 	this.proxy = proxy;
 	this.con = con;
 	this.request = request;
 	this.tlh = tlh;
+	ProxyChain pc = con.getProxy ().getProxyChain ();
+	resolver = pc.getResolver (request.getRequestURI ());
     }
 
     /** Are we allowed to proxy ssl-type connections ?
@@ -44,18 +55,18 @@ class SSLHandler implements TunnelDoneListener {
     public boolean isAllowed () {
 	String hp = request.getRequestURI ();
 	int c = hp.indexOf (':');
-	Integer port = 443;
+	Integer port = Integer.valueOf (443);
 	if (c >= 0) {
 	    try {
-		port = new Integer (hp.substring (c+1));
+		port = new Integer (hp.substring (c + 1));
 	    } catch (NumberFormatException e) {
 		logger.warning ("Connect to odd port: " + e);
 		return false;
 	    }
 	}
-	if (proxy.proxySSL == false)
+	if (!proxy.proxySSL)
 	    return false;
-	if (proxy.proxySSL == true && proxy.sslports == null)
+	if (proxy.proxySSL && proxy.sslports == null)
 	    return true;
 	for (int i = 0; i < proxy.sslports.size (); i++) {
 	    if (port.equals (proxy.sslports.get (i)))
@@ -66,26 +77,25 @@ class SSLHandler implements TunnelDoneListener {
 
     /** handle the tunnel.
      * @param channel the client channel
-     * @param selector the proxy selector
      * @param bh the buffer handle used, may contain data from client.
      */
     public void handle (SocketChannel channel, BufferHandle bh) {
 	this.channel = channel;
 	this.bh = bh;
-	if (proxy.isProxyConnected ()) {
-	    String auth = proxy.getProxyAuthString ();
+	if (resolver.isProxyConnected ()) {
+	    String auth = resolver.getProxyAuthString ();
 	    // it should look like this (using RabbIT:RabbIT):
 	    // Proxy-authorization: Basic UmFiYklUOlJhYmJJVA==
 	    if (auth != null && !auth.equals (""))
 		request.setHeader ("Proxy-authorization",
-				   "Basic " + Coder.uuencode (auth));
+				   "Basic " + Base64.encode (auth));
 	}
 	WebConnectionListener wcl = new WebConnector ();
 	proxy.getWebConnection (request, wcl);
     }
 
     private class WebConnector implements WebConnectionListener {
-	private String uri;
+	private final String uri;
 
 	public WebConnector () {
 	    uri = request.getRequestURI ();
@@ -95,7 +105,7 @@ class SSLHandler implements TunnelDoneListener {
 
 	public void connectionEstablished (WebConnection wce) {
 	    wc = wce;
-	    if (proxy.isProxyConnected ()) {
+	    if (resolver.isProxyConnected ()) {
 		request.setRequestURI (uri); // send correct connect to next proxy.
 		setupChain ();
 	    } else {
@@ -145,7 +155,7 @@ class SSLHandler implements TunnelDoneListener {
 					tlh.getNetwork (),
 					con.getBufferHandler (), request,
 					proxy.getStrictHttp (),
-					proxy.isProxyConnected (), cr);
+					resolver.isProxyConnected (), cr);
 	    hrr.sendRequestAndWaitForResponse ();
 	} catch (IOException e) {
 	    warn ("IOException when waiting for chained response", e);
@@ -194,7 +204,7 @@ class SSLHandler implements TunnelDoneListener {
     }
 
     private class TunnelConnected implements HttpHeaderSentListener {
-	private BufferHandle server2client;
+	private final BufferHandle server2client;
 
 	public TunnelConnected (BufferHandle server2client) {
 	    this.server2client = server2client;
@@ -218,16 +228,11 @@ class SSLHandler implements TunnelDoneListener {
     private void tunnelData (BufferHandle server2client) {
 	sbh = server2client;
 	SocketChannel sc = wc.getChannel ();
-	try {
-	    Tunnel tunnel =
-		new Tunnel (proxy.getNioHandler (), channel, bh,
-			    tlh.getClient (), sc, server2client,
-			    tlh.getNetwork (), this);
-	    tunnel.start ();
-	} catch (IOException e) {
-	    warn ("SSLHandler error setting up tunnels", e);
-	    closeDown ();
-	}
+	Tunnel tunnel =
+	    new Tunnel (proxy.getNioHandler (), channel, bh,
+			tlh.getClient (), sc, server2client,
+			tlh.getNetwork (), this);
+	tunnel.start ();
     }
 
     public void tunnelClosed () {

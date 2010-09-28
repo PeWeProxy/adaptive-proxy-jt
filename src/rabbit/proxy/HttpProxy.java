@@ -18,6 +18,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.StatisticsHolder;
+import org.khelekore.rnio.impl.BasicStatisticsHolder;
+import org.khelekore.rnio.impl.MultiSelectorNioHandler;
 import rabbit.cache.Cache;
 import rabbit.cache.NCache;
 import rabbit.dns.DNSHandler;
@@ -28,18 +32,15 @@ import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.Acceptor;
 import rabbit.httpio.AcceptorListener;
-import rabbit.httpio.ResolvRunner;
+import rabbit.httpio.ProxiedProxyChain;
+import rabbit.httpio.SimpleProxyChain;
 import rabbit.io.BufferHandler;
 import rabbit.io.CachingBufferHandler;
 import rabbit.io.ConnectionHandler;
-import rabbit.io.InetAddressListener;
-import rabbit.io.Resolver;
+import rabbit.io.ProxyChain;
+import rabbit.io.ProxyChainFactory;
 import rabbit.io.WebConnection;
 import rabbit.io.WebConnectionListener;
-import rabbit.nio.DefaultTaskIdentifier;
-import rabbit.nio.MultiSelectorNioHandler;
-import rabbit.nio.NioHandler;
-import rabbit.nio.TaskIdentifier;
 import rabbit.util.Config;
 import rabbit.util.Counter;
 import rabbit.util.SProperties;
@@ -49,10 +50,10 @@ import sk.fiit.peweproxy.AdaptiveEngine;
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class HttpProxy implements Resolver {
+public class HttpProxy {
 
     /** Current version */
-    public static final String VERSION = "RabbIT proxy version 4.4";
+    public static final String VERSION = "RabbIT proxy version 4.7";
 
     /** The current config of this proxy. */
     private Config config;
@@ -60,7 +61,7 @@ public class HttpProxy implements Resolver {
     /** The time this proxy was started. Time in millis. */
     private long started;
 
-    /** The server identity of this server. */
+    /** The identity of this server. */
     private String serverIdentity = VERSION;
     
     /** The proxy identity of this server. */
@@ -93,10 +94,8 @@ public class HttpProxy implements Resolver {
     /** The port the proxy is using. */
     private int port = -1;
 
-    /** Adress of connected proxy. */
-    private InetAddress proxy = null;
-    /** Port of the connected proxy. */
-    private int proxyport = -1;
+    /** The proxy chain we are using */
+    private ProxyChain proxyChain;
 
     /** The serversocket the proxy is using. */
     private ServerSocketChannel ssc = null;
@@ -104,7 +103,7 @@ public class HttpProxy implements Resolver {
     private NioHandler nioHandler;
 
     /** The buffer handlers. */
-    private BufferHandler bufferHandler = new CachingBufferHandler ();
+    private final BufferHandler bufferHandler = new CachingBufferHandler ();
 
     /** If this proxy is using strict http parsing. */
     private boolean strictHttp = true;
@@ -113,7 +112,7 @@ public class HttpProxy implements Resolver {
     private int maxConnections = 50;
 
     /** The counter of events. */
-    private Counter counter = new Counter ();
+    private final Counter counter = new Counter ();
 
     /** The cache-handler */
     private NCache<HttpHeader, HttpHeader> cache;
@@ -127,16 +126,18 @@ public class HttpProxy implements Resolver {
     private HandlerFactoryHandler handlerFactoryHandler;
 
     /** All the currently active connections. */
-    private List<Connection> connections = new ArrayList<Connection> ();
+    private final List<Connection> connections = new ArrayList<Connection> ();
 
     /** The total traffic in and out of this proxy. */
-    private TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
+    private final TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
     
     private AdaptiveEngine adaptiveEngine;
     
     private String htdocsDir;
     
     private File cfgFile;
+
+    private HttpGeneratorFactory hgf;
 
     public HttpProxy () throws UnknownHostException {
 	localhost = InetAddress.getLocalHost ();
@@ -197,38 +198,91 @@ public class HttpProxy implements Resolver {
 	}
     }
 
+    private void setupNioHandler () {
+	String section = getClass ().getName ();
+	int cpus = Runtime.getRuntime ().availableProcessors ();
+	int threads = getInt (section, "num_selector_threads", cpus);
+	ExecutorService es = Executors.newCachedThreadPool ();
+	StatisticsHolder sh = new BasicStatisticsHolder ();
+	Long timeout = Long.valueOf (15000);
+	try {
+	    nioHandler =
+		new MultiSelectorNioHandler (es, sh, threads, timeout);
+	} catch (IOException e) {
+	    logger.log (Level.SEVERE,
+			"Failed to create the NioHandler",
+			e);
+	    stop ();
+	}
+    }
+
+    private ProxyChain setupProxyChainFromFactory (String pcf) {
+	try {
+	    Class<? extends ProxyChainFactory> clz =
+		Class.forName (pcf).asSubclass (ProxyChainFactory.class);
+	    ProxyChainFactory factory = clz.newInstance ();
+	    SProperties props = config.getProperties (pcf);
+	    return 
+		factory.getProxyChain (props, nioHandler, dnsHandler, logger);
+	} catch (Exception e) {
+	    logger.log (Level.WARNING,
+			"Unable to create the proxy chain " +
+			"will fall back to the default one.",
+			e);
+	}
+	return null;
+    }
+
+    /* TODO: remove this method, only kept for backwards compability. */
+    private ProxyChain setupProxiedProxyChain (String pname, String pport,
+					       String pauth) {
+	try {
+	    InetAddress proxy = dnsHandler.getInetAddress (pname);
+	    try {
+		int port = Integer.parseInt (pport);
+		return new ProxiedProxyChain (proxy, port, pauth);
+	    } catch (NumberFormatException e) {
+		logger.severe ("Strange proxyport: '" + pport +
+			       "', will not chain");
+	    }
+	} catch (UnknownHostException e) {
+	    logger.severe ("Unknown proxyhost: '" + pname +
+			   "', will not chain");
+	}
+	return null;
+    }
+
     /** Configure the chained proxy rabbit is using (if any).
      */
     private void setupProxyConnection () {
 	String sec = getClass ().getName ();
-	String pname = config.getProperty (sec, "proxyhost", "");
-	String pport = config.getProperty (sec, "proxyport", "");
-	if (!pname.equals ("") && !pport.equals ("")) {
-	    try {
-		proxy = dnsHandler.getInetAddress (pname);
-	    } catch (UnknownHostException e) {
-		logger.severe ("Unknown proxyhost: '" + pname + "'");
-	    }
-	    try {
-		proxyport = Integer.parseInt (pport.trim ());
-	    } catch (NumberFormatException e) {
-		logger.severe ("Strange proxyport: '" + pport + "'");
-	    }
+	String pcf =
+	    config.getProperty (sec, "proxy_chain_factory", "").trim ();
+	String pname = config.getProperty (sec, "proxyhost", "").trim ();
+	String pport = config.getProperty (sec, "proxyport", "").trim ();
+	String pauth = config.getProperty (sec, "proxyauth");
+
+	if (!"".equals(pcf)) {
+	    proxyChain = setupProxyChainFromFactory (pcf);
+	} else if (!pname.equals ("") && !pport.equals ("")) {
+	    proxyChain = setupProxiedProxyChain (pname, pport, pauth);
 	}
+	if (proxyChain == null)
+	    proxyChain = new SimpleProxyChain (nioHandler, dnsHandler);
     }
 
     private void setupCache () {
-   	SProperties props =
-   	    config.getProperties (NCache.class.getName ());
-   	HttpHeaderFileHandler hhfh = new HttpHeaderFileHandler ();
-   	try {
-   	    cache = new NCache<HttpHeader, HttpHeader> (props, hhfh, hhfh);
-   	    cache.startCleaner ();
-   	} catch (IOException e) {
-   	    logger.log (Level.SEVERE, 
-   			"Failed to setup cache", 
-   			e);
-   	}
+	SProperties props =
+	    config.getProperties (NCache.class.getName ());
+	HttpHeaderFileHandler hhfh = new HttpHeaderFileHandler ();
+	try {
+	    cache = new NCache<HttpHeader, HttpHeader> (props, hhfh, hhfh);
+	    cache.startCleaner ();
+	} catch (IOException e) {
+	    logger.log (Level.SEVERE,
+			"Failed to setup cache",
+			e);
+	}
     }
 
     /** Configure the SSL support RabbIT should have.
@@ -285,9 +339,28 @@ public class HttpProxy implements Resolver {
 	    logger.info ("nioHandler == null " + this);
 	    return;
 	}
-	conhandler = new ConnectionHandler (counter, this, nioHandler);
-	String p = conhandler.getClass ().getName ();
-	conhandler.setup (config.getProperties (p));
+	conhandler = new ConnectionHandler (counter, proxyChain, nioHandler);
+	String section = conhandler.getClass ().getName ();
+	conhandler.setup (config.getProperties (section));
+    }
+
+    private void setupHttpGeneratorFactory () {
+	String def = StandardHttpGeneratorFactory.class.getName ();
+	String hgfClass = config.getProperty (getClass ().getName (),
+					      "http_generator_factory", def);
+	try {
+	    Class<? extends HttpGeneratorFactory> clz =
+		Class.forName (hgfClass).asSubclass (HttpGeneratorFactory.class);
+	    hgf = clz.newInstance ();
+	} catch (Exception e) {
+	    logger.log (Level.WARNING,
+			"Unable to create the http generator " +
+			"factory, will fall back to the default one.",
+			e);
+	    hgf = new StandardHttpGeneratorFactory ();
+	}
+	String section = hgf.getClass ().getName ();
+	hgf.setup (config.getProperties (section));
     }
 
     private void setConfig (Config config) {
@@ -295,6 +368,7 @@ public class HttpProxy implements Resolver {
 	setupLogging ();
 	setupDateParsing ();
 	setupDNSHandler ();
+	setupNioHandler ();
 	setupProxyConnection ();
 	String cn = getClass ().getName ();
 	serverIdentity = config.getProperty (cn, "serverIdentity", VERSION); 
@@ -309,6 +383,7 @@ public class HttpProxy implements Resolver {
 	openSocket ();
 	if (ssc != null) {
 		setupConnectionHandler ();
+		setupHttpGeneratorFactory ();
 		setupAdaptiveEngine();
 		logger.info (VERSION + ": Configuration loaded: ready for action.");
 	}
@@ -332,8 +407,7 @@ public class HttpProxy implements Resolver {
     private void openSocket () {
 	String section = getClass ().getName ();
 	int tport = getInt (section, "port", 9666);
-	int cpus = Runtime.getRuntime ().availableProcessors ();
-	int selectorThreads = getInt (section, "num_selector_threads", cpus);
+
 	String bindIP = config.getProperty (section, "listen_ip");
 	if (tport != port) {
 	    try {
@@ -343,15 +417,13 @@ public class HttpProxy implements Resolver {
 		ssc.configureBlocking (false);
 		if (bindIP == null) {
 		    ssc.socket ().bind (new InetSocketAddress (port));
-		} else { 
+		} else {
 		    InetAddress ia = InetAddress.getByName (bindIP);
-		    logger.info ("listening on inetaddress: " + ia + 
+		    logger.info ("listening on inetaddress: " + ia +
 				 ":" + port +
 				 " on inet address: " + ia);
 		    ssc.socket ().bind (new InetSocketAddress (ia, port));
 		}
-		ExecutorService es = Executors.newCachedThreadPool ();
-		nioHandler = new MultiSelectorNioHandler (es, selectorThreads);
 		AcceptorListener listener =
 		    new ProxyConnectionAcceptor (acceptorId++, this);
 		Acceptor acceptor = new Acceptor (ssc, nioHandler, listener);
@@ -371,7 +443,6 @@ public class HttpProxy implements Resolver {
     private void closeSocket () {
 	try {
 	    port = -1;
-	    closeNioHandler ();
 	    if (ssc != null) {
 		ssc.close ();
 		ssc = null;
@@ -382,7 +453,7 @@ public class HttpProxy implements Resolver {
 	}
     }
 
-    private void closeNioHandler () throws IOException {
+    private void closeNioHandler () {
 	if (nioHandler != null)
 	    nioHandler.shutdown ();
     }
@@ -418,7 +489,6 @@ public class HttpProxy implements Resolver {
 
     /** Run the proxy in a separate thread. */
     public void stop () {
-	// TODO: what level do we want here?
 	logger.severe ("HttpProxy.stop() called, shutting down");
 	if (adaptiveEngine != null)
 		adaptiveEngine.setProxyIsDying();
@@ -426,8 +496,7 @@ public class HttpProxy implements Resolver {
 	    closeSocket ();
 	    // TODO: wait for remaining connections.
 	    // TODO: as it is now, it will just close connections in the middle.
-	    if (nioHandler != null) // if we fail on startup we have null.
-		nioHandler.shutdown ();
+	    closeNioHandler ();
 	    cache.flush ();
 	    cache.stop ();
 	}
@@ -491,7 +560,7 @@ public class HttpProxy implements Resolver {
     }
 
     public String getServerIdentity () {
-    return serverIdentity;
+	return serverIdentity;
     }
         
     public String getProxyIdentity () {
@@ -512,33 +581,8 @@ public class HttpProxy implements Resolver {
 	return port;
     }
 
-    /** Get the InetAddress for a given url.
-     *  We do dns lookups on a separate thread until we have an
-     *  asyncronous dns library.
-     *  We jump back on the main thread before telling the listener.
-     */
-    public void getInetAddress (URL url, InetAddressListener ial) {
-	if (isProxyConnected ()) {
-	    ial.lookupDone (proxy);
-	    return;
-	}
-	ResolvRunner rr =
-	    new ResolvRunner (dnsHandler, url, ial);
-	TaskIdentifier ti = 
-	    new DefaultTaskIdentifier (getClass ().getSimpleName () +
-				       ".getInetAddress", 
-				       url.toString ());
-	nioHandler.runThreadTask (rr, ti);
-    }
-
-    /** Get the port to connect to.
-     * @param port the port we want to connect to.
-     * @return the port to connect to.
-     */
-    public int getConnectPort (int port) {
-	if (isProxyConnected ())    // are we talking through another proxy?
-	    return proxyport;
-	return port;
+    public ProxyChain getProxyChain () {
+	return proxyChain;
     }
 
     /** Try hard to check if the given address matches the proxy.
@@ -570,20 +614,6 @@ public class HttpProxy implements Resolver {
 	    }
 	}
 	return false;
-    }
-
-    /** Is this proxy chained to another proxy?
-     * @return true if the proxy is connected to another proxy.
-     */
-    public boolean isProxyConnected () {
-	return proxy != null;
-    }
-
-    /** Get the authenticationstring to use for proxy.
-     * @return an authentication string.
-     */
-    public String getProxyAuthString () {
-	return config.getProperty (getClass ().getName (), "proxyauth");
     }
 
     /** Get a WebConnection.
@@ -651,6 +681,10 @@ public class HttpProxy implements Resolver {
 
     protected BufferHandler getBufferHandler () {
 	return bufferHandler;
+    }
+
+    public HttpGeneratorFactory getHttpGeneratorFactory () {
+	return hgf;
     }
     
     public AdaptiveEngine getAdaptiveEngine() {

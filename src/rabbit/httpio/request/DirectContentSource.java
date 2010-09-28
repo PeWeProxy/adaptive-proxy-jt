@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
-import rabbit.nio.ReadHandler;
+import org.khelekore.rnio.ReadHandler;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
 

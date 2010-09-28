@@ -2,7 +2,6 @@ package rabbit.handler;
 
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ResourceSource;
-import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.SProperties;
@@ -17,17 +16,16 @@ public interface HandlerFactory {
      * @param connection the Connection handling the request.
      * @param tlh the Traffic logger handler.
      * @param header the request.
-     * @param bh the client side buffer handle (may contain the next request).
      * @param webheader the response.
      * @param content the resource.
      * @param mayCache if the handler may cache the response.
      * @param mayFilter if the handler may filter the response.
      * @param size the Size of the data beeing handled (-1 = unknown length).
+     * @return the new Handler
      */
     Handler getNewInstance (Connection connection,
 			    TrafficLoggerHandler tlh,
 			    HttpHeader header,
-			    BufferHandle bh, 
 			    HttpHeader webheader,
 			    ResourceSource content, 
 			    boolean mayCache,
@@ -35,6 +33,7 @@ public interface HandlerFactory {
 			    long size);
     
     /** setup the handler factory. 
+     * @param properties the properties for this factory
      */
     void setup (SProperties properties);
 }

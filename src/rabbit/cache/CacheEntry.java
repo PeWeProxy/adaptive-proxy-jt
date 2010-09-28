@@ -2,6 +2,9 @@ package rabbit.cache;
 
 /** A cached object.
  *
+ * @param <K> the key type of this cache entry
+ * @param <V> the data resource
+ *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public interface CacheEntry<K, V> {
@@ -13,29 +16,27 @@ public interface CacheEntry<K, V> {
 
     /** Get the key were holding data for
      * @return the key object
+     * @throws CacheException if retrieving the key object fails
      */
-    K getKey ();
+    K getKey () throws CacheException;
 
     /** Get the date this object was cached.
      * @return a date (millis since the epoch).
      */
     long getCacheTime ();
 
-    /** Set the date this object was cached.
-     * @param date the date.
-     */
-    void setCacheTime (long date);
-
     /** Get the size of our file
      * @return the size of our data
      */
     long getSize ();
 
-    /** Get the disk size of the key, if any
+    /** Get the disk size of the key, if any.
+     * @return the size of the key
      */
     long getKeySize ();
 
     /** Get the disc size of the hook, if any
+     * @return the size of the value
      */
     long getHookSize ();
 
@@ -57,8 +58,9 @@ public interface CacheEntry<K, V> {
     /** Get the hooked data.
      * @param cache the Cache this entry lives in. 
      * @return the the hooked data.
+     * @throws CacheException if getting the value fails
      */
-    V getDataHook (Cache<K, V> cache);
+    V getDataHook (Cache<K, V> cache) throws CacheException;
 
     /** Sets the data hook for this cache object.
      *  Since it is not always possible to make the key hold this...

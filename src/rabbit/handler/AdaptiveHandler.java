@@ -31,11 +31,11 @@ public class AdaptiveHandler extends FilterHandler {
 	public AdaptiveHandler() {}
 	
 	public AdaptiveHandler(Connection con, TrafficLoggerHandler tlh,
-			HttpHeader header, BufferHandle bufHandle, HttpHeader webHeader,
+			HttpHeader header, HttpHeader webHeader,
 			ResourceSource content, boolean mayCache, boolean mayFilter,
 			long size, boolean compress, boolean repack,
 			  List<HtmlFilterFactory> filterClasses) {
-		super(con, tlh, header, bufHandle, webHeader, content, mayCache,
+		super(con, tlh, header, webHeader, content, mayCache,
 				mayFilter, size, compress, repack, filterClasses);
 		long dataSize = size;
 		if (dataSize > 0) {
@@ -49,10 +49,10 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	public Handler getNewInstance(Connection con, TrafficLoggerHandler tlh,
-			HttpHeader header, BufferHandle bufHandle, HttpHeader webHeader,
+			HttpHeader header, HttpHeader webHeader,
 			ResourceSource content, boolean mayCache, boolean mayFilter,
 			long size) {
-		AdaptiveHandler h =  new AdaptiveHandler(con, tlh, header, bufHandle, webHeader, content,
+		AdaptiveHandler h = new AdaptiveHandler(con, tlh, header, webHeader, content,
 				mayCache, mayFilter, size, compress, repack, filterClasses);
 		h.askForCaching = askForCaching;
 		h.setupHandler();

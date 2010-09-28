@@ -3,11 +3,11 @@ package rabbit.httpio;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.ReadHandler;
 import rabbit.io.BufferHandle;
 import rabbit.io.ConnectionHandler;
 import rabbit.io.WebConnection;
-import rabbit.nio.NioHandler;
-import rabbit.nio.ReadHandler;
 import rabbit.util.TrafficLogger;
 
 /** A resource source that gets the data from a WebConnection
@@ -72,7 +72,7 @@ public class WebConnectionResourceSource
     public void addBlockListener (BlockListener listener) {
 	this.listener = listener;
 	if (isChunked)
-	    chunkHandler.addBlockListener (listener);
+	    chunkHandler.setBlockListener (listener);
 	if (dataSize > -1 && totalRead >= dataSize) {
 	    cleanupAndFinish ();
 	} else if (bufHandle.isEmpty ()) {

@@ -12,9 +12,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.khelekore.rnio.NioHandler;
+import org.khelekore.rnio.ReadHandler;
 import rabbit.http.HttpHeader;
-import rabbit.nio.NioHandler;
-import rabbit.nio.ReadHandler;
 import rabbit.util.Counter;
 import rabbit.util.SProperties;
 
@@ -31,7 +31,7 @@ public class ConnectionHandler {
     private final Counter counter;
 
     // The resolver to use
-    private final Resolver resolver;
+    private final ProxyChain proxyChain;
 
     // The available connections.
     private final Map<Address, List<WebConnection>> activeConnections;
@@ -51,10 +51,10 @@ public class ConnectionHandler {
     // the socket binder
     private SocketBinder socketBinder = new DefaultBinder ();
 
-    public ConnectionHandler (Counter counter, Resolver resolver,
+    public ConnectionHandler (Counter counter, ProxyChain proxyChain,
 			      NioHandler nioHandler) {
 	this.counter = counter;
-	this.resolver = resolver;
+	this.proxyChain = proxyChain;
 	this.nioHandler = nioHandler;
 
 	activeConnections = new HashMap<Address, List<WebConnection>> ();
@@ -87,13 +87,14 @@ public class ConnectionHandler {
 			       final WebConnectionListener wcl) {
 	// TODO: should we use the Host: header if its available? probably...
 	String requri = header.getRequestURI ();
-	URL url = null;
+	URL url;
 	try {
 	    url = new URL (requri);
 	} catch (MalformedURLException e) {
 	    wcl.failed (e);
 	    return;
 	}
+	Resolver resolver = proxyChain.getResolver (requri);
 	int port = url.getPort () > 0 ? url.getPort () : 80;
 	final int rport = resolver.getConnectPort (port);
 
@@ -116,7 +117,7 @@ public class ConnectionHandler {
     private void getConnection (HttpHeader header,
 				WebConnectionListener wcl,
 				Address a) {
-	WebConnection wc = null;
+	WebConnection wc;
 	counter.inc ("WebConnections used");
 	String method = header.getMethod ();
 
@@ -159,7 +160,7 @@ public class ConnectionHandler {
     }
 
     private WebConnection unregister (WebConnection wc) {
-	CloseListener closer = null;
+	CloseListener closer;
 	closer = wc2closer.remove (wc);
 	if (closer != null)
 	    nioHandler.cancel (wc.getChannel (), closer);
@@ -208,17 +209,10 @@ public class ConnectionHandler {
 		    throw new IllegalStateException (err);
 		}
 	    }
-	    try {
-		pool.add (wc);
-		CloseListener cl = new CloseListener (wc);
-		wc2closer.put (wc, cl);
-		cl.register ();
-	    } catch (IOException e) {
-		logger.log (Level.WARNING,
-			    "Get IOException when setting up a CloseListener: ",
-			    e);
-		closeWebConnection (wc);
-	    }
+	    pool.add (wc);
+	    CloseListener cl = new CloseListener (wc);
+	    wc2closer.put (wc, cl);
+	    cl.register ();
 	}
     }
 
@@ -235,10 +229,10 @@ public class ConnectionHandler {
     }
 
     private class CloseListener implements ReadHandler {
-	private WebConnection wc;
+	private final WebConnection wc;
 	private Long timeout;
 
-	public CloseListener (WebConnection wc) throws IOException {
+	public CloseListener (WebConnection wc) {
 	    this.wc = wc;
 	}
 
