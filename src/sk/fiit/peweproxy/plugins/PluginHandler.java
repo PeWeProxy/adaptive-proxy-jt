@@ -697,7 +697,8 @@ public class PluginHandler {
 		nodeList = docRoot.getElementsByTagName(ELEMENT_WORKDIR);
 		File workDir = null;
 		if (nodeList.getLength() == 0) {
-			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_WORKDIR+"', no working directory will be used");
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_WORKDIR+"', plugins directory will be used as working directory");
+			workDir = pluginRepositoryDir;
 		} else {
 			Element workDirElement = (Element)nodeList.item(0);
 			workDir = new File(pluginRepositoryDir, workDirElement.getTextContent());
