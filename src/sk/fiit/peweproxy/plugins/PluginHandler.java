@@ -3,6 +3,7 @@ package sk.fiit.peweproxy.plugins;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -24,7 +25,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
+import org.apache.log4j.WriterAppender;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -74,6 +78,7 @@ public class PluginHandler {
 	private final Map<URL, String> checksums4ldLibsMap;
 	private final AbcPluginsComparator comparator;
 	private boolean pluginsStopped = false;
+	private final StringBuffer loadingLogBuffer;
 	
 	static {
 		jarFilter = new FilenameFilter() {
@@ -111,6 +116,10 @@ public class PluginHandler {
 					stopPlugins();
 			}
 		});
+		log.setLevel(Level.ALL);
+		StringWriter outStream = new StringWriter();
+		loadingLogBuffer = outStream.getBuffer();
+		log.addAppender(new WriterAppender(new PatternLayout("%d{HH:mm:ss,SSS} %-5p %x - %m%n"), outStream));
 	}
 	
 	public void setPluginRepository(File pluginRepositoryDir, File servicesDir, File sharedLibsDir, Set<String> excludeFileNames) {
@@ -386,6 +395,7 @@ public class PluginHandler {
 			log.info("Plugins home repository not set");
 			return;
 		}
+		//loadingLogBuffer.setLength(0);	//keep previous logs
 		ldPlugins4TypeMap.clear();
 		entry4ldPluginMap.clear();
 		loadPluginsConfigs();
@@ -971,5 +981,9 @@ public class PluginHandler {
 		if (servicesCLoader == null)
 			return getClass().getClassLoader();
 		return servicesCLoader;
+	}
+	
+	public String getLoadingLogText() {
+		return loadingLogBuffer.toString();
 	}
 }

@@ -3,6 +3,7 @@ package rabbit.meta;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Scanner;
 import java.util.Set;
 
 import rabbit.http.HttpHeader;
@@ -56,6 +57,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		addModulesPart(sb);
 		addProcessingPluginsPart(sb);
 		addEventPluginsPart(sb);
+		addLogPart(sb);
 		return PageCompletion.PAGE_DONE;
 	}
 	
@@ -202,7 +204,39 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		}
 		sb.append ("</table>\n<br>\n");
 	}
-
+	
+	private void addLogPart(StringBuilder sb) {
+		sb.append("<p><h2>Plugins loading log</h2></p>\n");
+		//sb.append("<table border=\"1\" style=\"max-width:100%;\">\n");
+		//sb.append("<tr>\n<td>\n");
+		sb.append("<div height=\"200px\" width=\"100%\" style=\"overflow:scroll; white-space:nowrap; border-style:solid;\">\n");
+		Scanner sc = new Scanner(pluginHandler.getLoadingLogText());
+		while (sc.hasNextLine())
+			sb.append(colorLogLine(sc.nextLine())+"<br>\n");
+		sb.append("</div>\n");
+		//sb.append("</td>\n</tr>\n</table>\n");
+	}
+	
+	private String colorLogLine(String lineText) {
+		//13:52:48,797 INFO   - Can not read variables file ...
+		String logLvl = lineText.substring(13, lineText.indexOf(' ', 13));
+		String style = "black";
+		if ("TRACE".equals(logLvl))
+			style = "yellow";
+		else if ("DEBUG".equals(logLvl))
+			style = "green";
+		else if ("INFO".equals(logLvl))
+			style = "blue";
+		else if ("WARN".equals(logLvl))
+			style = "red; font-weight:bold";
+		else if ("ERROR".equals(logLvl))
+			style = "purple; font-weight:bold";
+		else if ("FATAL".equals(logLvl))
+			style = "black; font-weight:bold";
+		lineText = lineText.replaceAll(" ", "&nbsp;");
+		lineText = "<code style=\"color:" + style + ";\">" + lineText + "</code>";
+		return lineText;
+	}
 	@Override
 	protected String getPageHeader() {
 		return "AdaptiveProxy status page";
