@@ -1,7 +1,7 @@
 package sk.fiit.peweproxy.headers;
 
 /**
- * Base interface for read-only HTTP response header.
+ * Representation of read-only HTTP response header.
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */

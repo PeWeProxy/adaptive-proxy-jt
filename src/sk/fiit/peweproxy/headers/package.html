@@ -1,0 +1,28 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains classes for representations of HTTP headers.
+
+<p>
+There are two types of representations of HTTP headers, representations of request HTTP
+header and HTTP response header. For each type, there are two representations providing
+different level of access to HTTP header data, read only access and full access.
+<p>
+{@link sk.fiit.peweproxy.headers.ReadableHeader} is a base for any HTTP header with read-only
+access. Instances of derived interfaces {@link sk.fiit.peweproxy.headers.RequestHeader}
+and {@link sk.fiit.peweproxy.headers.ResponseHeader}, that provide convenient methods for
+getting request/response specific information, are passed to plugins in situations
+when the plugins aren't expected / allowed to modify message data.
+<p>
+{@link sk.fiit.peweproxy.headers.WritableHeader} that extends
+{@link sk.fiit.peweproxy.headers.ReadableHeader} by providing additional methods for
+header fields modification is a base for any HTTP header with full access. It is extended
+by {@link sk.fiit.peweproxy.headers.WritableRequestHeader} and
+{@link sk.fiit.peweproxy.headers.WritableResponseHeader} that provide convenient methods for
+setting request/response specific information.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

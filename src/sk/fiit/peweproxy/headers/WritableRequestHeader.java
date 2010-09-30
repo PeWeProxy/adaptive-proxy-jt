@@ -1,7 +1,7 @@
 package sk.fiit.peweproxy.headers;
 
 /**
- * Base interface for modifiable HTTP request header.
+ * Representation of modifiable HTTP request header.
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
