@@ -1,0 +1,49 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains interfaces for pluggable Adaptive Proxy plugins.
+A plugin is an external (3rd party) component that adds some new functionality to the
+Adaptive Proxy platform. To be pluggable into the platform, a plugin bundle must expose
+a class that implements at least one <b>processing plugin</b> interface
+(see {@link sk.fiit.peweproxy.plugins.processing}), <b>service module</b> interface (see
+{@link sk.fiit.peweproxy.plugins.events}
+{@link sk.fiit.peweproxy.plugins.services}) or <b>event plugin</b> interface, by making it
+public and instatiable using public no-arg constructor.  
+<p>
+<b>Processing plugins</b> are plugins that decide what to do with a HTTP message. To
+achieve their goals, they can access the message body via using services that get the
+information and / or modifies the message for them. They are provided with services by
+HTTP message's service handle (see {@link sk.fiit.peweproxy.services.ServicesHandle}). 
+<p>
+<b>Modules</b> or service modules are plugins that provide implementation of particular
+services to other plugins. Their purpose is to know how to get or modify information
+from / of the message and perform such tasks when some other plugin requests it. 
+<p>
+Adaptive Proxy distinguishes two types of processing plugins and modules, those plugged
+into the process of handling of HTTP requests and those for HTTP responses handling.
+<p>
+<b>Event plugins</b> are plugins that are notified by the platform when particular event
+(e.g. connection close, failure or timeout) happens.
+<p>
+For the Adaptive Proxy platform, a plugin is a combination of plugin configuration file
+and a plugin bundle (plugin's binaries). Plugin configuration file contains path to the
+bundle and the name of exactly one class in the bundle that will be loaded and instantiated
+to become an active plugin entity. Plugin configuration file also specifies one or more
+types, that loaded plugin class can act as (i.e. request/response processing plugin,
+request/response module or events plugin), which of course requires the exposed class to
+implement appropriate interface. Plugin configuration file and plugin bundle are not tied
+together (other than configuration file contains path to the bundle), so there can multiple
+plugins loaded from the same bundle (binaries), each with its own plugin configuration file
+referencing same binaries (even same class within binaries).
+<p>
+This package contains common interfaces for all request
+(see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins
+(see {@link sk.fiit.peweproxy.plugins.ResponsePlugin}) that define the way a plugin is
+loaded, configured and started. For more details on plugin's life cycle, see
+{@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)}.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

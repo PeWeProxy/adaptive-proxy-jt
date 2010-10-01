@@ -1,0 +1,21 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains interfaces for pluggable event plugins.
+An event plugin is an external (3rd party) component that is notified by the
+platform when particular communication channel (proxy <-> client) related event
+(e.g. connection closing, failure or timeout) occurs. There are three types of event
+plugins. <b>Connection events plugins </b> (see
+{@link sk.fiit.peweproxy.plugins.events.ConnectionEventPlugin}) are notified of
+communication channel life cycle events, when a client connects to the proxy or when any
+side closes the connection. <b>Timeout events plugins</b> (see
+{@link sk.fiit.peweproxy.plugins.events.TimeoutEventPlugin}) are notified when a data
+transfer timeout occurs. <b>Failure events plugins </b> (see
+{@link sk.fiit.peweproxy.plugins.events.ConnectionEventPlugin}) are notified of data transfer
+failure events.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

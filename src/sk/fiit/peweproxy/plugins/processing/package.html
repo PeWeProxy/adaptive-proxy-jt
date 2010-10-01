@@ -1,0 +1,34 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains interfaces for pluggable processing plugins.
+A processing plugins is an external (3rd party) component that decides what to do with a
+HTTP message. It's purpose is to decide what information to gather from a message or what
+information should the message carry. It can directly read and modify HTTP header of the
+message being processed, but can access it's body (if any) only indirectly by requesting
+services present for that message (see {@link sk.fiit.peweproxy.services.ServicesHandle})
+and calling their methods.
+<p>
+Plugins made to be integrated into the handling process of HTTP requests provide classes
+implementing {@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin}
+interface. Plugins made to be integrated into the handling process of HTTP responses
+provide classes implementing
+{@link sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin} interface.
+<p>
+When a request / response HTTP message is handled by the Adaptive Proxy platform, a
+representation of the HTTP message is passed sequentially (configurable order) to all
+successfully loaded request / response processing plugins. Each processing plugin can read
+from the message or modify the message and decide what's the next step in the message
+handling process. Either it let the same message representation to be used in subsequent
+processing or it provides substitutive message. At the same time it decides whether the
+message should be passed for processing to the rest of the processing plugins, or it is
+a final message and should be sent right away. Request processing plugins can also
+provide responses (which quits request processing sequence) and decide whether they should
+be processed by loaded response processing plugins or are final and should be sent right
+away.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

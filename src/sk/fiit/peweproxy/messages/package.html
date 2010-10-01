@@ -1,0 +1,30 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains classes for representations of HTTP messages.
+A HTTP message is an entity that provides access to the actual message data. For direct
+HTTP header access it provides references to corresponding HTTP header representations
+(see {@link sk.fiit.peweproxy.headers}). Message body data, if a message carries one, can
+be accessed only via using services accessible through provided service handle
+(see {@link sk.fiit.peweproxy.services.ServicesHandle}).
+<p>
+There are two types of representations of HTTP messages, representations of request HTTP
+message and HTTP response message. For each type, there are two representations providing
+different level of access to HTTP message data, read only access and full access.
+<p>
+Every representation of a HTTP message provides access to two distinct HTTP header
+representations: one for original HTTP header received by proxy (from the client or
+web source) and one that will be sent by proxy server (to web source or the client).
+Access to the original HTTP header is always read-only.
+<p>
+For read-only representations of the HTTP messages,
+{@link sk.fiit.peweproxy.messages.HttpRequest} for request message and
+{@link sk.fiit.peweproxy.messages.HttpResponse} for response message, provided
+{@link sk.fiit.peweproxy.services.ServicesHandle} will serve
+only services (implementations of services) that do not modify message body data.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

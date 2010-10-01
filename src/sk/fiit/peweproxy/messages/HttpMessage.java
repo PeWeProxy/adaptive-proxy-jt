@@ -17,10 +17,10 @@ public interface HttpMessage {
 	ServicesHandle getServiceHandle();
 	
 	/**
-	 * Returns whether body data of this HTTP message are accessible. Returning <code>false
+	 * Returns whether body data of this HTTP message is accessible. Returning <code>false
 	 * </code> does not mean that this message does not carry any body data, just that the
 	 * proxy server has not body data prefetched.
-	 * @return
+	 * @return whether body data of this message is accessible
 	 */
 	boolean hasBody();
 	

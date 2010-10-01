@@ -20,8 +20,8 @@ messages passing through. The plugins extension enables other developers to plug
 additional functionality that modifies the data of HTTP messages by using functionality
 provided by other plugins pluged into the proxy.
 <p>
-The base concept in the plugins environment is the concept of a service. A service is
-a functionality over HTTP message data on some level of abstraction. To explain this,
+The base concept in the plugins environment is the <b>concept of a service</b>. A service
+is a functionality over HTTP message data on some level of abstraction. To explain this,
 let's consider we have a HTTP message that is valid HTML page showing results of search
 on your favorite web search portal. The service on the lowest level of abstraction is
 one providing access to the message data in the form of bytes. A service on the next
@@ -48,12 +48,15 @@ implementation of text service to parse page text into DOM model, which in turn 
 byte service to get raw message data to decode it into text.
 <p>
 Implementation of services know <i>how</i> to gather particular information from the
-message or <i>how</i> to modify the message to make it carry the information we want to. Other
-type of plugins, called <b>processing plugins</b>, are those deciding <i>what</i> we want
-to gather from the message or <i>what</i> we want a messages to carry. Using currently
+message or <i>how</i> to modify the message to make it carry the information we want to.
+Other type of plugins, called <b>processing plugins</b>, are those deciding <i>what</i> we
+want to gather from the message or <i>what</i> we want a messages to carry. Using currently
 accessible services (implementations) in the same way as modules do, these plugins
 perform particular task (via telling services what to get / change) on HTTP messages
 in order to provide enhanced browsing experience.
+<p>
+Last family of pluggins pluggable into the platform are <b>event plugins</b>. They are
+notified when any client's connection related event (e.g. faliure or timeout) occurs.
 <p>
 Adaptive Proxy is fully extensible. Declaring additional services and developing
 additional modules and processing plugins that process HTTP messages in some new way 

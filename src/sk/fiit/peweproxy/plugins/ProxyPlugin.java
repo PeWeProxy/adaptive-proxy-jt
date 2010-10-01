@@ -29,7 +29,7 @@ public interface ProxyPlugin {
 	 * environment (plugin's roles or dependencies, shared libraries, shared services
 	 * definitions) was changed since the plugin was loaded and started, and the plugin
 	 * signals that it supports reconfiguration in it's current state
-	 * (see {@link #supportsReconfigure()}).</p> 
+	 * (see {@link #supportsReconfigure(PluginProperties)}).</p> 
 	 * @param props configuration properties for this plugin
 	 * @return <code>true</code> if the configuration and start was successful,
 	 * <code>false</code> otherwise

@@ -49,7 +49,9 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 	
 	/**
 	 * Returns substitutive request message for which currently processed request should
-	 * be replaced.
+	 * be replaced. In case of signaling <code>FINAL_REQUEST</code> without need to
+	 * substitute current request message for new one, plugins are expected to return
+	 * <code>request</code> object.
 	 * @param request request message currently processed
 	 * @param messageFactory a HTTP message factory for new messages creation
 	 * @return substitutive request message for further processing
@@ -57,8 +59,7 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 	HttpRequest getNewRequest(ModifiableHttpRequest request, HttpMessageFactory messageFactory);
 	
 	/**
-	 * Returns created response message for further response
-	 * processing.
+	 * Returns created response message for further response processing.
 	 * @param request request message currently processed
 	 * @param messageFactory a HTTP message factory for new messages creation
 	 * @return created response message for further processing

@@ -42,7 +42,9 @@ public interface ResponseProcessingPlugin extends ResponsePlugin {
 	
 	/**
 	 * Returns substitutive response message for which currently processed response should
-	 * be replaced.
+	 * be replaced. In case of signaling <code>FINAL_RESPONSE</code> without need to
+	 * substitute current response message for new one, plugins are expected to return
+	 * <code>response</code> object.
 	 * @param response response message currently processed
 	 * @param messageFactory a HTTP message factory for new messages creation
 	 * @return substitutive response message for further processing

@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +31,6 @@ import rabbit.httpio.request.ContentSource;
 import rabbit.httpio.request.DirectContentSource;
 import rabbit.httpio.request.PrefetchedContentSource;
 import rabbit.io.BufferHandle;
-import rabbit.io.SimpleBufferHandle;
 import org.khelekore.rnio.impl.DefaultTaskIdentifier;
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
@@ -40,6 +38,8 @@ import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.SProperties;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.messages.HttpMessageFactoryImpl;
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
@@ -246,8 +246,14 @@ public class AdaptiveEngine  {
 				try {
 					RequestProcessingActions action = requestPlugin.processRequest(conHandle.request);
 					if (action == RequestProcessingActions.NEW_REQUEST || action == RequestProcessingActions.FINAL_REQUEST) {
-						conHandle.request = (ModifiableHttpRequestImpl)requestPlugin.getNewRequest(conHandle.request, conHandle.messageFactory);
-						conHandle.request.setAllowedThread();
+						HttpRequest newRequest = requestPlugin.getNewRequest(conHandle.request, conHandle.messageFactory);
+						if (newRequest == null)
+							log.warn("Null HttpRequest was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewRequest()," +
+										"substitution is being ignored.");
+						else {
+							conHandle.request = (ModifiableHttpRequestImpl) newRequest;
+							conHandle.request.setAllowedThread();
+						}
 						if (action == RequestProcessingActions.NEW_REQUEST) {
 							pluginsChangedResponse.add(requestPlugin);
 							again = true;
@@ -256,7 +262,12 @@ public class AdaptiveEngine  {
 					} else if (action == RequestProcessingActions.NEW_RESPONSE || action == RequestProcessingActions.FINAL_RESPONSE) {
 						if (action == RequestProcessingActions.FINAL_RESPONSE)
 							processResponse = false;
-						conHandle.response = (ModifiableHttpResponseImpl)requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
+						HttpResponse newResponse = requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
+						if (newResponse == null)
+							log.warn("Null HttpResponse was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewResponse()," +
+										"substitution is being ignored.");
+						else
+							conHandle.response = (ModifiableHttpResponseImpl) newResponse;
 						sendResponse = true;
 					}
 				} catch (Throwable t) {
@@ -400,8 +411,14 @@ public class AdaptiveEngine  {
 				try {
 					ResponseProcessingActions action = responsePlugin.processResponse(conHandle.response);
 					if (action == ResponseProcessingActions.NEW_RESPONSE || action == ResponseProcessingActions.FINAL_RESPONSE) {
-						conHandle.response = (ModifiableHttpResponseImpl)responsePlugin.getNewResponse(conHandle.response, conHandle.messageFactory);
-						conHandle.response.setAllowedThread();
+						HttpResponse newResponse = responsePlugin.getNewResponse(conHandle.response, conHandle.messageFactory);
+						if (newResponse == null)
+							log.warn("Null HttpResponse was provided by ResponseProcessingPlugin '"+responsePlugin+"' after calling getNewResponse()," +
+										"substitution is being ignored.");
+						else {
+							conHandle.response = (ModifiableHttpResponseImpl) newResponse;
+							conHandle.response.setAllowedThread();
+						}
 						if (action == ResponseProcessingActions.NEW_RESPONSE) {
 							pluginsChangedResponse.add(responsePlugin);
 							again = true;
