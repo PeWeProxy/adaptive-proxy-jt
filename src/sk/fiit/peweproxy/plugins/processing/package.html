@@ -18,15 +18,22 @@ provide classes implementing
 <p>
 When a request / response HTTP message is handled by the Adaptive Proxy platform, a
 representation of the HTTP message is passed sequentially (configurable order) to all
-successfully loaded request / response processing plugins. Each processing plugin can read
-from the message or modify the message and decide what's the next step in the message
-handling process. Either it let the same message representation to be used in subsequent
-processing or it provides substitutive message. At the same time it decides whether the
-message should be passed for processing to the rest of the processing plugins, or it is
-a final message and should be sent right away. Request processing plugins can also
-provide responses (which quits request processing sequence) and decide whether they should
-be processed by loaded response processing plugins or are final and should be sent right
-away.
+successfully loaded request / response processing plugins (see
+{@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin#processRequest(ModifiableHttpRequest)} and
+{@link sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin#processResponse(ModifiableHttpResponse)}).
+Each processing plugin can read from the message or modify the message and decide what's
+the next step in the message handling process. Either it let the same message representation
+to be used in subsequent processing or it provides substitutive message. At the same time
+it decides whether the message should be passed for processing to the rest of the processing
+plugins, or it is a final message and should be sent right away. Request processing plugins
+can also provide responses (which quits request processing sequence) and decide whether they
+should be processed by loaded response processing plugins or are final and should be sent
+right away. For detailed information on how a processing plugin signals platform how to
+continue in message process handling, see
+{@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin.RequestProcessingActions}
+for request processing plugins and
+{@link sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin.ResponseProcessingActions}
+for response processing plugins.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

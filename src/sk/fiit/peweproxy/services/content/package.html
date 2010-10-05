@@ -1,0 +1,38 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains specifications for base services over HTTP messages.
+There are 4 base services, specifications and implementations of which are part of
+the Adaptive Proxy platform itself. These services are present (when possible) to provide
+lowest level access to the HTTP message data for processing plugins and other services
+(modules).
+<p>
+All four services provide access to the message entity data that are properly
+"transfer-decoded" and "content-decoded" beforehand (see
+<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2">RFC 2616: 7.2
+Entity Body</a>).
+<p>
+{@link sk.fiit.peweproxy.services.content.ByteContentService} provides read only access
+to raw message entity data in form of bytes.
+{@link sk.fiit.peweproxy.services.content.ModifiableBytesService} provides full access to
+the same raw data as <code>ByteContentService</code>.
+{@link sk.fiit.peweproxy.services.content.StringContentService} provides read only access
+to the message entity data in form of properly decoded text string.
+{@link sk.fiit.peweproxy.services.content.ModifiableStringService} provides full access
+to the same entity data as <code>StringContentService</code>.
+Services providing read only access to the HTTP message data are provided in situations
+when plugins aren't expected / allowed to modify message data.
+<p>
+All four services will be provided by {@link sk.fiit.peweproxy.services.ServicesHandle}
+for particular HTTP message only when the message entity body data was prefetched by Adaptive
+Proxy platform. The platform prefetch entity body data when at least one plugin (processing
+plugin or module) requested one of these services (see
+{@link sk.fiit.peweproxy.plugins.RequestPlugin#desiredRequestServices(RequestHeader)} and
+{@link sk.fiit.peweproxy.plugins.ResponsePlugin#desiredResponseServices(ResponseHeader)}),
+and the actual HTTP message carries an entity.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

@@ -1,4 +1,15 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+	Plugin's configuration. XML files in plugins home directory (see proxy conf file)
+	conforming this schema represents single pluggable Adaptive Proxy plugin that will
+	be loaded (instantiated and configured) and treated as single plugin entity. Such
+	file reference single class exposed by plugin in form of relative path to the plugins
+	bundle (binaries) and name of the exposed class that is present within the bundle.
+	It can also reference all 3rd party libraries needed by the plugin and plugin's
+	working directory for which a plugin will obtain a java.io.File instance. File also
+	specifies types of the plugin, i.e. how the plugin will be integrated into the
+	process of handling HTTP messages, and can hold plugin's runtime configuration
+	parameters.
+-->
 <!ELEMENT plugin (name, classLocation?, className, workingDir?, libraries?, types, parameters?)>
 
 <!--
@@ -27,8 +38,9 @@
 <!ELEMENT className (#PCDATA)>
 
 <!--
-	Path to working directory of the plugin. If there's no such element, no working
-	directory will be set for the plugin. This path is relative to plugins home directory.
+	Path to working directory of the plugin. If there's no such element, plugins home
+	working directory will be set for the plugin. This path is relative to plugins home
+	directory.
 -->
 <!ELEMENT workingDir (#PCDATA)>
 

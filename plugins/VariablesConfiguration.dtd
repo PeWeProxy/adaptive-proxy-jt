@@ -1,8 +1,9 @@
-<?xml version="1.0" encoding="UTF-8" ?>
 <!ELEMENT variables (variable*)>
 
 <!--
-	Variables configuration. Subelements are in format
+	Variables configuration. Variables configured in a single XML file in plugins home
+	directory (see proxy conf file) conforming this	schema are global configuration
+	parameters accessible to all loaded plugins. Subelements are in format
 		<variable name="KEY">VALUE</variable>
 -->
 <!ELEMENT variable (#PCDATA)>

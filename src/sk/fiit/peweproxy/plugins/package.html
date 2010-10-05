@@ -26,22 +26,32 @@ into the process of handling of HTTP requests and those for HTTP responses handl
 <b>Event plugins</b> are plugins that are notified by the platform when particular event
 (e.g. connection close, failure or timeout) happens.
 <p>
-For the Adaptive Proxy platform, a plugin is a combination of plugin configuration file
-and a plugin bundle (plugin's binaries). Plugin configuration file contains path to the
-bundle and the name of exactly one class in the bundle that will be loaded and instantiated
-to become an active plugin entity. Plugin configuration file also specifies one or more
-types, that loaded plugin class can act as (i.e. request/response processing plugin,
-request/response module or events plugin), which of course requires the exposed class to
-implement appropriate interface. Plugin configuration file and plugin bundle are not tied
-together (other than configuration file contains path to the bundle), so there can multiple
-plugins loaded from the same bundle (binaries), each with its own plugin configuration file
-referencing same binaries (even same class within binaries).
+For the Adaptive Proxy platform, a plugin is a combination of <b>plugin's configuration
+file</b> (XML file) in plugins home directory and a plugin bundle (plugin's binaries).
+Plugin configuration file contains path to the bundle and the name of exactly one class 
+in the bundle that will be loaded and instantiated to become an active plugin entity.
+Plugin configuration file also specifies one or more types, that loaded plugin class can
+act as (i.e. request/response processing plugin, request/response module or events plugin),
+which of course requires the exposed class to implement appropriate interface. Plugin
+configuration file and plugin bundle are not tied together (other than configuration file
+contains path to the bundle), so there can multiple plugins loaded from the same bundle
+(binaries), each with its own plugin configuration file referencing same binaries (even
+same class within binaries). For more information on creating valid plugin configuration
+file, see
+<a href="../../../../PluginConfiguration.dtd">PluginConfiguration.dtd</a>
+<p>
+Besides plugin's own runtime configuration parameters defined in plugin's configuration
+file, all plugins can access global configuration parameters called <b>variables</b>,
+defined in single variables file "variables.xml" in the plugins home directory. For more
+information on creating valid variables file, see
+<a href="../../../../PluginConfiguration.dtd">VariablesConfiguration.dtd</a>
 <p>
 This package contains common interfaces for all request
 (see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins
 (see {@link sk.fiit.peweproxy.plugins.ResponsePlugin}) that define the way a plugin is
-loaded, configured and started. For more details on plugin's life cycle, see
-{@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)}.
+loaded, configured and started. For more details on plugin's life cycle, see methods of
+{@link sk.fiit.peweproxy.plugins.ProxyPlugin}, namely
+{@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)} method.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

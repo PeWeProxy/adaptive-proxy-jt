@@ -1,47 +1,43 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project default="javadoc">
-    <target name="javadoc">
+	<property name="dest_dir" value="doc"/>
+	<property name="tmp_dir" value="api_tmp"/>
+	
+	<target name="-extract_api">
+		<copy todir="${tmp_dir}/sk/fiit/peweproxy" overwrite="true">
+			<fileset dir="src/sk/fiit/peweproxy/"
+        		excludes="**/HeaderWrapper.java,**/EventsHandler.java,
+        			**/BaseServiceProvider.java,**/PluginHandler.java,
+        			**/ModulesManager.java,**/ServicesHandleBase.java,
+        		    **/AdaptiveEngine.java,**/RequestContentCahcedListener.java">
+        		<exclude name="**/*Impl.java"/>
+        		<exclude name="/utils/**"/>
+        	</fileset>
+		</copy>
+	</target>
+    <target name="javadoc" depends="-extract_api" description="Generates JavaDoc for AdaptiveProxy API classes">
         <javadoc access="package" author="true"
         	classpath="libs/log4j-zeroconf.jar;libs/antlr-3.2.jar;libs/rnio-1.jar;
         		libs/jargs.jar;libs/log4j-1.2.15.jar;libs/cpdetector_1.0.7.jar;
         		libs/commons-lang-2.5.jar;D:\Eclipse\eclipse\plugins\org.aspectj.runtime_1.6.9.20100629172100\aspectjrt.jar;
         		libs/chardet.jar;libs/dnsjava-2.0.7.jar"
-        	destdir="doc"
+        	destdir="${dest_dir}"
         	doctitle="Adaptive Proxy" nodeprecated="false" nodeprecatedlist="false"
         	noindex="false" nonavbar="false" notree="false"
-        	overview="D:\Eclipse\Workspace\Adaptive Proxy v4.7\src\sk\fiit\peweproxy\overview.html"
+        	overview="${tmp_dir}\sk\fiit\peweproxy\overview.html" source="1.6"
+        	splitindex="true" use="true" version="true"
+        	sourcepath="${tmp_dir}"
         	packagenames="sk.fiit.peweproxy.headers,
-        				sk.fiit.peweproxy.messages,
-        				sk.fiit.peweproxy.plugins,
-        				sk.fiit.peweproxy.plugins.events,
-        				sk.fiit.peweproxy.plugins.processing,
-        				sk.fiit.peweproxy.plugins.services,
-        				sk.fiit.peweproxy.services,
-        				sk.fiit.peweproxy.services.content"
-    		source="1.6"
-        	sourcefiles="src/sk/fiit/peweproxy/headers/ResponseHeader.java,
-        				src/sk/fiit/peweproxy/headers/WritableHeader.java,
-			        	src/sk/fiit/peweproxy/headers/RequestHeader.java,
-			        	src/sk/fiit/peweproxy/headers/WritableResponseHeader.java,
-			        	src/sk/fiit/peweproxy/services/ProxyService.java,
-			        	src/sk/fiit/peweproxy/messages/HttpResponse.java,
-			        	src/sk/fiit/peweproxy/plugins/events/TimeoutEventPlugin.java,
-			        	src/sk/fiit/peweproxy/messages/ModifiableHttpRequest.java,
-			        	src/sk/fiit/peweproxy/messages/ModifiableHttpResponse.java,
-			        	src/sk/fiit/peweproxy/messages/HttpMessage.java,
-			        	src/sk/fiit/peweproxy/plugins/events/FailureEventPlugin.java,
-			        	src/sk/fiit/peweproxy/plugins/PluginProperties.java,
-			        	src/sk/fiit/peweproxy/plugins/ProxyPlugin.java,
-			        	src/sk/fiit/peweproxy/plugins/PluginConfigurationException.java,
-			        	src/sk/fiit/peweproxy/plugins/events/ConnectionEventPlugin.java,
-			        	src/sk/fiit/peweproxy/headers/WritableRequestHeader.java,
-			        	src/sk/fiit/peweproxy/services/ServiceUnavailableException.java,
-			        	src/sk/fiit/peweproxy/headers/ReadableHeader.java,
-			        	src/sk/fiit/peweproxy/messages/HttpMessageFactory.java,
-			        	src/sk/fiit/peweproxy/plugins/ResponsePlugin.java,
-			        	src/sk/fiit/peweproxy/messages/HttpRequest.java,
-			        	src/sk/fiit/peweproxy/plugins/RequestPlugin.java,
-			        	src/sk/fiit/peweproxy/services/ServicesHandle.java"
-        	sourcepath="src" splitindex="true" use="true" version="true"/>
+        		sk.fiit.peweproxy.messages,
+        	    sk.fiit.peweproxy.plugins,
+        	    sk.fiit.peweproxy.plugins.events,
+        	    sk.fiit.peweproxy.plugins.processing,
+        	    sk.fiit.peweproxy.plugins.services,
+        	    sk.fiit.peweproxy.services,
+        	    sk.fiit.peweproxy.services.content"/>
+    	<copy todir="${dest_dir}" overwrite="true">
+    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/> 
+    	</copy>
+    	<delete dir="${tmp_dir}"/>
     </target>
 </project>
