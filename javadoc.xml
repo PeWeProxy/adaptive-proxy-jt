@@ -16,15 +16,16 @@
 		</copy>
 	</target>
     <target name="javadoc" depends="-extract_api" description="Generates JavaDoc for AdaptiveProxy API classes">
+    	<delete dir="${dest_dir}"/>
         <javadoc access="package" author="true"
         	classpath="libs/log4j-zeroconf.jar;libs/antlr-3.2.jar;libs/rnio-1.jar;
         		libs/jargs.jar;libs/log4j-1.2.15.jar;libs/cpdetector_1.0.7.jar;
-        		libs/commons-lang-2.5.jar;D:\Eclipse\eclipse\plugins\org.aspectj.runtime_1.6.9.20100629172100\aspectjrt.jar;
+        		libs/commons-lang-2.5.jar;libs/aspectjrt.jar;
         		libs/chardet.jar;libs/dnsjava-2.0.7.jar"
         	destdir="${dest_dir}"
         	doctitle="Adaptive Proxy" nodeprecated="false" nodeprecatedlist="false"
         	noindex="false" nonavbar="false" notree="false"
-        	overview="${tmp_dir}\sk\fiit\peweproxy\overview.html" source="1.6"
+        	overview="${tmp_dir}/sk/fiit/peweproxy/overview.html" source="1.6"
         	splitindex="true" use="true" version="true"
         	sourcepath="${tmp_dir}"
         	packagenames="sk.fiit.peweproxy.headers,
@@ -35,8 +36,8 @@
         	    sk.fiit.peweproxy.plugins.services,
         	    sk.fiit.peweproxy.services,
         	    sk.fiit.peweproxy.services.content"/>
-    	<copy todir="${dest_dir}" overwrite="true">
-    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/> 
+    	<copy todir="${dest_dir}/custom" overwrite="true">
+    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd,plugins_ordering"/> 
     	</copy>
     	<delete dir="${tmp_dir}"/>
     </target>
