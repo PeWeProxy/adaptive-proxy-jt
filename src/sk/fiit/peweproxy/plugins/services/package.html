@@ -1,0 +1,105 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains interfaces for pluggable services modules.
+A service module is an external (3rd party) component that provides a service, therefore
+knows how to work with HTTP message. It's purpose is to provide implementation(s) of 
+particular service(s) that know how to gather particular information from a message or
+how to modify a message to carry the information other plugin (processing plugin or
+another module) wants to. These implementations can directly read and modify HTTP header
+of the message being processed, but can access it's body (if any) only indirectly by
+requesting other services present for that message (see
+{@link sk.fiit.peweproxy.services.ServicesHandle}) and calling their methods.
+<p>
+Modules made to provide services over HTTP requests expose classes implementing
+{@link sk.fiit.peweproxy.plugins.services.RequestServiceModule}
+interface. Modules made to provide services over HTTP responses expose classes
+implementing {@link sk.fiit.peweproxy.plugins.services.ResponseServiceModule} interface.
+<p>
+When a request / response HTTP message is processed by the Adaptive Proxy platform, a
+representation of the HTTP message is passed sequentially to all successfully loaded
+request / response processing plugins. To read or modify processed message, these plugins
+need to use services available over that message obtained from message's
+{@link sk.fiit.peweproxy.services.ServicesHandle}.
+<p>
+<b>Service discovery</b><br>
+The mechanism of discovering what services (provided by modules) are available over
+particular message is as follows:
+<p>
+<i>Message body caching</i><br>
+When a HTTP header for incoming request / response message is received (before any
+message body data is read), Adaptive Proxy platform requests every request / response
+processing plugin to return a list of services (their definitions, i.e. interfaces of
+those services) it would like to be able to use later in the processing phase. If it
+finds one of the 4 base content services (see {@link sk.fiit.peweproxy.services.content})
+in the list, message body data will be cached and basic content services will be
+available in the processing phase (text services availability depends on "Content-Type"
+HTTP header, see proxy conf file, <code>stringServicesPattern</code> variable in <code>
+AdaptiveEngine</code> section). If these base services are not find in the list, platform
+then checks whether these services aren't "desired indirectly". This is when a plugin, in
+order to do what it is made for, wants to be able to use some other service (other than
+one of the 4 base services), which could be provided by plugged-in module if it could use
+one of the 4 base services, even "indirectly". If one of the 4 base content services is
+"desired indirectly", message body data will be cached and basic content services will
+be available in the processing phase (again, condition for text services).
+<p>
+<i>Service implementation providing</i><br>
+Modules provide services implementation by returning so called <i>service provider</i>
+when asked to by passing service definition interface. Service provider in turn provides
+service implementation that is an instance that implements service definition interface
+and that will be returned to other plugins when they ask for that service. Having service
+provider as a wrapper for a service implementation, and not only the implementation
+directly, is needed to isolate service usage from introducing changes made by the service
+implementation into the actual message data.
+<p>
+Since it's ineffective to write changes caused by using service to the message data
+every single time any method of a service is called, service implementations are expected
+to operate on their own inner model of a message, that is written to the message data
+later when needed. Adaptive Proxy platform itself keeps watching when it's time to do
+that. When its the right time, it is the service provider who introduce changes made in
+the inner model of its service implementation to the actual message data. For more
+information on requesting service providers and signaling service providers to introduce
+changes to the actual message data, see
+{@link sk.fiit.peweproxy.plugins.services.ServiceProvider} and it's subclasses.
+<p>
+<i>Discovering available services</i><br>
+Adaptive Proxy platform keeps list of zero or many references to created and provided
+service implementations inner models of which are considered up to date. If this list is
+not empty, it either holds one or more service implementations inner models of which
+are exact transformations of actual message data, or it holds single service
+implementation inner model of which was modified so it is not exact transformation of
+current message data it was built from.
+<p>
+Every time a plugin tries to access the message in a way that would make returned
+information inaccurate, the modified inner model of some service implementation, if there
+is such in the list, is written back to the actual message data, and the list is cleared.
+This is when plugin tries to read or write HTTP header or use some service implementation
+other than only one with up to date inner mode (if there is one).
+<p>
+Only when an implementation of requested service or service being used is not in the
+list (was not created and considered with up to date inner model), modules that are able
+to provide that service are requested one by one to return service provider providing
+implementation of that service. This is the situation when read only representation of a
+HTTP message is passed to modules and they are not expected / allowed to modify it in any
+way. First time any module return non <code>null</code> service provider, its service
+implementation is added to the list of implementations with up to date inner model.
+Providing a service implementation itself can be a process that ends with service
+implementation inner model of which is not exact transformation of the actual message
+data it was built from. In such cases, service provider is expected to signal this (see
+{@link sk.fiit.peweproxy.plugins.services.ServiceProvider#initChangedModel()}).
+<p>
+Platform also differentiates two types of methods of the services based on what type of
+access to the inner model of the service implementation (thus message itself) do they
+provide - read only methods and modifying methods. To distinguish whether a method is
+read only or not, special annotation
+{@link sk.fiit.peweproxy.services.ProxyService.readonly} is used. If a method in a service
+definition (service interface) or a service implementation (provided by service provider)
+is annotated with this <code>readonly</code> flag, platform will not clear list of
+up to date service implementations, since it consider method to only read inner model of
+the service implementation without modifying it in any way.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

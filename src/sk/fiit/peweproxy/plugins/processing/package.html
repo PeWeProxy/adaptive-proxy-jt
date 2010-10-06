@@ -10,13 +10,13 @@ message being processed, but can access it's body (if any) only indirectly by re
 services present for that message (see {@link sk.fiit.peweproxy.services.ServicesHandle})
 and calling their methods.
 <p>
-Plugins made to be integrated into the handling process of HTTP requests provide classes
+Plugins made to be integrated into the handling process of HTTP requests expose classes
 implementing {@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin}
 interface. Plugins made to be integrated into the handling process of HTTP responses
-provide classes implementing
+expose classes implementing
 {@link sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin} interface.
 <p>
-When a request / response HTTP message is handled by the Adaptive Proxy platform, a
+When a request / response HTTP message is processed by the Adaptive Proxy platform, a
 representation of the HTTP message is passed sequentially (configurable order) to all
 successfully loaded request / response processing plugins (see
 {@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin#processRequest(ModifiableHttpRequest)} and

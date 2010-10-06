@@ -46,12 +46,20 @@ defined in single variables file "variables.xml" in the plugins home directory. 
 information on creating valid variables file, see
 <a href="../../../../custom/VariablesConfiguration.dtd">Variables configuration schema</a>
 <p>
-This package contains common interfaces for all request
-(see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins
-(see {@link sk.fiit.peweproxy.plugins.ResponsePlugin}) that define the way a plugin is
-loaded, configured and started. For more details on plugin's life cycle, see methods of
-{@link sk.fiit.peweproxy.plugins.ProxyPlugin}, namely
-{@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)} method.
+This package contains common interafce for all plugins (see
+{@link sk.fiit.peweproxy.plugins.ProxyPlugin}) that define the way a plugin is loaded,
+configured and started. For more details on plugin's life cycle, see methods of
+this class, namely {@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)}
+method.
+<p>
+Besides this base plugin interface, this package also contains common interfaces for all
+request (see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins
+(see {@link sk.fiit.peweproxy.plugins.ResponsePlugin}), that define the way a request
+/ response plugins are asked for services they want to be available over the HTTP message
+in the processing phase. This querying is done by Adaptive Proxy platform after the HTTP
+header of any message is received (before message body is received and message is
+processed by plugins) to decide, whether to prefetch message body, which introduce
+expensive operations into the message handling process.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
