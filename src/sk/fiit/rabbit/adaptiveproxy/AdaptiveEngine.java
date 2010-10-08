@@ -17,12 +17,12 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 import org.apache.log4j.xml.DOMConfigurator;
 import rabbit.handler.AdaptiveHandler;
-import rabbit.handler.BaseHandler;
 import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.request.ClientResourceHandler;
@@ -61,7 +61,7 @@ public class AdaptiveEngine  {
 	private static final File homeDir = new File(System.getProperty("user.dir"));
 	private static final String ORDERING_REQUEST_TEXT = "[request]";
 	private static final String ORDERING_RESPONSE_TEXT = "[response]";
-	private static final String DE_PATTERN_TEXTMSGS = "^text/.*|^application/xhtml(\\+xml)?.*";
+	private static final String DEF_PATTERN_TEXTMSGS = "^text/.*|^application/xhtml(\\+xml)?.*";
 	
 	/*private static AdaptiveEngine instance;
 	
@@ -507,10 +507,12 @@ public class AdaptiveEngine  {
 			if (loggingLvL == null)
 				loggingLvL = System.getProperty("sk.fiit.adaptiveproxy.logging_level", "INFO").trim();
 			Level lvl = Level.toLevel(loggingLvL);
-			Logger.getRootLogger().setLevel(lvl);
+			Logger root = Logger.getRootLogger();
+			root.setLevel(lvl);
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
 			log.setLevel(lvl);
-			BasicConfigurator.configure();
+		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%22t] %-5p %-15c{1} %x - %m%n")));
+			//BasicConfigurator.configure();
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
 		String pluginsHomeProp = prop.getProperty("pluginsHome");
@@ -531,13 +533,13 @@ public class AdaptiveEngine  {
 			excludeFiles.add(pluginsOrderFileName);
 			pluginHandler.setPluginRepository(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles);
 		}
-		String patternString = prop.getProperty("stringServicesPattern", DE_PATTERN_TEXTMSGS);
+		String patternString = prop.getProperty("stringServicesPattern", DEF_PATTERN_TEXTMSGS);
 		Pattern pattern = null;
 		try {
 			pattern = Pattern.compile(patternString);
 		} catch (PatternSyntaxException e) {
 			log.info("Invalid or no pattern for string content services, default one will be used", e);
-			pattern = Pattern.compile(DE_PATTERN_TEXTMSGS);
+			pattern = Pattern.compile(DEF_PATTERN_TEXTMSGS);
 		}
 		ServicesHandleBase.setStringServicesPattern(pattern);
 		reloadPlugins();
