@@ -2,6 +2,7 @@ package sk.fiit.peweproxy.services;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -50,14 +51,18 @@ public class ModulesManager {
 		initPlugins(RequestServiceModule.class, rqModules, providedRqServices, new ProvidedServicesGetter<RequestServiceModule>() {
 			@Override
 			public Set<Class<? extends ProxyService>> getProvidedServices(RequestServiceModule module) {
-				return module.getProvidedRequestServices();
+				Set<Class<? extends ProxyService>> providedServices = new HashSet<Class<? extends ProxyService>>();
+				module.getProvidedRequestServices(providedServices);
+				return providedServices;
 			}
 		});
 		log.info("Loading response service modules");
 		initPlugins(ResponseServiceModule.class, rpModules, providedRpServices, new ProvidedServicesGetter<ResponseServiceModule>() {
 			@Override
 			public Set<Class<? extends ProxyService>> getProvidedServices(ResponseServiceModule module) {
-				return module.getProvidedResponseServices();
+				Set<Class<? extends ProxyService>> providedServices = new HashSet<Class<? extends ProxyService>>();
+				module.getProvidedResponseServices(providedServices);
+				return providedServices;
 			}
 		});
 	}

@@ -57,7 +57,7 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	
 	@Override
 	public ModifiableHttpResponseImpl clone() {
-		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(getServiceHandle().getManager()
+		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(getServicesHandle().getManager()
 				, webRPHeaders, proxyRPHeaders.clone(),  request);
 		if (data != null)
 			retVal.data = Arrays.copyOf(data, data.length);

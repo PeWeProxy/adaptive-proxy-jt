@@ -10,11 +10,11 @@ import sk.fiit.peweproxy.services.ServicesHandle;
 public interface HttpMessage {
 	
 	/**
-	 * Returns service handle which provides implementations of services over this HTTP
+	 * Returns services handle which provides implementations of services over this HTTP
 	 * message.
-	 * @return service handle for this HTTP message
+	 * @return services handle for this HTTP message
 	 */
-	ServicesHandle getServiceHandle();
+	ServicesHandle getServicesHandle();
 	
 	/**
 	 * Returns whether body data of this HTTP message is accessible. Returning <code>false

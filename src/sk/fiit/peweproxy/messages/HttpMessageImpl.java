@@ -28,7 +28,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	}
 	
 	@Override
-	public HandleType getServiceHandle() {
+	public HandleType getServicesHandle() {
 		return serviceHandle;
 	}
 	

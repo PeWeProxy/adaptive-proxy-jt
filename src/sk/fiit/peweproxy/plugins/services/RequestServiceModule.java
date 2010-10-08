@@ -19,11 +19,14 @@ import sk.fiit.peweproxy.services.ServiceUnavailableException;
  */
 public interface RequestServiceModule extends ServiceModule, RequestPlugin {
 	/**
-	 * Returns set of service classes which this request service module is able to provide
-	 * implementation for, depending on particular request messages context. 
-	 * @return set of service classes this request service module provides implementation for
+	 * Called by platform to get services (their classes) which this request service module is
+	 * able to provide implementation for, depending on particular request messages context. For
+	 * convenience, an empty set is passed so that a module only needs to fill it with services
+	 * (their interfaces) it provides.
+	 * @param providedServices set to be filled with classes of services this request service
+	 * module provides implementation for
 	 */
-	Set<Class<? extends ProxyService>> getProvidedRequestServices();
+	void getProvidedRequestServices(Set<Class<? extends ProxyService>> providedServices);
 	
 	/**
 	 * Returns request service provider that provide implementation of requested service

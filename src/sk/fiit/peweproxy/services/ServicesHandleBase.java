@@ -7,8 +7,8 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
@@ -52,15 +52,15 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		@Override
 		public boolean start(PluginProperties props) {return true;}
 		@Override
-		public Set<Class<? extends ProxyService>> getProvidedRequestServices() {return null;}
+		public void getProvidedRequestServices(Set<Class<? extends ProxyService>> providedServices) {}
 		@Override
-		public Set<Class<? extends ProxyService>> getProvidedResponseServices() {return null;}
+		public void getProvidedResponseServices(Set<Class<? extends ProxyService>> providedServices) {}
 		@Override
-		public Set<Class<? extends ProxyService>> desiredRequestServices(
-				RequestHeader clientRQHeaders) {return null;}
+		public void desiredRequestServices(Set<Class<? extends ProxyService>> desiredServices,
+				RequestHeader clientRQHeaders) {}
 		@Override
-		public Set<Class<? extends ProxyService>> desiredResponseServices(
-				ResponseHeader webRPHeaders) {return null;}
+		public void desiredResponseServices(Set<Class<? extends ProxyService>> desiredServices,
+				ResponseHeader webRPHeaders) {}
 		@Override
 		public <Service extends ProxyService> RequestServiceProvider<Service> provideRequestService(
 				HttpRequest request, Class<Service> serviceClass)
@@ -81,6 +81,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	private final List<ServiceBinding<?>> actualServicesBindings;
 	private ServiceBinding<?> changedModelBinding;
 	private ServiceBinding<?> bindingDoingChanges;
+	private ModuleType moduleExecutingProvide;
 	
 	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		this.httpMessage = httpMessage;
@@ -99,15 +100,13 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
 			ModuleType module = iterator.previous();
 			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
-				Set<Class<? extends ProxyService>> plgDesiredSvcs = null;
+				Set<Class<? extends ProxyService>> plgDesiredSvcs = new HashSet<Class<? extends ProxyService>>();
 				try {
-					plgDesiredSvcs = discoverDesiredServices(module);
+					discoverDesiredServices(module,plgDesiredSvcs);
 				} catch (Throwable t) {
 					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "
 								+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
 				}
-				if (plgDesiredSvcs == null)
-					plgDesiredSvcs = Collections.emptySet();
 				desiredServices.addAll(plgDesiredSvcs);
 				if (contentNeeded(desiredServices)) {
 					if (log.isDebugEnabled())
@@ -137,7 +136,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	
 	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
 	
-	abstract Set<Class<? extends ProxyService>> discoverDesiredServices(ModuleType plugin);
+	abstract void discoverDesiredServices(ModuleType plugin,
+			Set<Class<? extends ProxyService>> desiredServices);
 	
 	protected enum LogText {NORMAL,CAPITAL,SHORT};
 	
@@ -398,6 +398,12 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	public void headerBeingModified() {
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"An attempt to modify message header");
+		if (inReadOnlyState()) {
+			UnsupportedOperationException e =  new UnsupportedOperationException("Modifying message header is not allowed when" +
+					" discovering services");
+			log.info("Attempt to modify message header when discovering services",e);
+			throw e;
+		}
 		ServiceBinding<?> binding = getExecutingBinding();
 		if (binding != bindingDoingChanges)
 			throw new UnsupportedOperationException("Service module is not allowed to modify header outside doChanges() method");
@@ -433,10 +439,24 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		return svc;
 	}
 	
+	private void providingDiscoveryStart(ModuleType module) {
+		if (moduleExecutingProvide == null)
+			moduleExecutingProvide = module; //go to read-only state
+	}
+	
+	private void providingDiscoveryEnd(ModuleType module) {
+		if (module == moduleExecutingProvide)
+			moduleExecutingProvide = null; //cancel read-only state
+	}
+	
+	public boolean inReadOnlyState() {
+		return moduleExecutingProvide != null;
+	}
 	
 	private <Service extends ProxyService> ServiceRealization<Service> getRealService(ModuleType module, Class<Service> serviceClass)
 			throws ServiceUnavailableException {
 		ServiceProvider<Service> svcProvider = null;
+		providingDiscoveryStart(module);
 		try {
 			svcProvider = callProvideService(module, serviceClass);
 		} catch (Throwable e) {
@@ -446,6 +466,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				log.info(getLogTextHead()+"Module "+module+" raised throwable when asked for provider for service "+serviceClass,e);
 				throw new ServiceUnavailableException(serviceClass, "Module failed at providing service provider", e);
 			}
+		} finally {
+			providingDiscoveryEnd(module);
 		}
 		if (svcProvider == null)
 			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
@@ -481,6 +503,14 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> ServiceRealization<Service> getNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
+		if ((svcInfo.serviceClass == ModifiableStringService.class
+				|| svcInfo.serviceClass == ModifiableBytesService.class) && inReadOnlyState()) {
+			ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
+					"unavilable when discovering services", null);
+			log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
+					+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
+			throw e;
+		}
 		boolean skip = (svcInfo.ignoredModule != null);
 		// try to use already initialized service
 		for (ServiceBinding<?> existingBinding : actualServicesBindings) {

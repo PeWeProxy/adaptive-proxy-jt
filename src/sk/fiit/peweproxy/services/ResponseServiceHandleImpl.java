@@ -18,8 +18,9 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Modifiab
 	}
 	
 	@Override
-	Set<Class<? extends ProxyService>> discoverDesiredServices(ResponseServiceModule plugin) {
-		return plugin.desiredResponseServices(httpMessage.getWebResponseHeader());
+	void discoverDesiredServices(ResponseServiceModule plugin,
+			Set<Class<? extends ProxyService>> desiredServices) {
+		plugin.desiredResponseServices(desiredServices,httpMessage.getWebResponseHeader());
 	}
 	
 	@Override
