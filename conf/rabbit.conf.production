@@ -82,7 +82,7 @@ logging_level=ALL
 
 # Regexp matching mime types of messages (Content-Type header) for which String services
 # (StringContentService, ModifiableStringService) should be served. When no value is set,
-# default pattern ^text/.*|^application/xhtml(\\+xml)?.* is used.
+# default pattern ^text/.*|^application/xhtml(\+xml)?.* is used.
 stringServicesPattern=^text/html.*|^application/xhtml(\+xml)?.*
 
 [logging]
