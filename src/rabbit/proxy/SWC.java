@@ -210,7 +210,11 @@ public class SWC implements HttpHeaderSentListener,
 	    readResponse ();
 	} else {
 	    String responseVersion = rh.getWebHeader ().getResponseHTTPVersion ();
+	    String age = rh.getWebHeader ().getHeader ("Age");
 	    setAge (rh);
+	    String newAge = rh.getWebHeader ().getHeader ("Age");
+	    if (age != null || newAge != null)
+	    	rh.getWebHeader().setHeader("AgeORIG", age);
 	    WarningsHandler wh = new WarningsHandler ();
 	    wh.removeWarnings (rh.getWebHeader (), false);
 	    HttpHeader webHeader = rh.getWebHeader ();
@@ -248,6 +252,7 @@ public class SWC implements HttpHeaderSentListener,
      */
     private void setAge (RequestHandler rh) {
 	long now = System.currentTimeMillis ();
+	Date nowDate = new Date(now);
 	String age = rh.getWebHeader ().getHeader ("Age");
 	String date = rh.getWebHeader ().getHeader ("Date");
 	Date dd = HttpDateParser.getDate (date);
@@ -262,7 +267,7 @@ public class SWC implements HttpHeaderSentListener,
 	    // correct_age is found in spec, but is not actually used
 	    //long correct_age = lage + dt;
 	    long correct_recieved_age = Math.max (dt, lage);
-	    long corrected_initial_age = correct_recieved_age + dt;
+	    long corrected_initial_age = correct_recieved_age + (now - con.getRequestTime());
 	    if (corrected_initial_age > 0) {
 		rh.getWebHeader ().setHeader ("Age",
 					      "" + corrected_initial_age);

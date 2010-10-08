@@ -141,6 +141,8 @@ public class SCC {
 	    }
 	}
 	rh.getWebHeader ().setHeader ("Age", "" + secs);
+	if (secs > 60 * 60 * 24) 
+	    header.setHeader ("Warning", "113 RabbIT \"Heuristic expiration\"");
     }
 
     private List<Range> getRanges (HttpHeader header) {

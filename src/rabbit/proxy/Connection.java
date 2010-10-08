@@ -102,6 +102,8 @@ public class Connection {
     private TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
+
+	private long requestTime = 0;
     
     public Connection (ConnectionId id,	SocketChannel channel,
 		       HttpProxy proxy, BufferHandler bufHandler) {
@@ -200,6 +202,7 @@ public class Connection {
 	}
 	status = "Request read, processing";
 	this.clientRequest= request;
+	requestTime  = System.currentTimeMillis();
 	proxyRequest = request.clone();
 	this.requestHandle = bh;
 	requestVersion = request.getHTTPVersion ();
@@ -247,7 +250,11 @@ public class Connection {
 	}
     }
 
-    private boolean hasRegularContent (HttpHeader request, String ct,
+    public long getRequestTime() {
+		return requestTime;
+	}
+
+	private boolean hasRegularContent (HttpHeader request, String ct,
 				       long dataSize) {
 	if (request.getContent () != null)
 	    return true;

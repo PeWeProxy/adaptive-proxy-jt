@@ -425,18 +425,6 @@ public class HttpBaseFilter implements HttpFilter {
 	    useCache = false;
 	}
 
-	String age = header.getHeader ("Age");
-	long secs = 0;
-	if (age == null)
-	    age = "0";
-	try {
-	    secs = Long.parseLong (age);
-	} catch (NumberFormatException e) {
-	    // ignore, we already have a warning for this..
-	}
-	if (secs > 60 * 60 * 24) 
-	    header.setHeader ("Warning", "113 RabbIT \"Heuristic expiration\"");
-	
 	header.setResponseHTTPVersion ("HTTP/1.1");
 	con.setMayCache (useCache);
 
