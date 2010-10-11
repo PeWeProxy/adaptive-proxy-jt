@@ -203,7 +203,7 @@ public class FilterHandler extends GZipHandler {
     }
     
     // added by Redeemer ************
-    private boolean dataRequested = false;
+    protected boolean dataRequested = false;
     
     @Override
     protected void requestMoreData() {

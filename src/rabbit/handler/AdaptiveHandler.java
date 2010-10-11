@@ -24,7 +24,6 @@ public class AdaptiveHandler extends FilterHandler {
 	private InMemBytesStore memStore = null;
 	private ByteBuffer buffer = null;
 	private Queue<Integer> increments = null;
-	private boolean ignoreDataRequest = false;
 	private boolean askForCaching = true;
 	private boolean doHTMLparsing = false;
 	
@@ -99,9 +98,7 @@ public class AdaptiveHandler extends FilterHandler {
 			}
 		} else {
 			memStore.writeArray(arr, off, len);
-			ignoreDataRequest = false;
 			blockSent();
-			ignoreDataRequest = true;
 		}
 	}
 
@@ -158,7 +155,6 @@ public class AdaptiveHandler extends FilterHandler {
 		gzu = null;
 		memStore = null;
 		sendingPhase = true;
-		ignoreDataRequest = false;
 		setHTMLparsing();
 		sendHeader();
 	}
@@ -174,12 +170,11 @@ public class AdaptiveHandler extends FilterHandler {
 	@Override
 	protected void waitForData() {
 		if (notCaching || !sendingPhase) {
-			if (ignoreDataRequest) {
+			if (dataRequested) {
 				// data already requested (by passing MainBlockListener to SelectorRunner)
 				// once in this data-processing cycle, so we ignore the request and clear
 				// the flag
 				log.debug("Ignoring waitForData() call because data was already requested");
-				ignoreDataRequest = false;
 			} else
 				super.waitForData();
 		} else {
