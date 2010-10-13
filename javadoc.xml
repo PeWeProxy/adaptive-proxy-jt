@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project default="javadoc">
-	<property name="dest_dir" value="doc"/>
+	<property name="dest_dir" value="htdocs/pewepropxy_javadoc"/>
 	<property name="tmp_dir" value="api_tmp"/>
 	
 	<target name="-extract_api">
@@ -37,7 +37,8 @@
         	    sk.fiit.peweproxy.services,
         	    sk.fiit.peweproxy.services.content"/>
     	<copy todir="${dest_dir}/custom" overwrite="true">
-    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd,plugins_ordering"/> 
+    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd,plugins_ordering"/>
+    		<filelist dir="./src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
     	</copy>
     	<delete dir="${tmp_dir}"/>
     </target>
