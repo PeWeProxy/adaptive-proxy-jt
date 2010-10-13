@@ -52,7 +52,7 @@ public class EventsHandler {
 	
 	public void logClientClosedCon(Connection con) {
 		final InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
-		adaptiveEngine.getProxy().getNioHandler().runThreadTask(new Runnable() {
+		Runnable task = new Runnable() {
 			@Override
 			public void run() {
 				for (ConnectionEventPlugin plugin : connectionEventPlugins) {
@@ -63,7 +63,11 @@ public class EventsHandler {
 					}
 				}
 			}
-		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logClientClosedCon",
+		};
+		if (adaptiveEngine.isProxyDying())
+			task.run();
+		else
+			adaptiveEngine.getProxy().getNioHandler().runThreadTask(task, new DefaultTaskIdentifier(getClass().getSimpleName()+".logClientClosedCon",
 				"Dispatching 'client closed the connection' message to all ConnectionEventPlugin plugins"));
 	}
 	
