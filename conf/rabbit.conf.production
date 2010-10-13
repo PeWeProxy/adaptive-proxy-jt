@@ -41,7 +41,7 @@ proxy_chain_factory=
 # This is the small logo to use.
 # It is used in meta pages and other places.
 # Use $proxy to have RabbIT serve the image.
-logo=http://$proxy/FileSender/public/smallRabbIT4.png
+logo=/FileSender/public/smallRabbIT4.png
 
 # What do you want your proxy to identify itself as?
 # Server identity can be seen in HTTP header responses
