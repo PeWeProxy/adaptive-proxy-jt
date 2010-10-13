@@ -1,0 +1,30 @@
+<html>
+<head>
+<title>Adaptive Proxy</title>
+<body>
+Contains classes for services definition and management.
+A service is a functionality over HTTP message data on some level of abstraction. All
+services (instead of 4 base services, see {@link sk.fiit.peweproxy.services.content}) are
+provided by service modules - external plugins plugged into the Adaptive Proxy platform (see
+{@link sk.fiit.peweproxy.plugins.services}). Adaptive Proxy distinguishes between service
+definitions and service implementations. There can be multiple modules that provide different
+implementations of the same service definition (service interface) plugged in.
+<p>
+This package includes base service interface that all created service definitions have to
+extend (see {@link sk.fiit.peweproxy.services.ProxyService}). Package also contains interface
+of services handle (see {@link sk.fiit.peweproxy.services.ServicesHandle}), an entity
+accessible for each HTTP message representation that provides plugins with services (their
+implementations) available over the message. There's also
+{@link sk.fiit.peweproxy.services.ServiceUnavailableException} runtime exception defined in
+this package. This exception is thrown every time a plugin tries to use a service that
+is not currently available over particular message. This is when a plugin asks services
+handle to provide a service that is unavailable for the current state of a message, or when
+a plugin tries to use a service (call its method) obtained in the past, that is no longer
+available, because no module can provide it for the current state of a message. Plugins are
+not expected to handle this exception gracefully since an Adaptive Proxy platform always
+wraps calls to plugins with try-catch block.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

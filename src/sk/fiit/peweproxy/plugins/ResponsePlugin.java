@@ -9,7 +9,7 @@ import sk.fiit.peweproxy.services.ProxyService;
  * Base interface for proxy plugins that are involved in the process of handling HTTP responses.
  * This interface defines only one method used to decide whether response body data should be
  * precached before processing by plugins or not (see
- * {@link #desiredResponseServices(ResponseHeader)}).
+ * {@link #desiredResponseServices(Set, ResponseHeader)}).
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
@@ -22,7 +22,7 @@ public interface ResponsePlugin extends ProxyPlugin {
 	 * set is passed so that a plugin only needs to fill it with desired services (their
 	 * interfaces).
 	 * @param desiredServices set to be filled with classes of desired services
-	 * @param webRPHeaders read-only response header
+	 * @param webRPHeader read-only response header
 	 */
 	void desiredResponseServices(Set<Class<? extends ProxyService>> desiredServices,
 			ResponseHeader webRPHeader);

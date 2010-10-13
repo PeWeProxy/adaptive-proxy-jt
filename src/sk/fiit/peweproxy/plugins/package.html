@@ -14,7 +14,7 @@ public and instatiable using public no-arg constructor.
 <b>Processing plugins</b> are plugins that decide what to do with a HTTP message. To
 achieve their goals, they can access the message body via using services that get the
 information and / or modifies the message for them. They are provided with services by
-HTTP message's service handle (see {@link sk.fiit.peweproxy.services.ServicesHandle}). 
+HTTP message's services handle (see {@link sk.fiit.peweproxy.services.ServicesHandle}). 
 <p>
 <b>Modules</b> or service modules are plugins that provide implementation of particular
 services to other plugins. Their purpose is to know how to get or modify information
@@ -38,13 +38,13 @@ contains path to the bundle), so there can multiple plugins loaded from the same
 (binaries), each with its own plugin configuration file referencing same binaries (even
 same class within binaries). For more information on creating valid plugin configuration
 file, see
-<a href="../../../../custom/PluginConfiguration.dtd">Plugin configuration schema</a>
+<a href="../../../../custom/PluginConfiguration.dtd">Plugin configuration schema</a>.
 <p>
 Besides plugin's own runtime configuration parameters defined in plugin's configuration
 file, all plugins can access global configuration parameters called <b>variables</b>,
-defined in single variables file "variables.xml" in the plugins home directory. For more
-information on creating valid variables file, see
-<a href="../../../../custom/VariablesConfiguration.dtd">Variables configuration schema</a>
+defined in single variables file "<i>variables.xml</i>" in the plugins home directory. For
+more information on creating valid variables file, see
+<a href="../../../../custom/VariablesConfiguration.dtd">Variables configuration schema</a>.
 <p>
 This package contains common interafce for all plugins (see
 {@link sk.fiit.peweproxy.plugins.ProxyPlugin}) that define the way a plugin is loaded,
@@ -58,8 +58,8 @@ request (see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugi
 / response plugins are asked for services they want to be available over the HTTP message
 in the processing phase. This querying is done by Adaptive Proxy platform after the HTTP
 header of any message is received (before message body is received and message is
-processed by plugins) to decide, whether to prefetch message body, which introduce
-expensive operations into the message handling process.
+processed by plugins) to decide, whether the platform will prefetch message body, what
+introduces expensive operations into the message handling process.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

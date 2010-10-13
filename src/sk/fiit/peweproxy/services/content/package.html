@@ -27,10 +27,11 @@ when plugins aren't expected / allowed to modify message data.
 All four services will be provided by {@link sk.fiit.peweproxy.services.ServicesHandle}
 for particular HTTP message only when the message entity body data was prefetched by Adaptive
 Proxy platform. The platform prefetch entity body data when at least one plugin (processing
-plugin or module) requested one of these services (see
-{@link sk.fiit.peweproxy.plugins.RequestPlugin#desiredRequestServices(RequestHeader)} and
-{@link sk.fiit.peweproxy.plugins.ResponsePlugin#desiredResponseServices(ResponseHeader)}),
-and the actual HTTP message carries an entity.
+plugin or module) requested one of these base services (see
+{@link sk.fiit.peweproxy.plugins.RequestPlugin#desiredRequestServices(Set, RequestHeader)}
+and
+{@link sk.fiit.peweproxy.plugins.ResponsePlugin#desiredResponseServices(Set, ResponseHeader)}
+), and the actual HTTP message carries an entity.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
