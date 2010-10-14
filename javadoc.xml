@@ -15,6 +15,13 @@
         	</fileset>
 		</copy>
 	</target>
+		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/doc-files" overwrite="true">
+	    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/>
+	    		<filelist dir="./src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
+		</copy>
+		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/processing/doc-files" overwrite="true">
+		    		<filelist dir="./plugins" files="plugins_ordering"/>
+			</copy>
     <target name="javadoc" depends="-extract_api" description="Generates JavaDoc for AdaptiveProxy API classes">
     	<delete dir="${dest_dir}"/>
         <javadoc access="package" author="true"
@@ -36,10 +43,6 @@
         	    sk.fiit.peweproxy.plugins.services,
         	    sk.fiit.peweproxy.services,
         	    sk.fiit.peweproxy.services.content"/>
-    	<copy todir="${dest_dir}/custom" overwrite="true">
-    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd,plugins_ordering"/>
-    		<filelist dir="./src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
-    	</copy>
     	<delete dir="${tmp_dir}"/>
     </target>
 </project>
