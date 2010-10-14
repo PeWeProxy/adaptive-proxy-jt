@@ -542,12 +542,12 @@ public class AdaptiveEngine  {
 			//BasicConfigurator.configure();
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
-		String pluginsHomeProp = prop.getProperty("pluginsHome");
+		String pluginsHomeProp = prop.getProperty("plugins_home");
 		boolean defaultPlgDir = pluginsHomeProp != null;
 		if (pluginsHomeProp == null)
 			pluginsHomeProp = "../plugins"; 
 		File pluginsHomeDir = new File(confDir,pluginsHomeProp);
-		String pluginsOrderFileName = prop.getProperty("pluginsOrderFile","plugins_ordering");
+		String pluginsOrderFileName = prop.getProperty("plugins_order_file","plugins_ordering");
 		pluginsOrderFile = new File(pluginsHomeDir,pluginsOrderFileName);
 		if (!pluginsHomeDir.isDirectory() || !pluginsHomeDir.canRead()) {
 			log.info("Unable to find or access "+((!defaultPlgDir)? "default ":"")+"plugins directory "+pluginsHomeDir.getAbsolutePath());
@@ -559,9 +559,20 @@ public class AdaptiveEngine  {
 				sharedLibDir = new File(pluginsHomeDir,sharedLibDirName);
 			Set<String> excludeFiles = new HashSet<String>();
 			excludeFiles.add(pluginsOrderFileName);
-			pluginHandler.setPluginRepository(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles);
+			String coreThreadsNumber = prop.getProperty("thread_pool_core_threads");
+			int coreThreads = -1;
+			if (coreThreadsNumber == null)
+				log.info("No setting for number of core threads of plugins thread pool, default value will be used");
+			else {
+				try {
+					coreThreads = Integer.parseInt(coreThreadsNumber);
+				} catch (Exception e) {
+					log.info("Invalid number of core threads of plugins thread pool, default value will be used");
+				}
+			}
+			pluginHandler.setup(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles,coreThreads);
 		}
-		modulesManager.setPattern(prop.getProperty("stringServicesPattern"));
+		modulesManager.setPattern(prop.getProperty("string_services_pattern"));
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");
 	}

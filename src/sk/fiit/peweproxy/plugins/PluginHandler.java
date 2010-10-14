@@ -57,6 +57,7 @@ public class PluginHandler {
 	private static final String ATTR_NAME = "name";
 	private static final String ATTR_VARIABLE_NAME = "name";
 	private static final String VARIABLE_CONFIGURATION_FILE = "variables.xml";
+	private static final int DEF_CORE_THREADS = 3;
 	
 	private static final FilenameFilter jarFilter;
 	private static final FilenameFilter classFilter;
@@ -79,6 +80,7 @@ public class PluginHandler {
 	private final AbcPluginsComparator comparator;
 	private boolean pluginsStopped = false;
 	private final StringBuffer loadingLogBuffer;
+	private PluginsThreadPool threadPool;
 	
 	static {
 		jarFilter = new FilenameFilter() {
@@ -122,7 +124,8 @@ public class PluginHandler {
 		log.addAppender(new WriterAppender(new PatternLayout("%d{HH:mm:ss,SSS} %-5p %x - %m%n"), outStream));
 	}
 	
-	public void setPluginRepository(File pluginRepositoryDir, File servicesDir, File sharedLibsDir, Set<String> excludeFileNames) {
+	public void setup(File pluginRepositoryDir, File servicesDir, File sharedLibsDir,
+			Set<String> excludeFileNames, int coreThreads) {
 		if (!pluginRepositoryDir.isDirectory()) {
 			throw new IllegalArgumentException("Argument does not denote a directory");
 		}
@@ -130,6 +133,11 @@ public class PluginHandler {
 		this.servicesDir = servicesDir;
 		this.pluginRepositoryDir = pluginRepositoryDir;
 		this.excludeFileNames = excludeFileNames;
+		if (coreThreads < 1) {
+			coreThreads = DEF_CORE_THREADS;
+		}
+		threadPool = new PluginsThreadPool(coreThreads);
+		log.info("Thread pool for plugins created with "+coreThreads+" core threads");
 		String path = pluginRepositoryDir.getAbsolutePath();
 		try {
 			path = pluginRepositoryDir.getCanonicalPath();
@@ -759,7 +767,7 @@ public class PluginHandler {
 		}
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
-		PluginPropertiesImpl properties = new PluginPropertiesImpl(workDir);
+		PluginPropertiesImpl properties = new PluginPropertiesImpl(workDir,threadPool);
 		if (nodeList.getLength() == 0)
 			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at plugin configuration");
 		else {

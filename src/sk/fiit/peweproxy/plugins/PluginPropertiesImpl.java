@@ -5,19 +5,23 @@ import java.util.HashMap;
 import java.util.InputMismatchException;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
 
 public final class PluginPropertiesImpl implements PluginProperties {
 	private final File rootFile;
 	private final Map<String, String> properties;
+	private final ExecutorService threadPool;
 	
-	public PluginPropertiesImpl(File rootFile, Map<String, String> properties) {
-		this(rootFile);
+	public PluginPropertiesImpl(File rootFile, Map<String, String> properties,
+			ExecutorService threadPool) {
+		this(rootFile,threadPool);
 		this.properties.putAll(properties);
 	}
 	
-	public PluginPropertiesImpl(File rootFile) {
+	public PluginPropertiesImpl(File rootFile, ExecutorService threadPool) {
 		properties = new HashMap<String, String>();
 		this.rootFile = rootFile;
+		this.threadPool = threadPool;
 	}
 	
 	public void addProperty(String name, String property) {
@@ -106,5 +110,10 @@ public final class PluginPropertiesImpl implements PluginProperties {
 	@Override
 	public File getRootDir() {
 		return rootFile;
+	}
+
+	@Override
+	public ExecutorService getThreadPool() {
+		return threadPool;
 	}
 }

@@ -2,6 +2,7 @@ package sk.fiit.peweproxy.plugins;
 
 import java.io.File;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Configuration properties for a proxy plugin loaded from the plugin's configuration
@@ -94,4 +95,15 @@ public interface PluginProperties {
 	 * @return a file pointing to plugin's deployment directory 
 	 */
 	File getRootDir();
+	
+	/**
+	 * Returns a thread pool, that proxy plugins can use to execute their asynchronous jobs.
+	 * This thread pool preserves several core threads, based on setting in proxy conf file,
+	 * and cache any additionally created threads for 60 second. Plugins are not allowed to
+	 * terminate returned executor service, doing so will make an {@link IllegalAccessError}
+	 * to be thrown. Every plugin properties instance returns only thread pool instance that
+	 * is the same for the whole life of the proxy.
+	 * @return thread pool for executing asynchronous jobs of plugins
+	 */
+	ExecutorService getThreadPool();
 }
