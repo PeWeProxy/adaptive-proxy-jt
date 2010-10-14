@@ -5,10 +5,10 @@ import java.util.Queue;
 import rabbit.httpio.request.ContentCachingListener;
 import rabbit.proxy.Connection;
 
-public class RequestContentCahcedListener implements ContentCachingListener {
+public class RequestContentCachedListener implements ContentCachingListener {
 	private final Connection con;
 	
-	public RequestContentCahcedListener(Connection con) {
+	public RequestContentCachedListener(Connection con) {
 		this.con = con;
 	}
 

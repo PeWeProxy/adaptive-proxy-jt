@@ -25,7 +25,7 @@
 <!--
 	Plugin's classes class-path. Can point to either directory or a jar file. If
 	there's no such element, default path pointing to plugins home directory
-	(configured by pluginsHome parameter in AdaptiveEngine section of proxy conf file),
+	(configured by 'plugins_home' parameter in AdaptiveEngine section of proxy conf file),
 	where all plugins' XML configuration files are stored, is used. This path is relative
 	to plugins home directory.
 -->

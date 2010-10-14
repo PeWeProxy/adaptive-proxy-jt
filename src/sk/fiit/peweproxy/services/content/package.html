@@ -31,7 +31,12 @@ plugin or module) requested one of these base services (see
 {@link sk.fiit.peweproxy.plugins.RequestPlugin#desiredRequestServices(Set, RequestHeader)}
 and
 {@link sk.fiit.peweproxy.plugins.ResponsePlugin#desiredResponseServices(Set, ResponseHeader)}
-), and the actual HTTP message carries an entity.
+), and the actual HTTP message carries an entity. In addition, string services will be
+available only when "Content-Type" HTTP header (see 
+<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">RFC 2616: 14.17
+Content-Type</a>) value (only the first part until ';' character, if present, to ignore
+possible charset part) matches pattern defined by proxy configuration parameter <code>
+string_services_pattern</code> (see proxy conf file, <code> AdaptiveEngine</code> section).
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

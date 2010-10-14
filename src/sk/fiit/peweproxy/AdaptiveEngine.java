@@ -184,7 +184,7 @@ public class AdaptiveEngine  {
 			if (!prefetch)
 				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices);
 			if (prefetch) {
-				RequestContentCahcedListener contentCachedListener = new RequestContentCahcedListener(con);
+				RequestContentCachedListener contentCachedListener = new RequestContentCachedListener(con);
 				new ContentFetcher(con,bufHandle,tlh,separator,contentCachedListener,dataSize);
 				return;
 			} else {
