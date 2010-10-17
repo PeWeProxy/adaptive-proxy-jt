@@ -259,16 +259,18 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 	}
 	
 	private class ServiceRealization<Service extends ProxyService> {
-		Service realService;
-		ServiceProvider<Service> provider;
-		ModuleType module;
+		final Service realService;
+		final ServiceProvider<Service> provider;
+		final ModuleType module;
 		final Map<Method, Boolean> readonlyFlags;
+		final boolean initChangedModel;
 		
-		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module) {
+		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module, boolean initChangedModel) {
 			this.realService = realService;
 			this.provider = provider;
 			this.module = module;
 			readonlyFlags = new HashMap<Method, Boolean>();
+			this.initChangedModel = initChangedModel;
 		}
 		
 		@Override
@@ -299,7 +301,6 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		
 		@Override
 		public String toString() {
-			// TODO Auto-generated method stub
 			return getClass().getSimpleName()+"(service:"+svcInfo.serviceClass.getName()+", module:"
 				+((realization != null) ? realization.module : "unbound")+")";
 		}
@@ -344,9 +345,22 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						readingAttempt(binding);
 						if (log.isDebugEnabled())
 							log.debug(getLogTextHead()+"New "+svcInfo.serviceClass.getName()+" service realization has to be created");
-						ServiceRealization<Service> newRealization = getNextService(svcInfo);
+						ServiceRealization<Service> newRealization = getNewNextService(svcInfo);
 						binding.bindToService(newRealization);
-						actualServicesBindings.add(binding);
+						registerSvcRealization(newRealization, binding);
+					} else if (changedModelBinding != null) {
+						// because the target service is in the list, but is not referenced by changedModelBinding
+						// target service was initialized without need to access message data {e.g. service for response accessed request only}
+						if (log.isDebugEnabled())
+							log.debug(getLogTextHead()+"Inner model of called service realization is up-do-date, even if there's other realization with changed model");
+						if (!readOnlyMethod) {
+							if (log.isDebugEnabled())
+								log.debug(getLogTextHead()+"Called method is modifying, commiting changed model of other service realization");
+							// we commit changes referenced by changedModelBinding into the message so that it is safe
+							// (changedModelBinding = null) to set changedModelBinding to new binding 
+							while (changedModelBinding != null)
+								applyLastChanges();
+						}
 					}
 				} else {
 					if (log.isTraceEnabled())
@@ -357,17 +371,27 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				Object retVal = method.invoke(binding.realization.realService, args);
 				inCodeOfStack.poll();
 				if (!readOnlyMethod) {
-					modifyingAttempt(binding);
+					modifyingAttempt(binding,true);
 				}
 				return retVal;
 			}
 		};
 		Service proxyInstance = (Service) Proxy.newProxyInstance(servicesCLoader, new Class<?>[] {svcInfo.serviceClass}, invHandler);
-		proxyInstance.toString();
+		//proxyInstance.toString();
 		binding.bindToProxy(proxyInstance);
 		binding.bindToService(realization);
-		actualServicesBindings.add(binding);
+		registerSvcRealization(realization, binding);
 		return proxyInstance;
+	}
+	
+	private <Service extends ProxyService> void registerSvcRealization(ServiceRealization<Service> newRealization, ServiceBinding<Service> binding) {
+		if (binding.realization != newRealization)
+			throw new IllegalStateException("Passed binding does not reference passed service realization");
+		if (newRealization.initChangedModel) {
+			changedModelBinding = binding;
+			actualServicesBindings.clear();
+		}
+		actualServicesBindings.add(binding);
 	}
 	
 	private void readingAttempt(ServiceBinding<?> binding) {
@@ -386,13 +410,15 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		readingAttempt(getExecutingBinding());
 	}
 	
-	private void modifyingAttempt(ServiceBinding<?> binding) {
+	private void modifyingAttempt(ServiceBinding<?> binding, boolean after) {
 		if (log.isTraceEnabled())
-			log.trace(getLogTextHead()+"Modifying attempt, actualServicesBindings list cleared");
+			log.trace(getLogTextHead()+"Modifying operation "+((after == true) ? "" : "to be ")+"executed, actualServicesBindings list cleared" +
+					((binding != null) ? ", binding doing changes added" : "")+" and changedModelBinding set");
 		actualServicesBindings.clear();
 		if (binding != null)
 			actualServicesBindings.add(binding);
-		changedModelBinding = binding;
+		if (bindingDoingChanges != binding)
+			changedModelBinding = binding;
 	}
 	
 	public void headerBeingModified() {
@@ -408,7 +434,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (binding != bindingDoingChanges)
 			throw new UnsupportedOperationException("Service module is not allowed to modify header outside doChanges() method");
 		readingAttempt(binding);
-		modifyingAttempt(binding);
+		modifyingAttempt(binding,false);
 	}
 	
 	private <Service extends ProxyService> Service createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
@@ -471,10 +497,11 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		}
 		if (svcProvider == null)
 			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
+		boolean wasEmpty = actualServicesBindings.isEmpty();
 		Service svcImpl = createRealService(svcProvider, serviceClass);
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"Service provider "+svcProvider+" provided for service "+serviceClass.getName());
-		return new ServiceRealization<Service>(svcImpl, svcProvider, module);
+		return new ServiceRealization<Service>(svcImpl, svcProvider, module, (!wasEmpty && actualServicesBindings.isEmpty()));
 	}
 	
 	abstract <Service extends ProxyService> ServiceProvider<Service> callProvideService(ModuleType module, Class<Service> serviceClass);
@@ -487,7 +514,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (log.isDebugEnabled())
 			log.debug(getLogTextHead()+"Asking for service "+serviceClass.getName());
 		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(serviceClass, null);
-		return createDecoratedService(svcInfo, getNextService(svcInfo));
+		return getNextService(svcInfo);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -498,19 +525,11 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		if (log.isDebugEnabled())
 			log.debug(getLogTextHead()+"Asking for next service "+svcContainer.svcInfo.serviceClass.getName()+"(previous: "+previousService+")");
 		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(svcContainer.svcInfo.serviceClass, svcContainer.realization.module);
-		return createDecoratedService(svcInfo, getNextService(svcInfo));
+		return getNextService(svcInfo);
 	}
 	
-	@SuppressWarnings("unchecked")
-	private <Service extends ProxyService> ServiceRealization<Service> getNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
-		if ((svcInfo.serviceClass == ModifiableStringService.class
-				|| svcInfo.serviceClass == ModifiableBytesService.class) && inReadOnlyState()) {
-			ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
-					"unavilable when discovering services", null);
-			log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
-					+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
-			throw e;
-		}
+	private <Service extends ProxyService> Service getNextService(ServiceInfo<Service> svcInfo) {
+		checkForbiddenServices(svcInfo);
 		boolean skip = (svcInfo.ignoredModule != null);
 		// try to use already initialized service
 		for (ServiceBinding<?> existingBinding : actualServicesBindings) {
@@ -526,17 +545,34 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 					continue;
 				if (log.isTraceEnabled())
 					log.trace(getLogTextHead()+"This binding was picked");
-				return (ServiceRealization<Service>)existingBinding.realization;
+				return (Service) existingBinding.proxiedService;
 			}
 		}
-		skip = (svcInfo.ignoredModule != null);
+		return createDecoratedService(svcInfo, getNewNextService(svcInfo));
+	}
+	
+	private <Service extends ProxyService> void checkForbiddenServices(ServiceInfo<Service> svcInfo) {
+		if ((svcInfo.serviceClass == ModifiableStringService.class
+				|| svcInfo.serviceClass == ModifiableBytesService.class) && inReadOnlyState()) {
+			ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
+					"unavilable when discovering services", null);
+			log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
+					+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
+			throw e;
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <Service extends ProxyService> ServiceRealization<Service> getNewNextService(ServiceInfo<Service> svcInfo) throws ServiceUnavailableException {
+		checkForbiddenServices(svcInfo);
+		boolean skip = (svcInfo.ignoredModule != null);
 		ServiceUnavailableException cause = null;
 		// if one of base services, provide realizations
 		ServiceProvider<Service> baseSvcProvider = getBasicProvider(svcInfo.serviceClass);
 		if (baseSvcProvider != null) {
 			if (log.isTraceEnabled())
 				log.trace(getLogTextHead()+"Base service provider "+baseSvcProvider+" created");
-			return new ServiceRealization<Service>(baseSvcProvider.getService(), baseSvcProvider, (ModuleType)baseModule);
+			return new ServiceRealization<Service>(baseSvcProvider.getService(), baseSvcProvider, (ModuleType)baseModule, false);
 		}
 		for (ModuleType module : modules) {
 			try {
@@ -553,6 +589,9 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 						continue;
 					if (log.isTraceEnabled())
 						log.trace(getLogTextHead()+"This module was picked");
+					// providing a service may not access this message and therefore its binding may be added to the actualServicesBindings
+					// without applying changes made by changedModelBinding
+					//readingAttempt(null);
 					return getRealService(module, svcInfo.serviceClass);
 				}
 			} catch (ServiceUnavailableException e) {

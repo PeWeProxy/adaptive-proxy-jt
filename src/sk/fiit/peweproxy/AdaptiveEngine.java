@@ -248,7 +248,7 @@ public class AdaptiveEngine  {
 						HttpRequest newRequest = requestPlugin.getNewRequest(conHandle.request, conHandle.messageFactory);
 						if (newRequest == null)
 							log.warn("Null HttpRequest was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewRequest()," +
-										"substitution is being ignored.");
+										" substitution is being ignored.");
 						else {
 							conHandle.request = (ModifiableHttpRequestImpl) newRequest;
 							conHandle.request.setAllowedThread();
@@ -264,7 +264,7 @@ public class AdaptiveEngine  {
 						HttpResponse newResponse = requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
 						if (newResponse == null)
 							log.warn("Null HttpResponse was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewResponse()," +
-										"substitution is being ignored.");
+										" substitution is being ignored.");
 						else
 							conHandle.response = (ModifiableHttpResponseImpl) newResponse;
 						sendResponse = true;
@@ -413,7 +413,7 @@ public class AdaptiveEngine  {
 						HttpResponse newResponse = responsePlugin.getNewResponse(conHandle.response, conHandle.messageFactory);
 						if (newResponse == null)
 							log.warn("Null HttpResponse was provided by ResponseProcessingPlugin '"+responsePlugin+"' after calling getNewResponse()," +
-										"substitution is being ignored.");
+										" substitution is being ignored.");
 						else {
 							conHandle.response = (ModifiableHttpResponseImpl) newResponse;
 							conHandle.response.setAllowedThread();
