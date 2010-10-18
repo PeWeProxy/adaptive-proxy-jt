@@ -600,6 +600,9 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 				cause = e;
 			}
 		}
+		if (cause == null)
+			cause = new ServiceUnavailableException(svcInfo.serviceClass, "No module to provide service of class "
+					+ svcInfo.serviceClass.getSimpleName(), null);
 		// throw the last exception 
 		throw cause;
 	}
