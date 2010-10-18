@@ -1,12 +1,10 @@
 package sk.fiit.peweproxy.messages;
 
-import java.util.Arrays;
-
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.ResponseServiceHandleImpl;
 
-public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
+public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl, ModifiableHttpResponse>
 		implements ModifiableHttpResponse {
 	private final ModifiableHttpRequestImpl request;
 	private final HeaderWrapper webRPHeaders;
@@ -56,12 +54,8 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	}
 	
 	@Override
-	public ModifiableHttpResponseImpl clone() {
-		ModifiableHttpResponseImpl retVal = new ModifiableHttpResponseImpl(getServicesHandle().getManager()
-				, webRPHeaders, proxyRPHeaders.clone(),  request);
-		if (data != null)
-			retVal.data = Arrays.copyOf(data, data.length);
-		retVal.disableThreadCheck();
-		return retVal;
+	protected ModifiableHttpResponseImpl makeClone() {
+		return new ModifiableHttpResponseImpl(getServicesHandle().getManager()
+				, webRPHeaders, proxyRPHeaders.clone(),  (ModifiableHttpRequestImpl)request.clone());
 	}
 }

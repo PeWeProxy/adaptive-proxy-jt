@@ -1,11 +1,13 @@
 package sk.fiit.peweproxy.messages;
 
+import java.util.Arrays;
+
 import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ServicesHandle;
 
-public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
+public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMessageType extends HttpMessage> implements HttpMessage {
 	private final static Logger log = Logger.getLogger(HttpMessageImpl.class);
 		
 	byte[] data = null;
@@ -85,6 +87,15 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
-	public abstract HttpMessage clone();
+	public HttpMessageType clone() {
+		HttpMessageImpl<HandleType,HttpMessageType> retVal = makeClone();
+		if (data != null)
+			retVal.data = Arrays.copyOf(data, data.length);
+		retVal.disableThreadCheck();
+		return (HttpMessageType) retVal;
+	}
+	
+	protected abstract HttpMessageImpl<HandleType,HttpMessageType> makeClone();
 }

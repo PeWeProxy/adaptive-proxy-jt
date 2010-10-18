@@ -16,15 +16,15 @@ import sk.fiit.peweproxy.messages.HttpResponse;
 
 public aspect MessageAccessAspect {
 	@SuppressWarnings("unchecked")
-	private final Map<WritableHeader, ServicesHandleBase> handlesForHeaders;
+	private final Map<WritableHeader, ServicesHandleBase<?,?>> handlesForHeaders;
 	
 	@SuppressWarnings("unchecked")
 	public MessageAccessAspect() {
-		handlesForHeaders = new HashMap<WritableHeader, ServicesHandleBase>();
+		handlesForHeaders = new HashMap<WritableHeader, ServicesHandleBase<?,?>>();
 	}
 	
 	@SuppressWarnings("unchecked")
-	after(ServicesHandleBase svcHandle,	HttpMessageImpl<?> httpMessage)
+	after(ServicesHandleBase svcHandle,	HttpMessageImpl<?,?> httpMessage)
 		: initialization(ServicesHandleBase.new(..)) && this(svcHandle) && args(httpMessage,..) {
 		WritableHeader header = httpMessage.getProxyHeader();
 		//String headerString = header.getClass().getSimpleName()+"@"+Integer.toHexString(header.hashCode());
@@ -39,7 +39,7 @@ public aspect MessageAccessAspect {
 	@SuppressWarnings("unchecked")
 	before(ReadableHeader header) : readableHeaderMethods() && this(header)
 			&& !cflowbelow(readableHeaderMethods()) && inMessageProcessing() {
-		ServicesHandleBase svcHandle = handlesForHeaders.get(header);
+		ServicesHandleBase<?,?> svcHandle = handlesForHeaders.get(header);
 		if (svcHandle != null) {
 			svcHandle.httpMessage.checkThreadAccess();
 			svcHandle.headerBeingRead();
@@ -49,7 +49,7 @@ public aspect MessageAccessAspect {
 	before(WritableHeader header) : writableHeaderMethods() && this(header)
 			&& !cflowbelow(writableHeaderMethods()) && !readableHeaderMethods() 
 			&& inMessageProcessing() {
-		ServicesHandleBase svcHandle = handlesForHeaders.get(header);
+		ServicesHandleBase<?,?> svcHandle = handlesForHeaders.get(header);
 		if (svcHandle != null) {
 			svcHandle.httpMessage.checkThreadAccess();
 			svcHandle.headerBeingModified();
@@ -59,6 +59,7 @@ public aspect MessageAccessAspect {
 	@SuppressWarnings("unchecked")
 	pointcut servicesHandleMethod(ServicesHandleBase svcHandle)
 		: execution(* ServicesHandle.*(..)) && this(svcHandle);
+	
 	@SuppressWarnings("unchecked")
 	pointcut messageMethod(HttpMessageImpl message)
 		: execution(* (HttpRequest || HttpResponse).*(..)) && this(message);

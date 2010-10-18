@@ -40,7 +40,7 @@ import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
 
-public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>, ModuleType extends ServiceModule> implements ServicesHandle {
+public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?>, ModuleType extends ServiceModule> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
 	private static ServiceModule baseModule = new BaseModule();
 	
@@ -528,6 +528,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?>,
 		return getNextService(svcInfo);
 	}
 	
+	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> Service getNextService(ServiceInfo<Service> svcInfo) {
 		checkForbiddenServices(svcInfo);
 		boolean skip = (svcInfo.ignoredModule != null);

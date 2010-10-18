@@ -10,7 +10,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.services.content.StringContentService;
 
-public class StringServiceImpl<MessageType extends HttpMessageImpl<?>>
+public class StringServiceImpl<MessageType extends HttpMessageImpl<?,?>>
 extends BaseServiceProvider<MessageType,StringContentService> implements StringContentService {
 	
 	final String content;

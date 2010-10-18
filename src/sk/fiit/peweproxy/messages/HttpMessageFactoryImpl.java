@@ -22,7 +22,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		this.request = request;
 	}
 	
-	private void setContent(HttpMessageImpl<?> message, String contentType) {
+	private void setContent(HttpMessageImpl<?,?> message, String contentType) {
 		HttpHeader proxyHeader = message.getProxyHeader().getBackedHeader();
 		if (contentType != null) {
 			proxyHeader.setHeader ("Content-Type", contentType);
@@ -39,7 +39,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	public ModifiableHttpRequest constructHttpRequest(ModifiableHttpRequest baseRequest, String contentType) {
 		ModifiableHttpRequestImpl retVal = null;
 		if (baseRequest != null) {
-			retVal = ((ModifiableHttpRequestImpl)baseRequest).clone();
+			retVal = (ModifiableHttpRequestImpl) ((ModifiableHttpRequestImpl)baseRequest).clone();
 		} else {
 			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(new HttpHeader())
 			,(request != null) ? request.getClientSocketAddress() : null);
@@ -53,7 +53,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	public ModifiableHttpResponse constructHttpResponse(ModifiableHttpResponse baseResponse, String contentType) {
 		ModifiableHttpResponseImpl retVal = null;
 		if (baseResponse != null)
-			retVal = ((ModifiableHttpResponseImpl)baseResponse).clone();
+			retVal = (ModifiableHttpResponseImpl) ((ModifiableHttpResponseImpl)baseResponse).clone();
 		else {
 			retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
 						,new HeaderWrapper(new HttpHeader()),request);

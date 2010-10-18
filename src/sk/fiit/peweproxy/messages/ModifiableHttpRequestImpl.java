@@ -1,13 +1,12 @@
 package sk.fiit.peweproxy.messages;
 
 import java.net.InetSocketAddress;
-import java.util.Arrays;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.RequestServiceHandleImpl;
 
-public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl>
+public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl, ModifiableHttpRequest>
 		implements ModifiableHttpRequest {
 	private InetSocketAddress clientSocketAdr;
 	private HeaderWrapper clientRQHeaders;
@@ -52,12 +51,8 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	}
 	
 	@Override
-	public ModifiableHttpRequestImpl clone() {
-		ModifiableHttpRequestImpl retVal =  new ModifiableHttpRequestImpl(getServicesHandle().getManager(), clientRQHeaders
+	protected ModifiableHttpRequestImpl makeClone() {
+		return new ModifiableHttpRequestImpl(getServicesHandle().getManager(), clientRQHeaders
 				, new HeaderWrapper(proxyRQHeaders.getBackedHeader().clone()),clientSocketAdr);
-		if (data != null)
-			retVal.data = Arrays.copyOf(data, data.length);
-		retVal.disableThreadCheck();
-		return retVal;
 	}
 }

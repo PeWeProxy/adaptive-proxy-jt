@@ -9,7 +9,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 
-public class ModifiableByteServiceImpl<MessageType extends HttpMessageImpl<?>>
+public class ModifiableByteServiceImpl<MessageType extends HttpMessageImpl<?,?>>
 	extends BaseServiceProvider<MessageType, ModifiableBytesService> implements ModifiableBytesService {
 	
 	byte[] data = null;
