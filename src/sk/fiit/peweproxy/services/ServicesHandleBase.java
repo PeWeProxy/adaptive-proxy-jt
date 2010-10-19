@@ -356,10 +356,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 						if (!readOnlyMethod) {
 							if (log.isDebugEnabled())
 								log.debug(getLogTextHead()+"Called method is modifying, commiting changed model of other service realization");
-							// we commit changes referenced by changedModelBinding into the message so that it is safe
-							// (changedModelBinding = null) to set changedModelBinding to new binding 
-							while (changedModelBinding != null)
-								applyLastChanges();
+							readingAttempt(binding);
 						}
 					}
 				} else {
@@ -395,7 +392,13 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	}
 	
 	private void readingAttempt(ServiceBinding<?> binding) {
-		if (changedModelBinding != null && changedModelBinding != binding) {
+		ServiceBinding<?> lastUptodateBinding = null;
+		while (changedModelBinding != null && changedModelBinding != binding) {
+			if (lastUptodateBinding == changedModelBinding) {
+				log.error("Possible recursive loop terminated when commiting changes made by service provided by " + changedModelBinding.realization.provider);
+				break;
+			}
+			lastUptodateBinding = changedModelBinding;
 			applyLastChanges();
 		}
 	}
@@ -633,7 +636,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	
 	public void finalize() {
 		if (changedModelBinding != null) {
-			applyLastChanges();
+			readingAttempt(null);
 		}
 	}
 	
