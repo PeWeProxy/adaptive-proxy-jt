@@ -994,4 +994,8 @@ public class PluginHandler {
 	public String getLoadingLogText() {
 		return loadingLogBuffer.toString();
 	}
+	
+	public void submitTaskToThreadPool(Runnable task) {
+		threadPool.execute(task);
+	}
 }

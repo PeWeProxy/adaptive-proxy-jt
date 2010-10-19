@@ -88,6 +88,7 @@ public class AdaptiveHandler extends FilterHandler {
 			if (doHTMLparsing)
 				super.handleArray(arr, off, len);
 			else {
+				memStore.writeArray(arr, off, len); // for read-only processing
 				List<ByteBuffer> buffers = new LinkedList<ByteBuffer>();
 				buffers.add(ByteBuffer.wrap(arr, off, len));
 				sendBlocks = buffers.iterator();
@@ -97,18 +98,23 @@ public class AdaptiveHandler extends FilterHandler {
 					blockSent();
 			}
 		} else {
-			memStore.writeArray(arr, off, len);
+			memStore.writeArray(arr, off, len); // for full access processing
 			blockSent();
 		}
 	}
 
 	@Override
 	protected void finishData() {
-		if (notCaching || sendingPhase)
+		if (notCaching || sendingPhase) {
 			super.finishData();
-		else {
+			if (!sendingPhase) {
+				if (log.isDebugEnabled())
+					log.debug(this+" cached data of length "+memStore.getBytes().length + " for read-only processing");
+				con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes());
+			}
+		} else {
 			if (log.isDebugEnabled())
-				log.debug(this+" cached data length = "+memStore.getBytes().length);
+				log.debug(this+" cached data of length "+memStore.getBytes().length + " for full acccess processing");
 			con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes(), this);
 		}
 	}
@@ -157,6 +163,17 @@ public class AdaptiveHandler extends FilterHandler {
 		sendingPhase = true;
 		setHTMLparsing();
 		sendHeader();
+	}
+	
+	@Override
+	protected void send(BufferHandle bufHandle) {
+		if (doHTMLparsing && notCaching && !sendingPhase) {
+			// FilterHandler's methods are messing with HTML blocks
+			// 		&& we are not caching for full access processing
+			//		&& we are not sending something already cached
+			memStore.writeBufferKeepPosition(bufHandle.getBuffer());
+		}
+		super.send(bufHandle);
 	}
 	
 	@Override

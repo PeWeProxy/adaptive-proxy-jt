@@ -14,6 +14,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 	private HandleType serviceHandle;
 	private boolean checkThread = false;
 	private Thread allowedThread;
+	private boolean isReadonly = false; 
 	
 	protected void setServiceHandle(HandleType serviceHandle) {
 		this.serviceHandle = serviceHandle;
@@ -82,6 +83,14 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 		}
 	}
 	
+	public void setReadOnly() {
+		isReadonly = true;
+	}
+	
+	public boolean isReadOnly() {
+		return isReadonly;
+	}
+	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
@@ -94,6 +103,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 		if (data != null)
 			retVal.data = Arrays.copyOf(data, data.length);
 		retVal.disableThreadCheck();
+		retVal.isReadonly = isReadonly;
 		return (HttpMessageType) retVal;
 	}
 	

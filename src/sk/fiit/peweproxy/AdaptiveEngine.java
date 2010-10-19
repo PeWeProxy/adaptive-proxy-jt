@@ -131,14 +131,14 @@ public class AdaptiveEngine  {
 		ConnectionHandle newHandle = new ConnectionHandle(con);
 		requestHandles.put(con, newHandle);
 		if (log.isTraceEnabled())
-			log.trace("RQ: "+newHandle+" | Registering new connection for connection "+con);
+			log.trace("RQ: "+newHandle+" | Registering new handle for "+con);
 	}
 	
 	public void connectionClosed(Connection con) {
 		//stackTraceWatcher.addStackTrace(con);
 		ConnectionHandle conHandle = requestHandles.remove(con);
 		if (log.isTraceEnabled())
-			log.trace("RQ: "+conHandle+" | Removing connection for connection "+con);
+			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
 	
 	public void newRequest(Connection con, boolean chunking) {
@@ -288,9 +288,10 @@ public class AdaptiveEngine  {
 			@Override
 			public void run() {
 				conHandle.request.setAllowedThread();
+				conHandle.request.setReadOnly();
 				if (log.isTraceEnabled()) {
-					log.trace("RQ: "+conHandle+" | Request handling time :"+(System.currentTimeMillis()-conHandle.requestTime));
-					log.trace("RQ: "+conHandle+" | Proceeding in processing request");
+					log.trace("RQ: "+conHandle+" | Request processing time :"+(System.currentTimeMillis()-conHandle.requestTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in handling request");
 				}
 				conHandle.con.processRequest(resourceHandler);
 			}
@@ -363,16 +364,16 @@ public class AdaptiveEngine  {
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 		} else {
-			if (log.isTraceEnabled())
-				log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
 			proceedTask.run();
+			if (log.isTraceEnabled())
+				log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
 		}
 	}
 	
 	public void responseContentCached(Connection con, final byte[] responseContent, final AdaptiveHandler handler) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
 		if (log.isTraceEnabled())
-			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached");
+			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for full access processing");
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -381,17 +382,33 @@ public class AdaptiveEngine  {
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 	}
 	
+	public void responseContentCached(Connection con, final byte[] responseContent) {
+		final ConnectionHandle conHandle = requestHandles.get(con);
+		if (log.isTraceEnabled())
+			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for read-only processing");
+		pluginHandler.submitTaskToThreadPool(new Runnable() {
+			@Override
+			public void run() {
+				processCachedResponse(conHandle, responseContent, null);
+			}
+		});
+	}
+	
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
 		conHandle.response.setData(responseContent);
+		if (handler == null)
+			conHandle.response.setReadOnly();
 		runResponseAdapters(conHandle);
 		final ModifiableHttpResponseImpl response = conHandle.response;
 		final byte[] modifiedContent = conHandle.response.getData();
-		proceedWithResponse(conHandle, new Runnable() {
-			@Override
-			public void run() {
-				handler.sendResponse(response.getProxyResponseHeader().getBackedHeader(),modifiedContent);
-			}
-		});
+		if (handler != null) {
+			proceedWithResponse(conHandle, new Runnable() {
+				@Override
+				public void run() {
+					handler.sendResponse(response.getProxyResponseHeader().getBackedHeader(),modifiedContent);
+				}
+			});
+		}
 	}
 	
 	private void runResponseAdapters(ConnectionHandle conHandle) {
@@ -439,8 +456,8 @@ public class AdaptiveEngine  {
 			public void run() {
 				conHandle.response.setAllowedThread();
 				if (log.isTraceEnabled()) {
-					log.trace("RP: "+conHandle+" | Response handling time :"+(System.currentTimeMillis()-conHandle.responseTime));
-					log.trace("RQ: "+conHandle+" | Proceeding in processing response");
+					log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
+					log.trace("RQ: "+conHandle+" | Proceeding in handling response");
 				}
 				proceedTask.run();
 			}

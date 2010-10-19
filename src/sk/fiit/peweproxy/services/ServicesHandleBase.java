@@ -427,6 +427,12 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	public void headerBeingModified() {
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"An attempt to modify message header");
+		if (httpMessage.isReadOnly()) {
+			UnsupportedOperationException e =  new UnsupportedOperationException("Modifying message header is not allowed for" +
+					" read-only messages");
+			log.info("Attempt to modify message header when discovering services",e);
+			throw e;
+		}
 		if (inReadOnlyState()) {
 			UnsupportedOperationException e =  new UnsupportedOperationException("Modifying message header is not allowed when" +
 					" discovering services");
@@ -557,12 +563,21 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	
 	private <Service extends ProxyService> void checkForbiddenServices(ServiceInfo<Service> svcInfo) {
 		if ((svcInfo.serviceClass == ModifiableStringService.class
-				|| svcInfo.serviceClass == ModifiableBytesService.class) && inReadOnlyState()) {
-			ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
-					"unavilable when discovering services", null);
-			log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
-					+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
-			throw e;
+				|| svcInfo.serviceClass == ModifiableBytesService.class)) {
+			if (httpMessage.isReadOnly()) {
+				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
+						"unavilable for read-only messages", null);
+				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
+						+" service for "+getText4Logging(LogText.NORMAL)+" because the message is read-only");
+				throw e;
+			}
+			if (inReadOnlyState()) {
+				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
+						"unavilable when discovering services", null);
+				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
+						+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
+				throw e;
+			}
 		}
 	}
 	

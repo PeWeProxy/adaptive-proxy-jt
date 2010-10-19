@@ -23,18 +23,29 @@ public class InMemBytesStore {
 	}
 	
 	public void writeBuffer(ByteBuffer buffer) {
+		writeBuffer(buffer,true);
+	}
+	
+	private void writeBuffer(ByteBuffer buffer, boolean advancePos) {
 		int size = buffer.remaining();
 		byte[] array = null;
 		int offset = buffer.position();
 		if (buffer.hasArray()) {
 			array = buffer.array();
+			if (advancePos)
+				buffer.position(buffer.limit());
 		} else {
 			array = new byte[size];
 			buffer.get(array);
+			if (!advancePos)
+				buffer.position(offset);
 			offset = 0;
 		}
 		writeArray(array,offset,size);
-		buffer.position(buffer.limit());
+	}
+	
+	public void writeBufferKeepPosition(ByteBuffer buffer) {
+		writeBuffer(buffer,false);
 	}
 	
 	public void writeArray(byte[] bytes, int offset, int len) {
