@@ -111,7 +111,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 				if (contentNeeded(desiredServices)) {
 					if (log.isDebugEnabled())
 						log.debug(getLogTextHead()+"Service module "+module+" wants "
-								+"'content' service for "+getLogTextNormal());
+								+"content modifying service for "+getLogTextNormal());
 					return true;
 				}
 			}
@@ -129,9 +129,9 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	
 	public static boolean contentNeeded(Set<Class<? extends ProxyService>> desiredServices) {
 		return (desiredServices.contains(ModifiableStringService.class)
-				|| desiredServices.contains(StringContentService.class)
+				/*|| desiredServices.contains(StringContentService.class)*/
 				|| desiredServices.contains(ModifiableBytesService.class)
-				|| desiredServices.contains(ByteContentService.class));
+				/*|| desiredServices.contains(ByteContentService.class)*/);
 	}
 	
 	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
