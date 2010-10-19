@@ -19,6 +19,8 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 		this.request = request;
 		this.webRPHeaders = webRPHeaders;
 		this.proxyRPHeaders = proxyRPHeaders;
+		webRPHeaders.setHttpMessage(this);
+		proxyRPHeaders.setHttpMessage(this);
 		setServiceHandle(new ResponseServiceHandleImpl(this,modulesManager));
 	}
 	
@@ -56,6 +58,6 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	@Override
 	protected ModifiableHttpResponseImpl makeClone() {
 		return new ModifiableHttpResponseImpl(getServicesHandle().getManager()
-				, webRPHeaders, proxyRPHeaders.clone(),  (ModifiableHttpRequestImpl)request.clone());
+				, webRPHeaders, proxyRPHeaders.clone(), (ModifiableHttpRequestImpl)request.clone());
 	}
 }

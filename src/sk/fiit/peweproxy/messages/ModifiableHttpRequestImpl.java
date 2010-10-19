@@ -22,6 +22,8 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 		this.clientSocketAdr = clientSocketAdr;
 		this.clientRQHeaders = clientRQHeaders;
 		this.proxyRQHeaders = proxyRQHeaders;
+		clientRQHeaders.setHttpMessage(this);
+		proxyRQHeaders.setHttpMessage(this);
 		setServiceHandle(new RequestServiceHandleImpl(this,modulesManager));
 	}
 	
@@ -53,6 +55,6 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	@Override
 	protected ModifiableHttpRequestImpl makeClone() {
 		return new ModifiableHttpRequestImpl(getServicesHandle().getManager(), clientRQHeaders
-				, new HeaderWrapper(proxyRQHeaders.getBackedHeader().clone()),clientSocketAdr);
+				,proxyRQHeaders.clone(), clientSocketAdr);
 	}
 }

@@ -2,6 +2,7 @@ package sk.fiit.peweproxy.headers;
 
 import java.util.List;
 import rabbit.http.HttpHeader;
+import sk.fiit.peweproxy.messages.HttpMessageImpl;
 
 public final class HeaderWrapper implements WritableRequestHeader, WritableResponseHeader, Cloneable {
 	enum HTTP_Version {
@@ -37,9 +38,18 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 		}
 	}
 	private final HttpHeader backedHeader; 
+	private HttpMessageImpl<?, ?> message;
 	
 	public HeaderWrapper(HttpHeader header) {
 		backedHeader = header;
+	}
+	
+	public void setHttpMessage(HttpMessageImpl<?, ?> message) {
+		this.message = message;
+	}
+	
+	public HttpMessageImpl<?, ?> getHttpMessage() {
+		return message;
 	}
 	
 	public HttpHeader getBackedHeader() {
