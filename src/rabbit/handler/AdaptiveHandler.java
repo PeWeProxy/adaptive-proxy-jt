@@ -59,7 +59,7 @@ public class AdaptiveHandler extends FilterHandler {
 			h.notCaching = false;
 		askForCaching = true;
 		if (log.isDebugEnabled())
-			log.debug(h+" is handling connection "+con+" (requested "
+			log.debug(h+" is handling "+con+" (requested "
 					+header.getRequestLine()+")");
 		return h;
 	}
@@ -106,6 +106,7 @@ public class AdaptiveHandler extends FilterHandler {
 	@Override
 	protected void finishData() {
 		if (notCaching || sendingPhase) {
+			Connection con = this.con;
 			super.finishData();
 			if (!sendingPhase) {
 				if (log.isDebugEnabled())

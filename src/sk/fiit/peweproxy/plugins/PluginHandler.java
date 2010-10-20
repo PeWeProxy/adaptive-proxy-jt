@@ -857,7 +857,7 @@ public class PluginHandler {
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
 			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
-				log.debug("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin, " +
+				log.warn("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin, " +
 						"and the proxy server won't be able to reload it on the fly if it changes");
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");

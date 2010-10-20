@@ -61,6 +61,7 @@ public class AdaptiveEngine  {
 	private static final String ORDERING_RESPONSE_TEXT = "[response]";
 	
 	private final Map<Connection, ConnectionHandle> requestHandles;
+	private final Map<Connection, ConnectionHandle> prevRequestHandles;
 	private final HttpProxy proxy;
 	private PluginHandler pluginHandler;
 	private final EventsHandler loggingHandler;
@@ -77,6 +78,7 @@ public class AdaptiveEngine  {
 		private HttpMessageFactoryImpl messageFactory;
 		private boolean requestChunking = false;
 		private boolean adaptiveHandling = false;
+		private boolean readOnlyProcessing = false;
 		private final long requestTime;
 		private long responseTime;
 
@@ -93,6 +95,7 @@ public class AdaptiveEngine  {
 	
 	public AdaptiveEngine(HttpProxy proxy) {
 		requestHandles = new HashMap<Connection, ConnectionHandle>();
+		prevRequestHandles = new HashMap<Connection, ConnectionHandle>();
 		this.proxy = proxy;
 		loggingHandler = new EventsHandler(this);
 		pluginHandler = new PluginHandler();
@@ -129,7 +132,9 @@ public class AdaptiveEngine  {
 	
 	public void newRequestAttempt(Connection con) {
 		ConnectionHandle newHandle = new ConnectionHandle(con);
-		requestHandles.put(con, newHandle);
+		ConnectionHandle prevHandle = requestHandles.put(con, newHandle);
+		if (prevHandle != null && prevHandle.readOnlyProcessing)
+			prevRequestHandles.put(con, prevHandle);
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+newHandle+" | Registering new handle for "+con);
 	}
@@ -172,7 +177,7 @@ public class AdaptiveEngine  {
 					pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 						if (log.isDebugEnabled())
-							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants 'content' service for request");
+							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants content modifying service for request");
 						prefetch = true;
 						break;
 					} else
@@ -189,7 +194,7 @@ public class AdaptiveEngine  {
 				return;
 			} else {
 				if (log.isDebugEnabled())
-					log.debug("RQ: "+conHandle+" | No plugin wants 'content' service for request");
+					log.debug("RQ: "+conHandle+" | No plugin wants content modifying service for request");
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator);
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
@@ -332,7 +337,7 @@ public class AdaptiveEngine  {
 				pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
-						log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants 'content' service for response");
+						log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants content modifying service for response");
 					return true;
 				} else
 					desiredServices.addAll(pluginsDesiredSvcs);
@@ -343,7 +348,8 @@ public class AdaptiveEngine  {
 		if (conHandle.response.getServicesHandle().needContent(desiredServices))
 			return true;
 		if (log.isDebugEnabled())
-			log.debug("RP: "+conHandle+" | No plugin wants 'content' service for response");
+			log.debug("RP: "+conHandle+" | No plugin wants content modifying service for response");
+		conHandle.readOnlyProcessing = true;
 		return false;
 	}
 
@@ -365,7 +371,7 @@ public class AdaptiveEngine  {
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 		} else {
 			proceedTask.run();
-			if (log.isTraceEnabled())
+			if (proxyDying && log.isTraceEnabled())
 				log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
 		}
 	}
@@ -383,7 +389,11 @@ public class AdaptiveEngine  {
 	}
 	
 	public void responseContentCached(Connection con, final byte[] responseContent) {
-		final ConnectionHandle conHandle = requestHandles.get(con);
+		ConnectionHandle tmpHandle = requestHandles.get(con);
+		if (tmpHandle == null || tmpHandle.response == null) {
+			tmpHandle = prevRequestHandles.remove(con);
+		}
+		final ConnectionHandle conHandle = tmpHandle;
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for read-only processing");
 		pluginHandler.submitTaskToThreadPool(new Runnable() {

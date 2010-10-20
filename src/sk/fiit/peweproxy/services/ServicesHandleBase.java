@@ -333,6 +333,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 						return method.invoke(binding.realization.realService, args);
 					else
 						return method.invoke(binding, args);
+				if (method.getDeclaringClass() == ProxyService.class)
+					return method.invoke(binding.realization.realService, args);
 				httpMessage.checkThreadAccess();
 				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
 				if (log.isTraceEnabled())
@@ -566,7 +568,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 				|| svcInfo.serviceClass == ModifiableBytesService.class)) {
 			if (httpMessage.isReadOnly()) {
 				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
-						"unavilable for read-only messages", null);
+						" unavilable for read-only messages", null);
 				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
 						+" service for "+getText4Logging(LogText.NORMAL)+" because the message is read-only");
 				throw e;
