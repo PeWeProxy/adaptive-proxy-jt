@@ -142,6 +142,8 @@ public class AdaptiveEngine  {
 	public void connectionClosed(Connection con) {
 		//stackTraceWatcher.addStackTrace(con);
 		ConnectionHandle conHandle = requestHandles.remove(con);
+		if (conHandle.readOnlyProcessing)
+			prevRequestHandles.put(con, conHandle);
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
