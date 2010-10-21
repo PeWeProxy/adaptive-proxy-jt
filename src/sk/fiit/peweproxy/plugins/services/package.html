@@ -63,6 +63,18 @@ information on requesting service providers and signaling service providers to i
 changes to the actual message data, see
 {@link sk.fiit.peweproxy.plugins.services.ServiceProvider} and it's subclasses.
 <p>
+Reason for having this 3 layer design (module - service provider - service implementation)
+instead of just a module, also performing service provider's job, and a service
+implementation, is to enable a service module to provide services that differ in both
+identification and implementation. Different identification means that a module is allowed
+to provide realizations of different services. Different implementation means that
+a module is able to provide different implementations for the same service identification.
+For example, a module can provide realizations of the same service, e.g. fictional search
+results service, that differ heavily in code, thus being implemented in several other
+classes. When asked for a service, a module then decides what class to return as a service
+provider, based on actual message data. For example based on whether a message is a results
+page of Google, Bing, Yahoo, or other search portal supported by module. 
+<p>
 <i>Discovering available services</i><br>
 Adaptive Proxy platform keeps list of zero or many references to created and provided
 service implementations inner models of which are considered up to date. If this list is
