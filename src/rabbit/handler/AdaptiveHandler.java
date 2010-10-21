@@ -88,7 +88,8 @@ public class AdaptiveHandler extends FilterHandler {
 			if (doHTMLparsing)
 				super.handleArray(arr, off, len);
 			else {
-				memStore.writeArray(arr, off, len); // for read-only processing
+				if (!sendingPhase)
+					memStore.writeArray(arr, off, len); // for read-only processing
 				List<ByteBuffer> buffers = new LinkedList<ByteBuffer>();
 				buffers.add(ByteBuffer.wrap(arr, off, len));
 				sendBlocks = buffers.iterator();
