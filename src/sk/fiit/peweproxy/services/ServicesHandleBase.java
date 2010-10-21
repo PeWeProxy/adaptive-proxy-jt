@@ -258,19 +258,38 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		}
 	}
 	
-	private class ServiceRealization<Service extends ProxyService> {
+	private class RealService<Service extends ProxyService> {
 		final Service realService;
+		final boolean initChangedModel;
+		
+		public RealService(Service realService, boolean initChangedModel) {
+			this.realService = realService;
+			this.initChangedModel = initChangedModel;
+		}
+		
+		private RealService(RealService<Service> otherRealSvc) {
+			this.realService = otherRealSvc.realService;
+			this.initChangedModel = otherRealSvc.initChangedModel;
+		}
+	}
+	
+	private class ServiceRealization<Service extends ProxyService> extends RealService<Service> {
 		final ServiceProvider<Service> provider;
 		final ModuleType module;
 		final Map<Method, Boolean> readonlyFlags;
-		final boolean initChangedModel;
 		
 		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module, boolean initChangedModel) {
-			this.realService = realService;
+			super(realService,initChangedModel);
 			this.provider = provider;
 			this.module = module;
 			readonlyFlags = new HashMap<Method, Boolean>();
-			this.initChangedModel = initChangedModel;
+		}
+		
+		public ServiceRealization(RealService<Service> realService, ServiceProvider<Service> provider, ModuleType module) {
+			super(realService);
+			this.provider = provider;
+			this.module = module;
+			readonlyFlags = new HashMap<Method, Boolean>();
 		}
 		
 		@Override
@@ -387,7 +406,8 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		if (binding.realization != newRealization)
 			throw new IllegalStateException("Passed binding does not reference passed service realization");
 		if (newRealization.initChangedModel) {
-			changedModelBinding = binding;
+			if (!httpMessage.isReadOnly())
+				changedModelBinding = binding;
 			actualServicesBindings.clear();
 		}
 		actualServicesBindings.add(binding);
@@ -448,12 +468,12 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		modifyingAttempt(binding,false);
 	}
 	
-	private <Service extends ProxyService> Service createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
+	private <Service extends ProxyService> RealService<Service> createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
 		Service svc = null;
 		Throwable cause = null;
+		boolean modifyingInit = true;
 		try {
 			svc = svcProvider.getService();
-			boolean modifyingInit = true;
 			try {
 				modifyingInit = svcProvider.initChangedModel();
 			} catch (Throwable t) {
@@ -473,7 +493,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 			else
 				throw new ServiceUnavailableException(serviceClass, "Module's provider failed at providing implementation", cause);
 		}
-		return svc;
+		return new RealService<Service>(svc, modifyingInit);
 	}
 	
 	private void providingDiscoveryStart(ModuleType module) {
@@ -508,11 +528,10 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		}
 		if (svcProvider == null)
 			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
-		boolean wasEmpty = actualServicesBindings.isEmpty();
-		Service svcImpl = createRealService(svcProvider, serviceClass);
+		RealService<Service> svcImpl = createRealService(svcProvider, serviceClass);
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"Service provider "+svcProvider+" provided for service "+serviceClass.getName());
-		return new ServiceRealization<Service>(svcImpl, svcProvider, module, (!wasEmpty && actualServicesBindings.isEmpty()));
+		return new ServiceRealization<Service>(svcImpl, svcProvider, module);
 	}
 	
 	abstract <Service extends ProxyService> ServiceProvider<Service> callProvideService(ModuleType module, Class<Service> serviceClass);
