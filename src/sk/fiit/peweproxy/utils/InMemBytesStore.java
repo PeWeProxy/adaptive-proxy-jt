@@ -12,10 +12,7 @@ public class InMemBytesStore {
 	private final Queue<Integer> dataIncrements;
 	
 	public InMemBytesStore(int initSize) {
-		if (initSize < 0) {
-			throw new IllegalArgumentException("initSize can not be negative");
-		}
-		if (initSize == 0) {
+		if (initSize < 1) {
 			initSize = DEF_ARRAYSIZE;
 		}
 		stream = new ByteArrayOutputStream((int)initSize);

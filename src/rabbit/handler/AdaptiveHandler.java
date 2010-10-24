@@ -222,9 +222,6 @@ public class AdaptiveHandler extends FilterHandler {
 		super.setupHandler();
 		if (askForCaching) {
 			if (isCompressing || super.seeUnpackedData()) {
-				// [ignore the method name !]
-				// if this condition is true, this handler will have an access to
-				// not-compressed or uncompressed data passing through it
 				notCaching = !con.getProxy().getAdaptiveEngine().cacheResponse(con, response);
 				if (log.isDebugEnabled())
 					log.debug(this+" caching response data: "+!notCaching);

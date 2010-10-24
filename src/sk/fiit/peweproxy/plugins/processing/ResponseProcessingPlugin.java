@@ -33,7 +33,8 @@ public interface ResponseProcessingPlugin extends ResponsePlugin {
 	}
 	
 	/**
-	 * Process passed <code>response</code> by this response processing plugin. Returning
+	 * Process passed <code>response</code> by this response processing plugin. In this method
+	 * a response processing plugin performs it's real-time message processing. Returning
 	 * action type signals proxy server how to continue in further response processing. 
 	 * @param response response message to process
 	 * @return signal for further processing of a response
@@ -50,4 +51,12 @@ public interface ResponseProcessingPlugin extends ResponsePlugin {
 	 * @return substitutive response message for further processing
 	 */
 	HttpResponse getNewResponse(ModifiableHttpResponse response, HttpMessageFactory messageFactory);
+	
+	/**
+	 * Processes passed read-only <code>response</code>, that was already fully transfered by the
+	 * proxy, by this response processing plugin. In this method a response processing plugin
+	 * performs it's late message processing.
+	 * @param response read-only response message to process
+	 */
+	void processTransferedResponse(HttpResponse response);
 }

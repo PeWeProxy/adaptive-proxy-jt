@@ -17,34 +17,14 @@ Modules made to provide services over HTTP requests expose classes implementing
 interface. Modules made to provide services over HTTP responses expose classes
 implementing {@link sk.fiit.peweproxy.plugins.services.ResponseServiceModule} interface.
 <p>
-When a request / response HTTP message is processed by the Adaptive Proxy platform, a
-representation of the HTTP message is passed sequentially to all successfully loaded
-request / response processing plugins. To read or modify processed message, these plugins
-need to use services available over that message obtained from message's
-{@link sk.fiit.peweproxy.services.ServicesHandle}, thus use active modules indirectly.
+When a request / response HTTP message is processed (real-time or late message processing)
+by the Adaptive Proxy platform, a representation of the HTTP message is passed sequentially
+to all successfully loaded request / response processing plugins. To read or modify processed
+message, these plugins need to use services available over that message obtained from
+message's {@link sk.fiit.peweproxy.services.ServicesHandle}, thus use active modules
+indirectly.
 <p>
-<b>Service discovery</b><br>
-The mechanism of discovering what services (provided by modules) are available over
-particular message is as follows:
-<p>
-<i>Message body caching</i><br>
-When a HTTP header for incoming request / response message is received (before any
-message body data is read), Adaptive Proxy platform requests every request / response
-processing plugin to return a list of services (their definitions, i.e. interfaces of
-those services) it would like to be able to use later in the processing phase. If it
-finds one of the 4 base content services (see {@link sk.fiit.peweproxy.services.content})
-in the list, message body data will be cached and basic content services will be
-available in the processing phase (text services availability depends on "Content-Type"
-HTTP header, see proxy conf file, <code>string_services_pattern</code> variable in <code>
-AdaptiveEngine</code> section). If these base services are not find in the list, platform
-then checks whether these services aren't "desired indirectly". This is when a plugin, in
-order to do what it is made for, wants to be able to use some other service (other than
-one of the 4 base services), which could be in turn provided by plugged-in module if it
-could use one of the 4 base services, even "indirectly". If one of the 4 base content
-services is "desired indirectly", message body data will be cached and basic content
-services will be available in the processing phase (again, condition for text services).
-<p>
-<i>Service implementation providing</i><br>
+<b>Service implementation providing</b><br>
 Modules provide services implementation by returning so called <i>service provider</i>
 when asked to (by platform passing service definition interface). Service provider in turn
 provides service implementation that is an instance that implements service definition
@@ -75,7 +55,7 @@ classes. When asked for a service, a module then decides what class to return as
 provider, based on actual message data. For example based on whether a message is a results
 page of Google, Bing, Yahoo, or other search portal supported by module. 
 <p>
-<i>Discovering available services</i><br>
+<b>Discovering available services</b><br>
 Adaptive Proxy platform keeps list of zero or many references to created and provided
 service implementations inner models of which are considered up to date. If this list is
 not empty, it either holds one or more service implementations inner models of which

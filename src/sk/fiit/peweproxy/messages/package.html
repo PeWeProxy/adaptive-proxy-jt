@@ -18,11 +18,13 @@ representations: one for original HTTP header received by proxy (from the client
 web source) and one that will be sent by proxy server (to web source or the client).
 Access to the original HTTP header is always read-only.
 <p>
+<b>Read-only messages</b><br>
 For read-only representations of the HTTP messages,
 {@link sk.fiit.peweproxy.messages.HttpRequest} for request message and
 {@link sk.fiit.peweproxy.messages.HttpResponse} for response message, provided
 {@link sk.fiit.peweproxy.services.ServicesHandle} will serve
-only services (implementations of services) that do not modify message body data.
+only services (implementations of services) that do not modify message data (header or body
+data).
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

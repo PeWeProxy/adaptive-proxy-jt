@@ -22,7 +22,7 @@ public class ContentFetcher implements BlockListener {
 		if (dataSize > Integer.MAX_VALUE)
 			dataSize = Integer.MAX_VALUE;
 		memStore = new InMemBytesStore((int)dataSize);
-		directSource = new DirectContentSource(con,bufHandle,tlh,separator);
+		directSource = new DirectContentSource(con,bufHandle,tlh,separator,null);
 		directSource.readFirstBytes(this);
 	}
 	

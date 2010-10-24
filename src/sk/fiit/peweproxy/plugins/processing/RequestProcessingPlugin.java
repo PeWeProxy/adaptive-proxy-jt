@@ -40,9 +40,10 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 	}
 	
 	/**
-	 * Process passed <code>request</code> by this request processing plugin. Returning
+	 * Processes passed <code>request</code> by this request processing plugin. In this method
+	 * a request processing plugin performs it's real-time message processing. Returning
 	 * action type signals proxy server how to continue in further request processing. 
-	 * @param request request message to process
+	 * @param request full-access request message to process
 	 * @return signal for further processing of a request
 	 */
 	RequestProcessingActions processRequest(ModifiableHttpRequest request);
@@ -65,4 +66,12 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 	 * @return created response message for further processing
 	 */
 	HttpResponse getResponse(ModifiableHttpRequest request, HttpMessageFactory messageFactory);
+	
+	/**
+	 * Processes passed read-only <code>request</code>, that was already fully transfered by the
+	 * proxy, by this request processing plugin. In this method a request processing plugin
+	 * performs it's late message processing.
+	 * @param request read-only request message to process
+	 */
+	void processTransferedRequest(HttpRequest request);
 }

@@ -21,22 +21,39 @@ the same raw data as <code>ByteContentService</code>.
 to the message entity data in form of properly decoded text string.
 {@link sk.fiit.peweproxy.services.content.ModifiableStringService} provides full access
 to the same entity data as <code>StringContentService</code>.
-Services providing read only access to the HTTP message data are provided in situations
-when plugins aren't expected / allowed to modify message data.
 <p>
-All four services will be provided by {@link sk.fiit.peweproxy.services.ServicesHandle}
-for particular HTTP message only when the message entity body data was prefetched by Adaptive
-Proxy platform. The platform prefetch entity body data when at least one plugin (processing
-plugin or module) requested one of these base services (see
-{@link sk.fiit.peweproxy.plugins.RequestPlugin#desiredRequestServices(Set, RequestHeader)}
-and
-{@link sk.fiit.peweproxy.plugins.ResponsePlugin#desiredResponseServices(Set, ResponseHeader)}
-), and the actual HTTP message carries an entity. In addition, string services will be
-available only when "Content-Type" HTTP header (see 
+<b>Read-only vs. modifying</b><br>
+<i>Read-only services</i>, <code>ByteContentService</code> and
+<code>StringContentService</code> will be provided during:
+<ul>
+<li>discovering services (see {@link sk.fiit.peweproxy.plugins.services})</li>
+<li>real-time processing of a message by plugins</li>
+<li>committing changes to the message</li>
+<li>late processing of a message by plugins</li>
+</ul>
+for every request message that has a body (carries and entity) and response message that has a
+body (carries and entity) and is / was handled by AdaptiveHandler.
+<p>
+<i>Conent modifying services</i>, <code>ModifiableBytesService</code> and
+<code>ModifiableStringService</code>
+will be provided while:
+<ul>
+<li>real-time processing of a message by plugins</li>
+<li>committing changes to the message</li>
+</ul>
+for every <u>non read-only</u> (see {@link sk.fiit.peweproxy.messages}) request message that
+has a body (carries and entity) and response message that has a body (carries and entity) and
+is / was handled by AdaptiveHandler.
+<p>
+A response is handled by AdaptiveHandler depending on it's "Content-Type" HTTP header and
+proxy configuration (see proxy conf file, <code>Handlers</code> section).
+<p>
+<b>String services</b><br>
+In addition, string services will be available only when "Content-Type" HTTP header (see 
 <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17">RFC 2616: 14.17
 Content-Type</a>) value (only the first part until ';' character, if present, to ignore
 possible charset part) matches pattern defined by proxy configuration parameter <code>
-string_services_pattern</code> (see proxy conf file, <code> AdaptiveEngine</code> section).
+string_services_pattern</code> (see proxy conf file, <code>AdaptiveEngine</code> section).
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

@@ -7,6 +7,7 @@ import rabbit.io.SimpleBufferHandle;
 import org.khelekore.rnio.ReadHandler;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
+import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class DirectContentSource extends ContentSource {
 	private final Connection con;
@@ -14,20 +15,30 @@ public class DirectContentSource extends ContentSource {
     private final TrafficLoggerHandler tlh;
     private final ContentSeparator separator;
     private boolean allDataPassed = false;
+    private final ContentCachingListener cachedListener;
+    private final InMemBytesStore memStore;
     
 	public DirectContentSource(Connection con, BufferHandle bufHandle, 
-			TrafficLoggerHandler tlh, ContentSeparator separator) {
+			TrafficLoggerHandler tlh, ContentSeparator separator, ContentCachingListener cachedListener) {
 		this.con = con;
 		this.bufHandle = bufHandle;
 		this.tlh = tlh;
 		this.separator = separator;
+		this.cachedListener = cachedListener;
+		if (cachedListener == null)
+			memStore = null;
+		else
+			memStore = new InMemBytesStore(0);
+			
 	}
 
 	@Override
 	public void readNextBytes() {
-		if (allDataPassed)
+		if (allDataPassed) {
 			listener.finishedRead();
-		else if (!bufHandle.isEmpty())
+			if (cachedListener != null)
+				cachedListener.dataCached(memStore.getBytes(),memStore.getIncrements());
+		} else if (!bufHandle.isEmpty())
 			separateData();
 		else
 			waitForRead();
@@ -104,6 +115,8 @@ public class DirectContentSource extends ContentSource {
 			buffer.position(buffer.limit());
 			buffer.limit(limit);
 			allDataPassed = (indicator == ContentSeparator.VAL_SEPARATED_FINISHED);
+			if (memStore != null)
+				memStore.writeBufferKeepPosition(providedBuffer.getBuffer());
 			listener.bufferRead(providedBuffer);
 		} else
 			throw new IllegalStateException("Content separator returned unspecified value");
