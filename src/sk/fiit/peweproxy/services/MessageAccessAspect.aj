@@ -1,14 +1,10 @@
 package sk.fiit.peweproxy.services;
 
-import java.util.HashMap;
-import java.util.Map;
 
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
-import sk.fiit.peweproxy.headers.ReadableHeader;
 import sk.fiit.peweproxy.headers.RequestHeader;
 import sk.fiit.peweproxy.headers.ResponseHeader;
-import sk.fiit.peweproxy.headers.WritableHeader;
 import sk.fiit.peweproxy.headers.WritableRequestHeader;
 import sk.fiit.peweproxy.headers.WritableResponseHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;

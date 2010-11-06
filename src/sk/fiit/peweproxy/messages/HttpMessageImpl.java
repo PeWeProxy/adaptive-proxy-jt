@@ -60,7 +60,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 				StackTraceElement[] trace = curThread.getStackTrace();
 				boolean internalThread = false;
 				for (StackTraceElement stackTraceElement : trace) {
-					if (stackTraceElement.getClassName().startsWith("rabbit.nio")) {
+					if (stackTraceElement.getClassName().startsWith("org.khelekore.rnio")) {
 						internalThread = true;
 						break;
 					}

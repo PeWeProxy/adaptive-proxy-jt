@@ -222,6 +222,7 @@ public class AdaptiveEngine  {
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for real-time processing");
 		}
 		conHandle.request.setData(requestContent);
+		conHandle.request.setAllowedThread();
 		if (conHandle.lateProcessing) {
 			pluginHandler.submitTaskToThreadPool(new Runnable() {
 				@Override

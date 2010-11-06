@@ -39,6 +39,7 @@ import sk.fiit.peweproxy.services.content.ByteContentService;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
+import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?>, ModuleType extends ServiceModule> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
@@ -665,7 +666,15 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		inCodeOfStack.add(changedModelBinding);
 		bindingDoingChanges = changedModelBinding;
 		changedModelBinding = null;
+		if (httpMessage.isReadOnly()) {
+			String msg = "Attempt to introduce changes on read-only message. Fix it !\n"+StackTraceUtils.getStackTraceText(); 
+			log.warn(msg);
+			System.err.println(msg);
+		}
+		ModuleType moduleProvidingSvc = moduleExecutingProvide;
+		moduleExecutingProvide = null;	// we can be executing service providing atm so make the message writable temporally
 		callDoChanges(svcProvider);
+		moduleExecutingProvide = moduleProvidingSvc;
 		inCodeOfStack.poll();
 		bindingDoingChanges = null;
 	}
