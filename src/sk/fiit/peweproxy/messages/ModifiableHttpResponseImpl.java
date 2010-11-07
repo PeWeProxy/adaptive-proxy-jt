@@ -3,6 +3,7 @@ package sk.fiit.peweproxy.messages;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.ResponseServiceHandleImpl;
+import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl, ModifiableHttpResponse>
 		implements ModifiableHttpResponse {
@@ -16,6 +17,8 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	}
 	
 	private ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper webRPHeaders, HeaderWrapper proxyRPHeaders, ModifiableHttpRequestImpl request) {
+		if (request == null) // temporary assert-like check 
+			throw new NullPointerException("Constructing response with request set to null\n"+StackTraceUtils.getStackTraceText());
 		this.request = request;
 		this.webRPHeaders = webRPHeaders;
 		this.proxyRPHeaders = proxyRPHeaders;

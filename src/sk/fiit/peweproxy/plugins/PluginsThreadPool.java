@@ -14,7 +14,7 @@ public class PluginsThreadPool extends ThreadPoolExecutor {
 				@Override
 				public synchronized Thread newThread(Runnable r) {
 					// maybe we'll need the threads to be in the same group in the future
-					Thread newThread = new Thread(group,r,PluginsThreadPool.class.getSimpleName()+"-thread-"+number);
+					Thread newThread = new Thread(group,r,PluginsThreadPool.class.getSimpleName()+"-"+number);
 					number++;
 					return newThread;
 				}};

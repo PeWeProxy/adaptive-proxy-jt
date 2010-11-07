@@ -51,6 +51,7 @@ import sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin.ResponsePro
 import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
+import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
@@ -76,7 +77,8 @@ public class AdaptiveEngine  {
 		private HttpMessageFactoryImpl messageFactory;
 		private boolean requestChunking = false;
 		private boolean adaptiveHandling = false;
-		private boolean lateProcessing = false;
+		private boolean rqLateProcessing = false;
+		private boolean rpLateProcessing = false;
 		private final long requestTime;
 		private long responseTime;
 
@@ -104,12 +106,12 @@ public class AdaptiveEngine  {
 	
 	public ModifiableHttpRequestImpl getRequestForConnection(Connection con) {
 		if (con == null) {
-			log.warn("Trying to get request for null connection");
+			log.warn("Trying to get request for null connection\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
 			//stackTraceWatcher.printStackTrace(con);
-			log.warn("No handle for "+con+", can't return request");
+			log.warn("No handle for "+con+", can't return request\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
 		return requestHandles.get(con).request;
@@ -117,12 +119,12 @@ public class AdaptiveEngine  {
 	
 	public ModifiableHttpResponseImpl getResponseForConnection(Connection con) {
 		if (con == null) {
-			log.warn("Trying to get response for null connection");
+			log.warn("Trying to get response for null connection\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
 			//stackTraceWatcher.printStackTrace(con);
-			log.warn("No handle for "+con+", can't return response");
+			log.warn("No handle for "+con+", can't return response\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
 		return requestHandles.get(con).response;
@@ -131,7 +133,7 @@ public class AdaptiveEngine  {
 	public void newRequestAttempt(Connection con) {
 		ConnectionHandle newHandle = new ConnectionHandle(con);
 		ConnectionHandle prevHandle = requestHandles.put(con, newHandle);
-		if (prevHandle != null && prevHandle.lateProcessing)
+		if (prevHandle != null && (prevHandle.rqLateProcessing || prevHandle.rpLateProcessing))
 			prevRequestHandles.put(con, prevHandle);
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+newHandle+" | Registering new handle for "+con);
@@ -140,7 +142,7 @@ public class AdaptiveEngine  {
 	public void connectionClosed(Connection con) {
 		//stackTraceWatcher.addStackTrace(con);
 		ConnectionHandle conHandle = requestHandles.remove(con);
-		if (conHandle.lateProcessing)
+		if (conHandle.rqLateProcessing || conHandle.rpLateProcessing)
 			prevRequestHandles.put(con, conHandle);
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
@@ -194,6 +196,7 @@ public class AdaptiveEngine  {
 			} else {
 				if (log.isDebugEnabled())
 					log.debug("RQ: "+conHandle+" | No plugin wants content modifying service for request");
+				conHandle.rqLateProcessing = true;
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator,new RequestContentCachedListener(con));
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
 			}
@@ -205,27 +208,37 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				if (runRequestAdapters(conHandle))
+				boolean lateWasSet = conHandle.rqLateProcessing;
+				conHandle.rqLateProcessing = false; // clear late processing flag since we're going to do real-time processing
+				if (runRequestAdapters(conHandle)) {
+					conHandle.rqLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runRequestAdapters() 
 					proceedWithRequest(conHandle, handler);
+				}
+				conHandle.rqLateProcessing = lateWasSet;
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
 	public void requestContentCached(final Connection con, final byte[] requestContent, final Queue<Integer> dataIncrements) {
-		final ConnectionHandle conHandle = requestHandles.get(con);
+		ConnectionHandle tmpHandle = requestHandles.get(con);
+		if (tmpHandle == null || tmpHandle.request == null) {
+			tmpHandle = prevRequestHandles.remove(con);
+		}
+		final ConnectionHandle conHandle = tmpHandle;
 		if (log.isTraceEnabled()) {
-			if (conHandle.lateProcessing)
+			if (conHandle.rqLateProcessing)
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for late processing");
 			else
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for real-time processing");
 		}
 		conHandle.request.setData(requestContent);
 		conHandle.request.setAllowedThread();
-		if (conHandle.lateProcessing) {
+		if (conHandle.rqLateProcessing) {
 			pluginHandler.submitTaskToThreadPool(new Runnable() {
 				@Override
 				public void run() {
 					runRequestAdapters(conHandle);
+					conHandle.rqLateProcessing = false; // to avoid saving conHandle in prevRequestHandles
 				}
 			});
 		} else {
@@ -249,7 +262,7 @@ public class AdaptiveEngine  {
 	private boolean runRequestAdapters(ConnectionHandle conHandle) {
 		conHandle.request.setAllowedThread();
 		if (log.isTraceEnabled()) {
-			if (conHandle.lateProcessing)
+			if (conHandle.rqLateProcessing)
 				log.trace("RQ: "+conHandle+" | Running late request processing");
 			else
 				log.trace("RQ: "+conHandle+" | Running real-time request processing");
@@ -265,7 +278,7 @@ public class AdaptiveEngine  {
 				boolean sendResponse = false;
 				boolean processResponse = true;
 				try {
-					if (conHandle.lateProcessing) {
+					if (conHandle.rqLateProcessing) {
 						requestPlugin.processTransferedRequest(conHandle.request);
 					} else {
 						RequestProcessingActions action = requestPlugin.processRequest(conHandle.request);
@@ -305,14 +318,12 @@ public class AdaptiveEngine  {
 				}
 			}
 		} while (again);
-		if (!conHandle.lateProcessing)
+		if (!conHandle.rqLateProcessing)
 			conHandle.request.getServicesHandle().finalize();
 		return true;
 	}
 
 	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
-		if (conHandle.lateProcessing)
-			conHandle.request.setReadOnly();
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -329,7 +340,6 @@ public class AdaptiveEngine  {
 	
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
-		conHandle.lateProcessing = false;
 		conHandle.responseTime = System.currentTimeMillis();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
 		//conHandle.response.getProxyResponseHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
@@ -375,19 +385,22 @@ public class AdaptiveEngine  {
 			return true;
 		if (log.isDebugEnabled())
 			log.debug("RP: "+conHandle+" | No plugin wants content modifying service for response");
-		conHandle.lateProcessing = true;
+		conHandle.rpLateProcessing = true;
 		return false;
 	}
 
 	public void processResponse(final Connection con, final Runnable proceedTask) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.response.setAllowedThread();
-		if (!conHandle.adaptiveHandling && !proxyDying) {
+		if ((!conHandle.adaptiveHandling || conHandle.rpLateProcessing) && !proxyDying) {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
+					boolean lateWasSet = conHandle.rpLateProcessing;
+					conHandle.rpLateProcessing = false; // clear late processing flag since we might do real-time processing
 					runResponseAdapters(conHandle);
-					if (conHandle.lateProcessing)
+					conHandle.rpLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runResponseAdapters()
+					if (conHandle.rpLateProcessing)
 						conHandle.response.setReadOnly();
 					proceedWithResponse(conHandle, proceedTask);
 				}
@@ -430,7 +443,7 @@ public class AdaptiveEngine  {
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
 		conHandle.response.setData(responseContent);
 		runResponseAdapters(conHandle);
-		if (!conHandle.lateProcessing) {
+		if (!conHandle.rpLateProcessing) {
 			final ModifiableHttpResponseImpl response = conHandle.response;
 			final byte[] modifiedContent = conHandle.response.getData();
 			proceedWithResponse(conHandle, new Runnable() {
@@ -445,7 +458,7 @@ public class AdaptiveEngine  {
 	private void runResponseAdapters(ConnectionHandle conHandle) {
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled()) {
-			if (conHandle.lateProcessing)
+			if (conHandle.rpLateProcessing)
 				log.trace("RP: "+conHandle+" | Running late response processing");
 			else
 				log.trace("RP: "+conHandle+" | Running real-time response processing");
@@ -460,7 +473,7 @@ public class AdaptiveEngine  {
 					// skip this plugin to prevent cycling
 					continue;
 				try {
-					if (conHandle.lateProcessing) {
+					if (conHandle.rpLateProcessing) {
 						responsePlugin.processTransferedResponse(conHandle.response);
 					} else {
 						ResponseProcessingActions action = responsePlugin.processResponse(conHandle.response);
@@ -486,7 +499,7 @@ public class AdaptiveEngine  {
 				}
 			}
 		} while (again);
-		if (!conHandle.lateProcessing)
+		if (!conHandle.rpLateProcessing)
 			conHandle.response.getServicesHandle().finalize();
 	}
 	

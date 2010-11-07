@@ -6,6 +6,7 @@ import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ServicesHandle;
+import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMessageType extends HttpMessage> implements HttpMessage {
 	private final static Logger log = Logger.getLogger(HttpMessageImpl.class);
@@ -47,6 +48,8 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 	public void setAllowedThread() {
 		checkThread = true;
 		allowedThread = Thread.currentThread();
+		if (log.isTraceEnabled())
+			log.trace(this+" setting allowed thread to "+allowedThread);
 	}
 	
 	public void disableThreadCheck() {
@@ -56,6 +59,8 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 	public void checkThreadAccess() {
 		if (checkThread) {
 			Thread curThread = Thread.currentThread();
+			if (log.isTraceEnabled())
+				log.trace(this+" checking executing thread "+curThread+" against allowed thread "+allowedThread);
 			if (curThread != allowedThread) {
 				StackTraceElement[] trace = curThread.getStackTrace();
 				boolean internalThread = false;
@@ -66,13 +71,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 					}
 				}
 				if (internalThread) {
-					StringBuilder sb = new StringBuilder();
-		            for (int i=1; i < trace.length; i++) {
-		                sb.append("\tat ");
-		                sb.append(trace[i]);
-		                sb.append('\n');
-		            }
-					log.warn("Internal thread was not recognized as allowed, fix this !\nStackTrace:\n"+sb.toString());
+					log.warn("Internal thread was not recognized as allowed, fix this !\n"+StackTraceUtils.getStackTraceText(curThread));
 					return;
 				}
 	            UnsupportedOperationException e =  new UnsupportedOperationException("Access to the message is not allowed" +

@@ -5,9 +5,11 @@ public class StackTraceUtils {
 		StringBuilder sb = new StringBuilder(thread.toString());
 		sb.append('\n');
 		for (StackTraceElement element : thread.getStackTrace()) {
-			sb.append("\tat ");
-			sb.append(element.toString());
-			sb.append('\n');
+			if (!StackTraceUtils.class.getName().equals(element.getClassName())) {
+				sb.append("\tat ");
+				sb.append(element.toString());
+				sb.append('\n');
+			}
 		}
 		return sb.toString();
 	}
