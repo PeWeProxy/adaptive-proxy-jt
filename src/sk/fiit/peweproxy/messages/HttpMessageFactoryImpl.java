@@ -42,7 +42,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			retVal = (ModifiableHttpRequestImpl) ((ModifiableHttpRequestImpl)baseRequest).clone();
 		} else {
 			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(new HttpHeader())
-			,(request != null) ? request.getClientSocketAddress() : null);
+			,(request != null) ? request.getClientSocketAddr() : null);
 		}
 		retVal.setAllowedThread();
 		setContent(retVal, contentType);

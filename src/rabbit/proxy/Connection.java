@@ -573,7 +573,7 @@ public class Connection {
 				@Override
 				public void run() {
 					HttpHeader response = ((HeaderWrapper)getProxy().getAdaptiveEngine()
-						.getResponseForConnection(Connection.this).getProxyResponseHeader()).getBackedHeader();
+						.getResponseForConnection(Connection.this).getProxyHeader()).getBackedHeader();
 					sendAndRestart (response);
 				}
 			});

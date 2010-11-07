@@ -41,6 +41,11 @@ public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServ
 	public InetSocketAddress getClientSocketAddress() {
 		return clientSocketAdr;
 	}
+	
+	// method not advised by aspect intended to be used in AdaptiveEngine code
+	public InetSocketAddress getClientSocketAddr() {
+		return clientSocketAdr;
+	}
 
 	@Override
 	public HeaderWrapper getOriginalHeader() {

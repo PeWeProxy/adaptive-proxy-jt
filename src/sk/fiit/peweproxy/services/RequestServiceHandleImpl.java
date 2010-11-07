@@ -20,7 +20,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	@Override
 	void discoverDesiredServices(RequestServiceModule plugin,
 			Set<Class<? extends ProxyService>> desiredServices) {
-		plugin.desiredRequestServices(desiredServices,httpMessage.getClientRequestHeader());
+		plugin.desiredRequestServices(desiredServices,httpMessage.getOriginalHeader());
 	}
 	
 	@Override
