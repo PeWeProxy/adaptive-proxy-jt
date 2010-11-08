@@ -5,11 +5,11 @@ import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceProvider;
 import sk.fiit.peweproxy.services.ProxyService;
 
-abstract class BaseServiceProvider<MessageType extends HttpMessageImpl<?,?>, Service extends ProxyService>
+abstract class BaseServiceProvider<Service extends ProxyService>
 	implements RequestServiceProvider<Service>, ResponseServiceProvider<Service>, ProxyService {
-	final MessageType httpMessage;
+	final HttpMessageImpl<?> httpMessage;
 	
-	public BaseServiceProvider(MessageType httpMessage) {
+	public BaseServiceProvider(HttpMessageImpl<?> httpMessage) {
 		if (httpMessage == null)
 			throw new IllegalStateException("HTTP message can not be null");
 		if (httpMessage.getData() == null)

@@ -12,17 +12,17 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 
-public class ModifiableStringServiceImpl<MessageType extends HttpMessageImpl<?,?>>
-	extends BaseServiceProvider<HttpMessageImpl<?,?>,ModifiableStringService> implements ModifiableStringService{
+public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableStringService>
+	implements ModifiableStringService{
 
 	private final StringBuilder sb;
 	private Charset charset = null;
 	
-	public ModifiableStringServiceImpl(MessageType httpMessage, boolean useJChardet)
+	public ModifiableStringServiceImpl(HttpMessageImpl<?> httpMessage, boolean useJChardet)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
 		super(httpMessage);
 		byte[] data = httpMessage.getData();
-		charset = CharsetUtils.detectCharset(httpMessage.getProxyHeader(), data, useJChardet);
+		charset = CharsetUtils.detectCharset(httpMessage.getHeader(), data, useJChardet);
 		sb = new StringBuilder(CharsetUtils.decodeBytes(data, charset, true));
 	}
 
@@ -56,7 +56,7 @@ public class ModifiableStringServiceImpl<MessageType extends HttpMessageImpl<?,?
 		String s = sb.toString();
 		httpMessage.setData(s.getBytes(charset));
 		
-		WritableHeader proxyHeader = httpMessage.getProxyHeader();
+		WritableHeader proxyHeader = httpMessage.getHeader();
 		String cType = proxyHeader.getField("Content-Type");
 		if (cType == null)
 			return;

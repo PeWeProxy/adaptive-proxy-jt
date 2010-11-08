@@ -9,11 +9,11 @@ import sk.fiit.peweproxy.headers.WritableResponseHeader;
  */
 public interface ModifiableHttpResponse extends HttpResponse {
 	/**
-	 * Returns read-only HTTP response header that will be (or was) sent by proxy
-	 * server back to the client.
-	 * @return sending HTTP response header
+	 * Returns modifiable representation of HTTP response header of this response
+	 * message.
+	 * @return modifiable HTTP response header
 	 */
-	WritableResponseHeader getProxyResponseHeader();
+	WritableResponseHeader getResponseHeader();
 	
 	public ModifiableHttpResponse clone();
 }

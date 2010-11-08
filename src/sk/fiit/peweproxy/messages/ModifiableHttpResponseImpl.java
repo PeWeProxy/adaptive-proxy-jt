@@ -1,55 +1,42 @@
 package sk.fiit.peweproxy.messages;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
+import sk.fiit.peweproxy.headers.WritableResponseHeader;
 import sk.fiit.peweproxy.services.ModulesManager;
-import sk.fiit.peweproxy.services.ResponseServiceHandleImpl;
-import sk.fiit.peweproxy.utils.StackTraceUtils;
 
-public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl, ModifiableHttpResponse>
+public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 		implements ModifiableHttpResponse {
-	private final ModifiableHttpRequestImpl request;
-	private final HeaderWrapper webRPHeaders;
-	private final HeaderWrapper proxyRPHeaders;
+	private final HttpResponseImpl originalResponse;
 	
-	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper webRPHeaders, ModifiableHttpRequestImpl request) {
-		// webRPHeaders are those that are going to be modified by RabbIT code
-		this(modulesManager, webRPHeaders.clone(), webRPHeaders, request);
+	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper header,
+			HttpResponseImpl originalResponse) {
+		super(modulesManager, header, originalResponse.request);
+		this.originalResponse = originalResponse;
 	}
 	
-	private ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper webRPHeaders, HeaderWrapper proxyRPHeaders, ModifiableHttpRequestImpl request) {
-		if (request == null) // temporary assert-like check 
-			throw new NullPointerException("Constructing response with request set to null\n"+StackTraceUtils.getStackTraceText());
-		this.request = request;
-		this.webRPHeaders = webRPHeaders;
-		this.proxyRPHeaders = proxyRPHeaders;
-		webRPHeaders.setHttpMessage(this);
-		proxyRPHeaders.setHttpMessage(this);
-		setServiceHandle(new ResponseServiceHandleImpl(this,modulesManager));
-	}
-	
-	@Override
-	public HeaderWrapper getProxyResponseHeader() {
-		return proxyRPHeaders;
-	}
-	
-	@Override
-	public HeaderWrapper getWebResponseHeader() {
-		return webRPHeaders;
+	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper header,
+			HttpRequestImpl request) {
+		super(modulesManager, header, request);
+		this.originalResponse = this;
 	}
 	
 	@Override
 	public HttpRequest getRequest() {
-		return request;
+		return getRequest();
 	}
 
 	@Override
-	public HeaderWrapper getOriginalHeader() {
-		return webRPHeaders;
+	public WritableResponseHeader getResponseHeader() {
+		return header;
 	}
-
+	
 	@Override
-	public HeaderWrapper getProxyHeader() {
-		return proxyRPHeaders;
+	public HttpResponse getOriginalResponse() {
+		return originalResponse;
+	}
+	
+	public HttpResponse originalResponse() {
+		return originalResponse;
 	}
 	
 	@Override
@@ -59,8 +46,13 @@ public final class ModifiableHttpResponseImpl extends HttpMessageImpl<ResponseSe
 	}
 	
 	@Override
-	protected ModifiableHttpResponseImpl makeClone() {
-		return new ModifiableHttpResponseImpl(getServicesHandle().getManager()
-				, webRPHeaders, proxyRPHeaders.clone(), (ModifiableHttpRequestImpl)request.clone());
+	public ModifiableHttpResponseImpl clone() {
+		return clone(new ModifiableHttpResponseImpl(getServicesHandle().getManager(),
+				header, originalResponse));
+	}
+	
+	@Override
+	public String toString() {
+		return super.toString()+"["+originalResponse.toString()+"]";
 	}
 }

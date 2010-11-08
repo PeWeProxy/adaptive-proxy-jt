@@ -9,12 +9,12 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 
-public class ModifiableByteServiceImpl<MessageType extends HttpMessageImpl<?,?>>
-	extends BaseServiceProvider<MessageType, ModifiableBytesService> implements ModifiableBytesService {
+public class ModifiableByteServiceImpl extends BaseServiceProvider<ModifiableBytesService>
+	implements ModifiableBytesService {
 	
 	byte[] data = null;
 	
-	public ModifiableByteServiceImpl(MessageType httpMessage) {
+	public ModifiableByteServiceImpl(HttpMessageImpl<?> httpMessage) {
 		super(httpMessage);
 		data = httpMessage.getData();
 		data =  Arrays.copyOf(data, data.length);
@@ -44,11 +44,11 @@ public class ModifiableByteServiceImpl<MessageType extends HttpMessageImpl<?,?>>
 
 	@Override
 	public void doChanges(ModifiableHttpRequest request) {
-		doChanges(request.getClientRequestHeader(), request.getProxyRequestHeader());
+		doChanges(request.getOriginalRequest().getRequestHeader(), request.getRequestHeader());
 	}
 
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {
-		doChanges(response.getWebResponseHeader(), response.getProxyResponseHeader());
+		doChanges(response.getOriginalResponse().getResponseHeader(), response.getResponseHeader());
 	}
 }

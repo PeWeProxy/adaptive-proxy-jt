@@ -9,20 +9,25 @@ import sk.fiit.peweproxy.headers.ResponseHeader;
  */
 public interface HttpResponse extends HttpMessage {
 	
+	/**
+	 * Returns a request message that resulted in HTTP response represented by
+	 * this response message.
+	 * @return request message this message is a response for
+	 */
 	HttpRequest getRequest();
 
 	/**
-	 * Returns read-only HTTP response header received from the web source.
-	 * @return original HTTP response header received from the web source
+	 * Returns modifiable representation of HTTP response header of this response
+	 * message.
+	 * @return modifiable HTTP response header
 	 */
-	ResponseHeader getWebResponseHeader();
+	ResponseHeader getResponseHeader();
 	
 	/**
-	 * Returns read-only HTTP response header that will be (or was) sent by proxy
-	 * server back to the client.
-	 * @return sending HTTP response header
+	 * Returns original HTTP response as sent by the web resource.
+	 * @return original HTTP response
 	 */
-	ResponseHeader getProxyResponseHeader();
+	HttpResponse getOriginalResponse();
 	
 	public HttpResponse clone();
 }

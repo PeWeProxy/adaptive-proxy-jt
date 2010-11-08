@@ -41,7 +41,7 @@ import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
-public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?>, ModuleType extends ServiceModule> implements ServicesHandle {
+public abstract class ServicesHandleBase<ModuleType extends ServiceModule> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
 	private static ServiceModule baseModule = new BaseModule();
 	
@@ -74,7 +74,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	
 	
 	final ModulesManager manager;
-	final MessageType httpMessage;
+	final HttpMessageImpl<?> httpMessage;
 	private final ClassLoader servicesCLoader;
 	private final List<ModuleType> modules;
 	private final Map<ProxyService, ServiceBinding<?>> serviceBindings;
@@ -84,7 +84,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	private ServiceBinding<?> bindingDoingChanges;
 	private ModuleType moduleExecutingProvide;
 	
-	public ServicesHandleBase(MessageType httpMessage, List<ModuleType> modules, ModulesManager manager) {
+	public ServicesHandleBase(HttpMessageImpl<?> httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		this.httpMessage = httpMessage;
 		this.modules = modules;
 		this.serviceBindings = new HashMap<ProxyService, ServiceBinding<?>>();
@@ -158,14 +158,14 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	
 	private ServiceProvider<ByteContentService> getByteService() {
 		if (httpMessage.hasBody())
-			return new ByteServiceImpl<MessageType>(httpMessage);
+			return new ByteServiceImpl(httpMessage);
 		else
 			throw new ServiceUnavailableException(ByteContentService.class, "The massage carries no data", null);
 	}
 	
 	private ServiceProvider<ModifiableBytesService> getModByteServie()  {
 		if (httpMessage.hasBody())
-			return new ModifiableByteServiceImpl<MessageType>(httpMessage);
+			return new ModifiableByteServiceImpl(httpMessage);
 		else
 			throw new ServiceUnavailableException(ModifiableBytesService.class, "The massage carries no data", null);
 	}
@@ -173,7 +173,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 	private boolean hasTextutalContent () {
 		if (!httpMessage.hasBody())
 			return false;
-		return manager.matchesStringServicePattern(httpMessage.getProxyHeader());
+		return manager.matchesStringServicePattern(httpMessage.getHeader());
 	}
 	
 	private ServiceProvider<StringContentService> getStringService() {
@@ -181,7 +181,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new StringServiceImpl<MessageType>(httpMessage,false);
+				return new StringServiceImpl(httpMessage,false);
 			} catch (CharacterCodingException e) {
 				excMessage = "Data of this message don't match it's charset";
 				cause = e;
@@ -203,7 +203,7 @@ public abstract class ServicesHandleBase<MessageType extends HttpMessageImpl<?,?
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new ModifiableStringServiceImpl<MessageType>(httpMessage, false);
+				return new ModifiableStringServiceImpl(httpMessage, false);
 			}  catch (UnsupportedCharsetException e) {
 				log.warn(getLogTextHead()+getLogTextCapital()
 						+" header denotes unsupported charset "+e.getCharsetName());

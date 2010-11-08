@@ -1,65 +1,41 @@
 package sk.fiit.peweproxy.messages;
 
-import java.net.InetSocketAddress;
-
 import sk.fiit.peweproxy.headers.HeaderWrapper;
+import sk.fiit.peweproxy.headers.WritableRequestHeader;
 import sk.fiit.peweproxy.services.ModulesManager;
-import sk.fiit.peweproxy.services.RequestServiceHandleImpl;
 
-public final class ModifiableHttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl, ModifiableHttpRequest>
+public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 		implements ModifiableHttpRequest {
-	private InetSocketAddress clientSocketAdr;
-	private HeaderWrapper clientRQHeaders;
-	private HeaderWrapper proxyRQHeaders;
+	private final HttpRequestImpl originalRequest;
 	
-	public ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper clientRQHeaders, InetSocketAddress clientSocketAdr) {
-		this(modulesManager,clientRQHeaders
-			,clientRQHeaders.clone(),clientSocketAdr);
-	}
-	
-	private ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper clientRQHeaders,
-			HeaderWrapper proxyRQHeaders, InetSocketAddress clientSocketAdr) {
-		this.clientSocketAdr = clientSocketAdr;
-		this.clientRQHeaders = clientRQHeaders;
-		this.proxyRQHeaders = proxyRQHeaders;
-		clientRQHeaders.setHttpMessage(this);
-		proxyRQHeaders.setHttpMessage(this);
-		setServiceHandle(new RequestServiceHandleImpl(this,modulesManager));
+	public ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper header,
+			HttpRequestImpl originalRequest) {
+		super(modulesManager, header, originalRequest.clientSocketAddress());
+		this.originalRequest = originalRequest;
 	}
 	
 	@Override
-	public HeaderWrapper getProxyRequestHeader() {
-		return proxyRQHeaders;
+	public WritableRequestHeader getRequestHeader() {
+		return header;
 	}
 
 	@Override
-	public HeaderWrapper getClientRequestHeader() {
-		return clientRQHeaders;
-	}
-
-	@Override
-	public InetSocketAddress getClientSocketAddress() {
-		return clientSocketAdr;
+	public HttpRequest getOriginalRequest() {
+		return originalRequest;
 	}
 	
-	// method not advised by aspect intended to be used in AdaptiveEngine code
-	public InetSocketAddress getClientSocketAddr() {
-		return clientSocketAdr;
-	}
-
-	@Override
-	public HeaderWrapper getOriginalHeader() {
-		return clientRQHeaders;
-	}
-
-	@Override
-	public HeaderWrapper getProxyHeader() {
-		return proxyRQHeaders;
+	public HttpRequest originalRequest() {
+		return originalRequest;
 	}
 	
 	@Override
-	protected ModifiableHttpRequestImpl makeClone() {
-		return new ModifiableHttpRequestImpl(getServicesHandle().getManager(), clientRQHeaders
-				,proxyRQHeaders.clone(), clientSocketAdr);
+	public ModifiableHttpRequestImpl clone() {
+		return clone(new ModifiableHttpRequestImpl(getServicesHandle().getManager(),
+				header.clone(), originalRequest));
+	}
+	
+	@Override
+	public String toString() {
+		return super.toString()+"["+originalRequest.toString()+"]";
 	}
 }

@@ -14,16 +14,17 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	
 	private final AdaptiveEngine adaptiveEngine;
 	private final Connection con;
-	private final ModifiableHttpRequestImpl request;
+	private final HttpRequestImpl request;
+	private HttpResponseImpl response;
 	
-	public HttpMessageFactoryImpl(AdaptiveEngine adaptiveEngine, Connection con, ModifiableHttpRequestImpl request) {
+	public HttpMessageFactoryImpl(AdaptiveEngine adaptiveEngine, Connection con, HttpRequestImpl request) {
 		this.adaptiveEngine = adaptiveEngine;
 		this.con = con;
 		this.request = request;
 	}
 	
-	private void setContent(HttpMessageImpl<?,?> message, String contentType) {
-		HttpHeader proxyHeader = message.getProxyHeader().getBackedHeader();
+	private void setContent(HttpMessageImpl<?> message, String contentType) {
+		HttpHeader proxyHeader = message.getHeader().getBackedHeader();
 		if (contentType != null) {
 			proxyHeader.setHeader ("Content-Type", contentType);
 			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
@@ -42,7 +43,7 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 			retVal = (ModifiableHttpRequestImpl) ((ModifiableHttpRequestImpl)baseRequest).clone();
 		} else {
 			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(new HttpHeader())
-			,(request != null) ? request.getClientSocketAddr() : null);
+						, request);
 		}
 		retVal.setAllowedThread();
 		setContent(retVal, contentType);
@@ -55,9 +56,13 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		if (baseResponse != null)
 			retVal = (ModifiableHttpResponseImpl) ((ModifiableHttpResponseImpl)baseResponse).clone();
 		else {
-			retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
+			if (response == null) // when creating response during request processing
+				retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
 						,new HeaderWrapper(new HttpHeader()),request);
-			HttpHeader header = retVal.getProxyHeader().getBackedHeader();
+			else
+				retVal = new ModifiableHttpResponseImpl(adaptiveEngine.getModulesManager()
+						,new HeaderWrapper(new HttpHeader()),response);
+			HttpHeader header = retVal.getHeader().getBackedHeader();
 			header.setStatusLine("HTTP/1.1 200 OK");
 			header.setHeader("Date", HttpDateParser.getDateString(new Date()));
 			header.setHeader("Via", con.getProxy().getProxyIdentity());
@@ -69,5 +74,9 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		retVal.setAllowedThread();
 		setContent(retVal, contentType);
 		return retVal;
+	}
+	
+	public void setResponse(HttpResponseImpl response) {
+		this.response = response;
 	}
 }

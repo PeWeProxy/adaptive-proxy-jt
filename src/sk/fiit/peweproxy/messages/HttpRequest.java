@@ -11,17 +11,17 @@ import sk.fiit.peweproxy.headers.RequestHeader;
  */
 public interface HttpRequest extends HttpMessage {
 	/**
-	 * Returns read-only HTTP request header received from the client.
-	 * @return original HTTP request header received from the client
+	 * Returns read-only representation of HTTP request header of this request
+	 * message.
+	 * @return read-only HTTP request header
 	 */
-	RequestHeader getClientRequestHeader();
+	RequestHeader getRequestHeader();
 	
 	/**
-	 * Returns read-only HTTP request header that will be (or was) sent by proxy
-	 * server to the web source.
-	 * @return sending HTTP request header
+	 * Returns original HTTP request as sent by the client.
+	 * @return original HTTP request
 	 */
-	RequestHeader getProxyRequestHeader();
+	HttpRequest getOriginalRequest();
 	
 	/**
 	 * Returns client's endpoint info (socket address) of connection through which

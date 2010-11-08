@@ -2,14 +2,16 @@ package sk.fiit.peweproxy.services;
 
 import java.util.Set;
 
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpRequestImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
 
-public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpRequestImpl,RequestServiceModule> {
+public class RequestServiceHandleImpl extends ServicesHandleBase<RequestServiceModule> {
 	
-	public RequestServiceHandleImpl(ModifiableHttpRequestImpl request, ModulesManager modulesManager) {
+	public RequestServiceHandleImpl(HttpRequestImpl request, ModulesManager modulesManager) {
 		super(request, modulesManager.getRequestModules(), modulesManager);
 	}
 	
@@ -20,7 +22,7 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	@Override
 	void discoverDesiredServices(RequestServiceModule plugin,
 			Set<Class<? extends ProxyService>> desiredServices) {
-		plugin.desiredRequestServices(desiredServices,httpMessage.getOriginalHeader());
+		plugin.desiredRequestServices(desiredServices,httpMessage.getHeader());
 	}
 	
 	@Override
@@ -35,11 +37,12 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<ModifiableHttpR
 	@Override
 	<Service extends ProxyService> ServiceProvider<Service> callProvideService(RequestServiceModule module,
 			Class<Service> serviceClass) {
-		return module.provideRequestService(httpMessage, serviceClass);
+		return module.provideRequestService((HttpRequest)httpMessage, serviceClass);
 	}
 	
 	@Override
 	<Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider) {
-		((RequestServiceProvider<Service>) svcProvider).doChanges(httpMessage);
+		// doChanges can be called only on modifiable message, so it's OK to crash if the cast fails
+		((RequestServiceProvider<Service>) svcProvider).doChanges((ModifiableHttpRequestImpl)httpMessage);
 	}
 }

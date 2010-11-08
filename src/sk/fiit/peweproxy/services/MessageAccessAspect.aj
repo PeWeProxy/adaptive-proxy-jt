@@ -43,7 +43,7 @@ public aspect MessageAccessAspect {
 	@SuppressWarnings("unchecked")
 	before(HeaderWrapper header) : readableHeaderMethods() && this(header)
 			&& !cflowbelow(readableHeaderMethods()) && inMessageProcessing() {
-		ServicesHandleBase<?,?> svcHandle = (ServicesHandleBase<?, ?>) header.getHttpMessage().getServicesHandle();
+		ServicesHandleBase<?> svcHandle = (ServicesHandleBase<?>) header.getHttpMessage().getServicesHandle();
 		if (svcHandle != null) {
 			svcHandle.httpMessage.checkThreadAccess();
 			svcHandle.headerBeingRead();
@@ -53,7 +53,7 @@ public aspect MessageAccessAspect {
 	before(HeaderWrapper header) : writableHeaderMethods() && this(header)
 			&& !cflowbelow(writableHeaderMethods()) && !readableHeaderMethods() 
 			&& inMessageProcessing() {
-		ServicesHandleBase<?,?> svcHandle = (ServicesHandleBase<?, ?>) header.getHttpMessage().getServicesHandle();
+		ServicesHandleBase<?> svcHandle = (ServicesHandleBase<?>) header.getHttpMessage().getServicesHandle();
 		if (svcHandle != null) {
 			svcHandle.httpMessage.checkThreadAccess();
 			svcHandle.headerBeingModified();

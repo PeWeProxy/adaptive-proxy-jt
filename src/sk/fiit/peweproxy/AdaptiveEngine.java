@@ -38,7 +38,9 @@ import rabbit.util.SProperties;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.messages.HttpMessageFactoryImpl;
 import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpRequestImpl;
 import sk.fiit.peweproxy.messages.HttpResponse;
+import sk.fiit.peweproxy.messages.HttpResponseImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponseImpl;
 import sk.fiit.peweproxy.plugins.PluginHandler;
@@ -151,13 +153,14 @@ public class AdaptiveEngine  {
 	public void newRequest(Connection con, boolean chunking) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
-		conHandle.request = new ModifiableHttpRequestImpl(modulesManager,new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
+		HttpRequestImpl origRequest = new HttpRequestImpl(modulesManager, new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
+		conHandle.request = new ModifiableHttpRequestImpl(modulesManager, origRequest.getHeader().clone(), origRequest);
 		conHandle.messageFactory = new HttpMessageFactoryImpl(this,con,conHandle.request);
 		conHandle.requestChunking = chunking;
-		con.setProxyRHeader(conHandle.request.getProxyHeader().getBackedHeader());
+		con.setProxyRHeader(conHandle.request.getHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
-					+conHandle.request.getOriginalHeader().getRequestLine()+") - "+conHandle.request);
+					+origRequest.getHeader().getRequestLine()+") - "+conHandle.request);
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
@@ -175,7 +178,7 @@ public class AdaptiveEngine  {
 				try {
 					Set<Class<? extends ProxyService>> pluginsDesiredSvcs
 						= new HashSet<Class<? extends ProxyService>>();
-					requestPlugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getOriginalHeader());
+					requestPlugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
 					pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 						if (log.isDebugEnabled())
@@ -289,6 +292,7 @@ public class AdaptiveEngine  {
 											" substitution is being ignored.");
 							else {
 								conHandle.request = (ModifiableHttpRequestImpl) newRequest;
+								conHandle.messageFactory = new HttpMessageFactoryImpl(this, conHandle.con, conHandle.request);
 								conHandle.request.setAllowedThread();
 							}
 							if (action == RequestProcessingActions.NEW_REQUEST) {
@@ -341,13 +345,15 @@ public class AdaptiveEngine  {
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
-		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
-		//conHandle.response.getProxyResponseHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
+		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
+		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
+		//conHandle.response.getHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
 		conHandle.response.setAllowedThread();
+		conHandle.messageFactory.setResponse(conHandle.response);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
 					+response.getStatusLine()+" | requested "
-					+conHandle.request.getProxyHeader().getRequestLine()+") - "+conHandle.response);
+					+conHandle.request.getHeader().getRequestLine()+") - "+conHandle.response);
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
@@ -361,15 +367,16 @@ public class AdaptiveEngine  {
 	public boolean cacheResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
-		// conHandle.response.proxyRPHeaders were modified meanwhile
-		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,new HeaderWrapper(response),conHandle.request);
+		// conHandle.response.eader was modified meanwhile
+		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
+		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
 		conHandle.adaptiveHandling = true;
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 			try {
 				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
 					= new HashSet<Class<? extends ProxyService>>(); 
-				responsePlugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getOriginalHeader());
+				responsePlugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
 				pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
@@ -449,7 +456,7 @@ public class AdaptiveEngine  {
 			proceedWithResponse(conHandle, new Runnable() {
 				@Override
 				public void run() {
-					handler.sendResponse(response.getProxyHeader().getBackedHeader(),modifiedContent);
+					handler.sendResponse(response.getHeader().getBackedHeader(),modifiedContent);
 				}
 			});
 		}
@@ -529,8 +536,8 @@ public class AdaptiveEngine  {
 		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
 		Connection con = conHandle.con;
 		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
-		HttpHeader requestHeaders = conHandle.request.getProxyHeader().getBackedHeader();
-		final HttpHeader responseHeaders = conHandle.response.getProxyHeader().getBackedHeader();
+		HttpHeader requestHeaders = conHandle.request.getHeader().getBackedHeader();
+		final HttpHeader responseHeaders = conHandle.response.getHeader().getBackedHeader();
 		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
 		handlerFactory.nextInstanceWillNotCache();
 		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
@@ -544,30 +551,30 @@ public class AdaptiveEngine  {
 	
 	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
 		return "Running plugins processing on request \""
-			+ conHandle.request.getOriginalHeader().getRequestLine()
-			+ "\" from " + conHandle.request.getClientSocketAddr();
+			+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getRequestLine()
+			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseProcessingTaskInfo (ConnectionHandle conHandle) {
 		return "Running plugins processing on response \""
-			+ conHandle.response.getOriginalHeader().getStatusLine()
-			+ "\" for request \"" + conHandle.request.getProxyHeader().getRequestLine()
-			+ "\" from " + conHandle.request.getClientSocketAddr();
+			+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getStatusLine()
+			+ "\" for request \"" + conHandle.request.getHeader().getRequestLine()
+			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String requestSendingTaskInfo(ConnectionHandle conHandle) {
 		return "Proceeding in handling request \""
-			+ conHandle.request.getProxyHeader().getRequestLine()
-			+ "\" (orig: \""+ conHandle.request.getOriginalHeader().getRequestLine()
-			+ "\") from " + conHandle.request.getClientSocketAddr();
+			+ conHandle.request.getHeader().getRequestLine()
+			+ "\" (orig: \""+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getRequestLine()
+			+ "\") from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseSendingTaskInfo (ConnectionHandle conHandle) {
 		return "Proceeding in handling response \""
-			+ conHandle.response.getProxyHeader().getStatusLine()
-			+ "\" (orig: \""+ conHandle.response.getOriginalHeader().getStatusLine()
-			+ "\") for request \"" + conHandle.request.getProxyHeader().getRequestLine()
-			+ "\" from " + conHandle.request.getClientSocketAddr();
+			+ conHandle.response.getHeader().getStatusLine()
+			+ "\" (orig: \""+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getStatusLine()
+			+ "\") for request \"" + conHandle.request.getHeader().getRequestLine()
+			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	public HttpProxy getProxy() {
@@ -745,7 +752,7 @@ public class AdaptiveEngine  {
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
-					+" on " +conHandle.request.getProxyHeader().getRequestLine());
+					+" on " +conHandle.request.getHeader().getRequestLine());
 	}
 
 	public ModulesManager getModulesManager() {

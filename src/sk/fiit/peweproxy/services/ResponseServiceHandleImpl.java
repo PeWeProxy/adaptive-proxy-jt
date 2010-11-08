@@ -2,14 +2,16 @@ package sk.fiit.peweproxy.services;
 
 import java.util.Set;
 
+import sk.fiit.peweproxy.messages.HttpResponse;
+import sk.fiit.peweproxy.messages.HttpResponseImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponseImpl;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
 
-public final class ResponseServiceHandleImpl extends ServicesHandleBase<ModifiableHttpResponseImpl,ResponseServiceModule> {
+public final class ResponseServiceHandleImpl extends ServicesHandleBase<ResponseServiceModule> {
 	
-	public ResponseServiceHandleImpl(ModifiableHttpResponseImpl response, ModulesManager modulesManager) {
+	public ResponseServiceHandleImpl(HttpResponseImpl response, ModulesManager modulesManager) {
 		super(response, modulesManager.getResponseModules(), modulesManager);
 	}
 	
@@ -20,7 +22,7 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Modifiab
 	@Override
 	void discoverDesiredServices(ResponseServiceModule plugin,
 			Set<Class<? extends ProxyService>> desiredServices) {
-		plugin.desiredResponseServices(desiredServices,httpMessage.getOriginalHeader());
+		plugin.desiredResponseServices(desiredServices,httpMessage.getHeader());
 	}
 	
 	@Override
@@ -35,11 +37,12 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Modifiab
 	@Override
 	<Service extends ProxyService> ServiceProvider<Service> callProvideService(ResponseServiceModule module,
 				Class<Service> serviceClass) throws ServiceUnavailableException {
-		return module.provideResponseService(httpMessage, serviceClass);
+		return module.provideResponseService((HttpResponse)httpMessage, serviceClass);
 	}
 	
 	@Override
 	<Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider) {
-		((ResponseServiceProvider<Service>) svcProvider).doChanges(httpMessage);
+		// doChanges can be called only on modifiable message, so it's OK to crash if the cast fails
+		((ResponseServiceProvider<Service>) svcProvider).doChanges((ModifiableHttpResponseImpl)httpMessage);
 	}
 }

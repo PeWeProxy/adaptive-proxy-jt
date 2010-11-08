@@ -8,16 +8,22 @@ import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
-public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMessageType extends HttpMessage> implements HttpMessage {
+public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
 	private final static Logger log = Logger.getLogger(HttpMessageImpl.class);
-		
+	
+	protected final HeaderWrapper header;
 	byte[] data = null;
 	private HandleType serviceHandle;
 	private boolean checkThread = false;
 	private Thread allowedThread;
 	private boolean isReadonly = false; 
 	
-	protected void setServiceHandle(HandleType serviceHandle) {
+	public HttpMessageImpl(HeaderWrapper header) {
+		this.header = header;
+		header.setHttpMessage(this);
+	}
+	
+	protected void setServicesHandle(HandleType serviceHandle) {
 		this.serviceHandle = serviceHandle;
 		if (log.isDebugEnabled())
 			log.debug(toString()+" uses "+serviceHandle.toString());
@@ -41,9 +47,9 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 		return data != null;
 	}
 	
-	public abstract HeaderWrapper getOriginalHeader();
-	
-	public abstract HeaderWrapper getProxyHeader();
+	public HeaderWrapper getHeader() {
+		return header;
+	}
 	
 	public void setAllowedThread() {
 		checkThread = true;
@@ -95,16 +101,16 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle, HttpMes
 		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
 	}
 	
-	@SuppressWarnings("unchecked")
-	@Override
-	public HttpMessageType clone() {
-		HttpMessageImpl<HandleType,HttpMessageType> retVal = makeClone();
-		if (data != null)
-			retVal.data = Arrays.copyOf(data, data.length);
-		retVal.disableThreadCheck();
-		retVal.isReadonly = isReadonly;
-		return (HttpMessageType) retVal;
+	public HttpMessageImpl<HandleType> clone() {
+		// to avoid compile error, this method is never called
+		return null;
 	}
 	
-	protected abstract HttpMessageImpl<HandleType,HttpMessageType> makeClone();
+	protected <MessageType extends HttpMessageImpl<HandleType>> MessageType clone(MessageType message) {
+		if (data != null)
+			message.data = Arrays.copyOf(data, data.length);
+		message.disableThreadCheck();
+		message.isReadonly = isReadonly;
+		return message;
+	}
 }

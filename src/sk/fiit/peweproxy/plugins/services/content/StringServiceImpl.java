@@ -10,16 +10,16 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.services.content.StringContentService;
 
-public class StringServiceImpl<MessageType extends HttpMessageImpl<?,?>>
-extends BaseServiceProvider<MessageType,StringContentService> implements StringContentService {
+public class StringServiceImpl extends BaseServiceProvider<StringContentService>
+	implements StringContentService {
 	
 	final String content;
 	
-	public StringServiceImpl(MessageType httpMessage, boolean useJChardet)
+	public StringServiceImpl(HttpMessageImpl<?> httpMessage, boolean useJChardet)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
 		super(httpMessage);
 		byte[] data = httpMessage.getData();
-		content = CharsetUtils.decodeBytes(data, CharsetUtils.detectCharset(httpMessage.getProxyHeader(), data, useJChardet), true).toString();
+		content = CharsetUtils.decodeBytes(data, CharsetUtils.detectCharset(httpMessage.getHeader(), data, useJChardet), true).toString();
 		//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
 	}
 

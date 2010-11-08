@@ -38,17 +38,17 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 		}
 	}
 	private final HttpHeader backedHeader; 
-	private HttpMessageImpl<?, ?> message;
+	private HttpMessageImpl<?> message;
 	
 	public HeaderWrapper(HttpHeader header) {
 		backedHeader = header;
 	}
 	
-	public void setHttpMessage(HttpMessageImpl<?, ?> message) {
+	public void setHttpMessage(HttpMessageImpl<?> message) {
 		this.message = message;
 	}
 	
-	public HttpMessageImpl<?, ?> getHttpMessage() {
+	public HttpMessageImpl<?> getHttpMessage() {
 		return message;
 	}
 	
