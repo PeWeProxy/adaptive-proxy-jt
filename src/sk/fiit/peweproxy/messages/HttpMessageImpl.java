@@ -9,7 +9,7 @@ import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
-	private final static Logger log = Logger.getLogger(HttpMessageImpl.class);
+	protected static final Logger log = Logger.getLogger(HttpMessageImpl.class);
 	
 	protected final HeaderWrapper header;
 	byte[] data = null;
@@ -53,9 +53,10 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	
 	public void setAllowedThread() {
 		checkThread = true;
+		Thread lastThread = allowedThread;
 		allowedThread = Thread.currentThread();
-		if (log.isTraceEnabled())
-			log.trace(this+" setting allowed thread to "+allowedThread);
+		if (lastThread != allowedThread && log.isTraceEnabled())
+			log.trace(this+" changing allowed thread to "+allowedThread);
 	}
 	
 	public void disableThreadCheck() {

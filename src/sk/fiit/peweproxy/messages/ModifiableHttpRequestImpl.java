@@ -10,8 +10,10 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 	
 	public ModifiableHttpRequestImpl(ModulesManager modulesManager, HeaderWrapper header,
 			HttpRequestImpl originalRequest) {
-		super(modulesManager, header, originalRequest.clientSocketAddress());
+		super(modulesManager,header, originalRequest.clientSocketAddress());
 		this.originalRequest = originalRequest;
+		if (log.isTraceEnabled())
+			log.trace(toString()+" has original request set to "+originalRequest.toString());
 	}
 	
 	@Override
@@ -32,10 +34,5 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 	public ModifiableHttpRequestImpl clone() {
 		return clone(new ModifiableHttpRequestImpl(getServicesHandle().getManager(),
 				header.clone(), originalRequest));
-	}
-	
-	@Override
-	public String toString() {
-		return super.toString()+"["+originalRequest.toString()+"]";
 	}
 }

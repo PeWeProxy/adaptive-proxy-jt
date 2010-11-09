@@ -12,12 +12,14 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 			HttpResponseImpl originalResponse) {
 		super(modulesManager, header, originalResponse.request);
 		this.originalResponse = originalResponse;
+		log.trace(toString()+" has original response set to "+originalResponse.toString());
 	}
 	
 	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper header,
 			HttpRequestImpl request) {
 		super(modulesManager, header, request);
 		this.originalResponse = this;
+		log.trace(toString()+" has original response set to self");
 	}
 	
 	@Override
@@ -49,10 +51,5 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	public ModifiableHttpResponseImpl clone() {
 		return clone(new ModifiableHttpResponseImpl(getServicesHandle().getManager(),
 				header, originalResponse));
-	}
-	
-	@Override
-	public String toString() {
-		return super.toString()+"["+originalResponse.toString()+"]";
 	}
 }

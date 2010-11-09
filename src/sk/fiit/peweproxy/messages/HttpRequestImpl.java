@@ -19,7 +19,7 @@ public class HttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl>
 		this.clientSocketAdr = clientSocketAdr;
 		setServicesHandle(new RequestServiceHandleImpl(this,modulesManager));
 	}
-
+	
 	@Override
 	public RequestHeader getRequestHeader() {
 		return header;

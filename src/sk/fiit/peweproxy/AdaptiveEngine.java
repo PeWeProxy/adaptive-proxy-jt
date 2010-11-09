@@ -140,9 +140,16 @@ public class AdaptiveEngine  {
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+newHandle+" | Registering new handle for "+con);
 	}
+	Map<Connection, String> closedConns = new HashMap<Connection, String>();
 	
 	public void connectionClosed(Connection con) {
 		//stackTraceWatcher.addStackTrace(con);
+		String stackTrace = StackTraceUtils.getStackTraceText();
+		if (closedConns.containsKey(con)) {
+			System.out.println(closedConns.get(con));
+			System.out.println(stackTrace);
+		}
+		closedConns.put(con, stackTrace);
 		ConnectionHandle conHandle = requestHandles.remove(con);
 		if (conHandle.rqLateProcessing || conHandle.rpLateProcessing)
 			prevRequestHandles.put(con, conHandle);
@@ -473,7 +480,6 @@ public class AdaptiveEngine  {
 		boolean again = false;
 		Set<ResponseProcessingPlugin> pluginsChangedResponse = new HashSet<ResponseProcessingPlugin>();
 		do {
-			// Discover services EVERY TIME there's new response
 			again = false;
 			for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 				if (pluginsChangedResponse.contains(responsePlugin))

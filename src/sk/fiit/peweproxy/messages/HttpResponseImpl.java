@@ -18,7 +18,7 @@ public class HttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
 		this.request = request;
 		setServicesHandle(new ResponseServiceHandleImpl(this,modulesManager));
 	}
-
+	
 	@Override
 	public HttpRequest getRequest() {
 		return request;
