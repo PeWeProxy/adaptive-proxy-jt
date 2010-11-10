@@ -2,7 +2,6 @@ package rabbit.handler;
 
 import java.nio.ByteBuffer;
 import rabbit.http.HttpHeader;
-import rabbit.httpio.BlockSender;
 import rabbit.httpio.ResourceSource;
 import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
@@ -94,10 +93,6 @@ public class MultiPartHandler extends BaseHandler {
     @Override public void bufferRead (BufferHandle bufHandle) {
 	ByteBuffer buf = bufHandle.getBuffer ();
 	mpp.parseBuffer (buf);
-	BlockSender bs = 
-	    new BlockSender (con.getChannel (), con.getNioHandler (),
-			     tlh.getClient (), bufHandle, 
-			     con.getChunking (), this);
-	bs.write ();
+	sendBlock(bufHandle);
     }
 }

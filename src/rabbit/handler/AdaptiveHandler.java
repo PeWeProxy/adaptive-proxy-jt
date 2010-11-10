@@ -121,13 +121,13 @@ public class AdaptiveHandler extends FilterHandler {
 		}
 	}
 	
-	public void sendResponse(HttpHeader responseHeaders, byte[] content) {
+	public void sendResponse(HttpHeader responseHeader, byte[] content) {
 		if (sendingPhase) {
 			log.warn("sendResponse() method was called second time, closing down connection");
 			finish(false);
 			return;
 		}
-		response = responseHeaders;
+		response = responseHeader;
 		if (content != null) {
 			if (log.isDebugEnabled())
 				log.debug(this+" sending response with data of length = "+content.length);

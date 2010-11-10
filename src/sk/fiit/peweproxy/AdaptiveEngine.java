@@ -78,7 +78,7 @@ public class AdaptiveEngine  {
 		private ModifiableHttpResponseImpl response = null;
 		private HttpMessageFactoryImpl messageFactory;
 		private boolean requestChunking = false;
-		private boolean adaptiveHandling = false;
+		private Handler handler = null;
 		private boolean rqLateProcessing = false;
 		private boolean rpLateProcessing = false;
 		private final long requestTime;
@@ -112,7 +112,6 @@ public class AdaptiveEngine  {
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			//stackTraceWatcher.printStackTrace(con);
 			log.warn("No handle for "+con+", can't return request\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
@@ -125,7 +124,6 @@ public class AdaptiveEngine  {
 			return null;
 		}
 		if (!requestHandles.containsKey(con)) {
-			//stackTraceWatcher.printStackTrace(con);
 			log.warn("No handle for "+con+", can't return response\n"+StackTraceUtils.getStackTraceText());
 			return null;
 		}
@@ -220,10 +218,8 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				boolean lateWasSet = conHandle.rqLateProcessing; 
-				conHandle.rqLateProcessing = false; // clear late processing flag since we're going to do real-time processing
-				runRequestAdapters(conHandle);
-				conHandle.rqLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runRequestAdapters()	
+				if (!runRequestAdapters(conHandle,false) && handler != null)
+					handler.setDontWritebytes(); // response was constructed and sent, so we just read request body bytes but won't send them
 				proceedWithRequest(conHandle, handler);	
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
@@ -249,7 +245,7 @@ public class AdaptiveEngine  {
 			pluginHandler.submitTaskToThreadPool(new Runnable() {
 				@Override
 				public void run() {
-					runRequestAdapters(conHandle);
+					runRequestAdapters(conHandle, true);
 					conHandle.rqLateProcessing = false; // to avoid saving conHandle in prevRequestHandles
 				}
 			});
@@ -257,7 +253,7 @@ public class AdaptiveEngine  {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
-					if (runRequestAdapters(conHandle)) {
+					if (runRequestAdapters(conHandle, false)) {
 						ClientResourceHandler resourceHandler = null;
 						byte[] requestContent = conHandle.request.getData();
 						if (requestContent != null) {
@@ -271,14 +267,15 @@ public class AdaptiveEngine  {
 		}
 	}
 	
-	private boolean runRequestAdapters(ConnectionHandle conHandle) {
+	private boolean runRequestAdapters(ConnectionHandle conHandle, boolean lateProcessing) {
 		conHandle.request.setAllowedThread();
 		if (log.isTraceEnabled()) {
-			if (conHandle.rqLateProcessing)
+			if (lateProcessing)
 				log.trace("RQ: "+conHandle+" | Running late request processing");
 			else
 				log.trace("RQ: "+conHandle+" | Running real-time request processing");
 		}
+		boolean transferOriginalBody = true;
 		boolean again = false;
 		Set<RequestProcessingPlugin> pluginsChangedResponse = new HashSet<RequestProcessingPlugin>();
 		do {
@@ -290,7 +287,7 @@ public class AdaptiveEngine  {
 				boolean sendResponse = false;
 				boolean processResponse = true;
 				try {
-					if (conHandle.rqLateProcessing) {
+					if (lateProcessing) {
 						requestPlugin.processTransferedRequest(conHandle.request);
 					} else {
 						RequestProcessingActions action = requestPlugin.processRequest(conHandle.request);
@@ -300,6 +297,7 @@ public class AdaptiveEngine  {
 								log.warn("Null HttpRequest was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewRequest()," +
 											" substitution is being ignored.");
 							else {
+								transferOriginalBody = false;
 								conHandle.request = (ModifiableHttpRequestImpl) newRequest;
 								conHandle.messageFactory = new HttpMessageFactoryImpl(this, conHandle.con, conHandle.request);
 								conHandle.request.setAllowedThread();
@@ -316,9 +314,11 @@ public class AdaptiveEngine  {
 							if (newResponse == null)
 								log.warn("Null HttpResponse was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewResponse()," +
 											" substitution is being ignored.");
-							else
+							else {
+								transferOriginalBody = false; // not needed but still leaving it here
+								sendResponse = true;
 								conHandle.response = (ModifiableHttpResponseImpl) newResponse;
-							sendResponse = true;
+							}
 						}
 					}
 				} catch (Throwable t) {
@@ -327,13 +327,13 @@ public class AdaptiveEngine  {
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
-					return false;
+					return false; // sending response means we don't want to transfer request body bytes, just read it
 				}
 			}
 		} while (again);
-		if (!conHandle.rqLateProcessing)
+		if (!lateProcessing)
 			conHandle.request.getServicesHandle().finalize();
-		return true;
+		return transferOriginalBody || !lateProcessing; //if we're doing realtime processing with cached body, return value must match !sendResponse = true
 	}
 
 	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
@@ -380,7 +380,6 @@ public class AdaptiveEngine  {
 		// conHandle.response.eader was modified meanwhile
 		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
-		conHandle.adaptiveHandling = true;
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 			try {
@@ -408,20 +407,23 @@ public class AdaptiveEngine  {
 
 	public void processResponse(final Connection con, final Runnable proceedTask) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
+		boolean adaptiveHandling = conHandle.handler instanceof AdaptiveHandler; 
 		conHandle.response.setAllowedThread();
-		if ((!conHandle.adaptiveHandling || conHandle.rpLateProcessing) && !proxyDying) {
+		if ((!adaptiveHandling || conHandle.rpLateProcessing) && !proxyDying) {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
-					boolean lateWasSet = conHandle.rpLateProcessing;
-					conHandle.rpLateProcessing = false; // clear late processing flag since we might do real-time processing (in case of !conHandle.adaptiveHandling)
-					runResponseAdapters(conHandle);
-					conHandle.rpLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runResponseAdapters()
+					boolean transferBody = runResponseAdapters(conHandle,false); // header-only real-tie processing
+					if (conHandle.handler != null) {
+						conHandle.handler.setResponseHeader(conHandle.response.getHeader().getBackedHeader());
+						if (!transferBody)
+							conHandle.handler.setDontSendBytes();
+					}
 					proceedWithResponse(conHandle, proceedTask);
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 		} else {
-			proceedTask.run();
+			proceedTask.run(); // let the AdaptiveHandler cache response body (or if proxy dying, dont bother unning task through NioHandler)
 			if (proxyDying && log.isTraceEnabled())
 				log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
 		}
@@ -459,7 +461,7 @@ public class AdaptiveEngine  {
 	}
 	
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
-		runResponseAdapters(conHandle);
+		runResponseAdapters(conHandle,conHandle.rpLateProcessing); // full response processing (real-tie or late)
 		if (!conHandle.rpLateProcessing) {
 			final ModifiableHttpResponseImpl response = conHandle.response;
 			final byte[] modifiedContent = conHandle.response.getData();
@@ -472,14 +474,15 @@ public class AdaptiveEngine  {
 		}
 	}
 	
-	private void runResponseAdapters(ConnectionHandle conHandle) {
+	private boolean runResponseAdapters(ConnectionHandle conHandle, boolean lateProcessing) {
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled()) {
-			if (conHandle.rpLateProcessing)
+			if (lateProcessing)
 				log.trace("RP: "+conHandle+" | Running late response processing");
 			else
 				log.trace("RP: "+conHandle+" | Running real-time response processing");
 		}
+		boolean transferOriginalBody = true;
 		boolean again = false;
 		Set<ResponseProcessingPlugin> pluginsChangedResponse = new HashSet<ResponseProcessingPlugin>();
 		do {
@@ -489,7 +492,7 @@ public class AdaptiveEngine  {
 					// skip this plugin to prevent cycling
 					continue;
 				try {
-					if (conHandle.rpLateProcessing) {
+					if (lateProcessing) {
 						responsePlugin.processTransferedResponse(conHandle.response);
 					} else {
 						ResponseProcessingActions action = responsePlugin.processResponse(conHandle.response);
@@ -499,6 +502,7 @@ public class AdaptiveEngine  {
 								log.warn("Null HttpResponse was provided by ResponseProcessingPlugin '"+responsePlugin+"' after calling getNewResponse()," +
 											" substitution is being ignored.");
 							else {
+								transferOriginalBody = false;
 								conHandle.response = (ModifiableHttpResponseImpl) newResponse;
 								conHandle.response.setAllowedThread();
 							}
@@ -515,8 +519,9 @@ public class AdaptiveEngine  {
 				}
 			}
 		} while (again);
-		if (!conHandle.rpLateProcessing)
+		if (!lateProcessing)
 			conHandle.response.getServicesHandle().finalize();
+		return transferOriginalBody;
 	}
 	
 	private void proceedWithResponse(final ConnectionHandle conHandle, final Runnable proceedTask) {
@@ -537,7 +542,8 @@ public class AdaptiveEngine  {
 	
 	private void sendResponse(final ConnectionHandle conHandle, boolean processResponse) {
 		if (processResponse) {
-			runResponseAdapters(conHandle);
+			runResponseAdapters(conHandle,false);
+			// conHandle.handler is null since this method is called from runRequestadapters() 
 		} else {
 			conHandle.response.getServicesHandle().finalize();
 		}
@@ -759,6 +765,7 @@ public class AdaptiveEngine  {
 
 	public void responseHandlerUsed(Connection connection, Handler handler) {
 		ConnectionHandle conHandle = requestHandles.get(connection);
+		conHandle.handler = handler;
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response

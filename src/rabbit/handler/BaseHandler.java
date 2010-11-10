@@ -71,6 +71,7 @@ public class BaseHandler
     protected boolean emptyChunkSent = false;
     
     private ResponseReadListener responseReadListener = null;
+    protected boolean sendBytes = true;
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
@@ -520,14 +521,21 @@ public class BaseHandler
 	    if (cacheChannel != null)
 		writeCache (buffer);
 	    totalRead += buffer.remaining ();
-	    BlockSender bs =
-		new BlockSender (con.getChannel (), con.getNioHandler (), 
-				 tlh.getClient (), bufHandle,
-				 con.getChunking (), this);
-	    bs.write ();
+	    sendBlock(bufHandle);
 	} catch (IOException e) {
 	    failed (e);
 	}
+    }
+    
+    protected void sendBlock(BufferHandle bufHandle) {
+    	 if (sendBytes) {
+ 		    BlockSender bs =
+ 			new BlockSender (con.getChannel (), con.getNioHandler (), 
+ 					 tlh.getClient (), bufHandle,
+ 					 con.getChunking (), this);
+ 		    bs.write ();
+ 	    } else
+ 	    	blockSent();
     }
     
      protected void requestMoreData() {
@@ -640,5 +648,15 @@ public class BaseHandler
 
     public void setup (SProperties properties) {
 	// nothing to do.
+    }
+    
+    @Override
+    public void setDontSendBytes() {
+    	sendBytes = false;
+    }
+    
+    @Override
+    public void setResponseHeader(HttpHeader header) {
+    	response = header;
     }
 }

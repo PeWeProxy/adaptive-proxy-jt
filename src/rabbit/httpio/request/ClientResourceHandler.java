@@ -18,6 +18,7 @@ public class ClientResourceHandler implements BlockListener {
     protected WebConnection wc;
     protected ClientResourceTransferredListener listener;
     final SendingListener sendingListener;
+    private boolean writeBytes = true;
 
     public ClientResourceHandler(Connection con, ContentSource contentSource,
     		boolean chunking) {
@@ -60,10 +61,13 @@ public class ClientResourceHandler implements BlockListener {
     @Override
     public void bufferRead(BufferHandle bufHandle) {
     	con.fireResouceDataRead (bufHandle);
-		BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
-			     con.getTrafficLoggerHandler().getNetwork (),
-			     bufHandle, chunking, sendingListener);
-		bs.write();
+    	if (writeBytes) {
+			BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
+				     con.getTrafficLoggerHandler().getNetwork (),
+				     bufHandle, chunking, sendingListener);
+			bs.write();
+    	} else
+    		sendingListener.blockSent();
     }
     
     @Override
@@ -97,5 +101,9 @@ public class ClientResourceHandler implements BlockListener {
 		public void timeout() {
 			listener.sendingTimeout();
 		}
+    }
+    
+    public void setDontWritebytes() {
+    	writeBytes = false;
     }
 }

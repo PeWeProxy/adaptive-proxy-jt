@@ -1,5 +1,7 @@
 package rabbit.handler;
 
+import rabbit.http.HttpHeader;
+
 /** This interface descsribes the methods neccessary to implement a
  *  handler. Besides this a constructor is also nedded 
  *
@@ -16,5 +18,9 @@ public interface Handler {
      *         Return false if this handler will not change the size.
      */
     boolean changesContentSize ();
+    
+    void setDontSendBytes();
+    
+    void setResponseHeader(HttpHeader header);
 }
 
