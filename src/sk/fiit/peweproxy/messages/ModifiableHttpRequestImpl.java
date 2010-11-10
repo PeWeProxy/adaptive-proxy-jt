@@ -26,7 +26,7 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 		return originalRequest;
 	}
 	
-	public HttpRequest originalRequest() {
+	public HttpRequestImpl originalRequest() {
 		return originalRequest;
 	}
 	

@@ -37,7 +37,7 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 		return originalResponse;
 	}
 	
-	public HttpResponse originalResponse() {
+	public HttpResponseImpl originalResponse() {
 		return originalResponse;
 	}
 	

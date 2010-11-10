@@ -161,6 +161,7 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
 		HttpRequestImpl origRequest = new HttpRequestImpl(modulesManager, new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
+		origRequest.setReadOnly();
 		conHandle.request = new ModifiableHttpRequestImpl(modulesManager, origRequest.getHeader().clone(), origRequest);
 		conHandle.messageFactory = new HttpMessageFactoryImpl(this,con,conHandle.request);
 		conHandle.requestChunking = chunking;
@@ -213,18 +214,17 @@ public class AdaptiveEngine  {
 		} else {
 			if (log.isTraceEnabled())
 				log.trace("RQ: "+conHandle+" | Request has no body");
+			conHandle.rqLateProcessing = false;
 		}
 		final ClientResourceHandler handler = resourceHandler;
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				boolean lateWasSet = conHandle.rqLateProcessing;
+				boolean lateWasSet = conHandle.rqLateProcessing; 
 				conHandle.rqLateProcessing = false; // clear late processing flag since we're going to do real-time processing
-				if (runRequestAdapters(conHandle)) {
-					conHandle.rqLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runRequestAdapters() 
-					proceedWithRequest(conHandle, handler);
-				}
-				conHandle.rqLateProcessing = lateWasSet;
+				runRequestAdapters(conHandle);
+				conHandle.rqLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runRequestAdapters()	
+				proceedWithRequest(conHandle, handler);	
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
@@ -235,13 +235,15 @@ public class AdaptiveEngine  {
 			tmpHandle = prevRequestHandles.remove(con);
 		}
 		final ConnectionHandle conHandle = tmpHandle;
+		conHandle.request.originalRequest().setData(requestContent);
+		if (!conHandle.rqLateProcessing)
+			conHandle.request.setData(requestContent);
 		if (log.isTraceEnabled()) {
 			if (conHandle.rqLateProcessing)
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for late processing");
 			else
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for real-time processing");
 		}
-		conHandle.request.setData(requestContent);
 		conHandle.request.setAllowedThread();
 		if (conHandle.rqLateProcessing) {
 			pluginHandler.submitTaskToThreadPool(new Runnable() {
@@ -353,6 +355,7 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
 		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
+		origResponse.setReadOnly();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
 		//conHandle.response.getHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
 		conHandle.response.setAllowedThread();
@@ -411,11 +414,9 @@ public class AdaptiveEngine  {
 				@Override
 				public void run() {
 					boolean lateWasSet = conHandle.rpLateProcessing;
-					conHandle.rpLateProcessing = false; // clear late processing flag since we might do real-time processing
+					conHandle.rpLateProcessing = false; // clear late processing flag since we might do real-time processing (in case of !conHandle.adaptiveHandling)
 					runResponseAdapters(conHandle);
 					conHandle.rpLateProcessing = lateWasSet; // set the late flag back because proceeding may result in call to runResponseAdapters()
-					if (conHandle.rpLateProcessing)
-						conHandle.response.setReadOnly();
 					proceedWithResponse(conHandle, proceedTask);
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
@@ -428,6 +429,8 @@ public class AdaptiveEngine  {
 	
 	public void responseContentCached(Connection con, final byte[] responseContent, final AdaptiveHandler handler) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
+		conHandle.response.setData(responseContent);
+		conHandle.response.originalResponse().setData(responseContent);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for real-time processing");
 		proxy.getNioHandler().runThreadTask(new Runnable() {
@@ -444,6 +447,7 @@ public class AdaptiveEngine  {
 			tmpHandle = prevRequestHandles.remove(con);
 		}
 		final ConnectionHandle conHandle = tmpHandle;
+		conHandle.response.originalResponse().setData(responseContent);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for late processing");
 		pluginHandler.submitTaskToThreadPool(new Runnable() {
@@ -455,7 +459,6 @@ public class AdaptiveEngine  {
 	}
 	
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
-		conHandle.response.setData(responseContent);
 		runResponseAdapters(conHandle);
 		if (!conHandle.rpLateProcessing) {
 			final ModifiableHttpResponseImpl response = conHandle.response;
@@ -520,6 +523,7 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
+				conHandle.response.setReadOnly();
 				conHandle.response.setAllowedThread();
 				if (log.isTraceEnabled()) {
 					log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
