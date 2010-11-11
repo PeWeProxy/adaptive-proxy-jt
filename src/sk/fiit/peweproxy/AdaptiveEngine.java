@@ -201,6 +201,7 @@ public class AdaptiveEngine  {
 				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices);
 			if (prefetch) {
 				new ContentFetcher(con,bufHandle,tlh,separator,new RequestContentCachedListener(con),dataSize);
+				// cache request body data first, then run full message real-time processing (see requestContentCached())
 				return;
 			} else {
 				if (log.isDebugEnabled())
@@ -208,6 +209,8 @@ public class AdaptiveEngine  {
 				conHandle.rqLateProcessing = true;
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator,new RequestContentCachedListener(con));
 				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
+				// will run header-only real-time processing, then proceeds in handling request what will
+				// transfer request body data while caching it for late processing
 			}
 		} else {
 			if (log.isTraceEnabled())
@@ -215,12 +218,33 @@ public class AdaptiveEngine  {
 			conHandle.rqLateProcessing = false;
 		}
 		final ClientResourceHandler handler = resourceHandler;
+		// no body or no need to modify it, run header-only real-time processing (request may have body)
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				if (!runRequestAdapters(conHandle,false) && handler != null)
-					handler.setDontWritebytes(); // response was constructed and sent, so we just read request body bytes but won't send them
-				proceedWithRequest(conHandle, handler);	
+				ClientResourceHandler handlerToUse = handler;
+				RequestProcessingResult result = runRequestAdapters(conHandle, false); 
+				if (result != RequestProcessingResult.ORIGINAL_REQUEST && handler != null) {
+					// we don't want to transfer original request body data, so we just read bytes (for late processing) but won't send them
+					handler.setDontWritebytes();
+				}
+				if (result == RequestProcessingResult.NEW_REQUEST) {
+					// substitutive request was constructed
+					byte[] requestContent = conHandle.request.getData();
+					if (requestContent != null) {
+						// substitutive request with body was constructed
+						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
+						ClientResourceHandler newHandler = new ClientResourceHandler(conHandle.con,contentSource,conHandle.requestChunking);
+						if (handlerToUse == null) {
+							// request without body received, but substitutive request with body was constructed
+							handlerToUse = newHandler;
+						} else {
+							// body of the request will be received (for late processing), but we need to send another body afterwards
+							handlerToUse.chainHandler(newHandler);
+						}
+					}
+				}
+				proceedWithRequest(conHandle, handlerToUse);	
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
@@ -242,6 +266,7 @@ public class AdaptiveEngine  {
 		}
 		conHandle.request.setAllowedThread();
 		if (conHandle.rqLateProcessing) {
+			// full message late processing
 			pluginHandler.submitTaskToThreadPool(new Runnable() {
 				@Override
 				public void run() {
@@ -250,10 +275,11 @@ public class AdaptiveEngine  {
 				}
 			});
 		} else {
+			// full message real-time processing
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
-					if (runRequestAdapters(conHandle, false)) {
+					if (runRequestAdapters(conHandle, false) != RequestProcessingResult.RESPONSE_SENT) {
 						ClientResourceHandler resourceHandler = null;
 						byte[] requestContent = conHandle.request.getData();
 						if (requestContent != null) {
@@ -267,7 +293,13 @@ public class AdaptiveEngine  {
 		}
 	}
 	
-	private boolean runRequestAdapters(ConnectionHandle conHandle, boolean lateProcessing) {
+	enum RequestProcessingResult {
+		RESPONSE_SENT,
+		NEW_REQUEST,
+		ORIGINAL_REQUEST,
+	}
+	
+	private RequestProcessingResult runRequestAdapters(ConnectionHandle conHandle, boolean lateProcessing) {
 		conHandle.request.setAllowedThread();
 		if (log.isTraceEnabled()) {
 			if (lateProcessing)
@@ -327,13 +359,16 @@ public class AdaptiveEngine  {
 				}
 				if (sendResponse) {
 					sendResponse(conHandle,processResponse);
-					return false; // sending response means we don't want to transfer request body bytes, just read it
+					return RequestProcessingResult.RESPONSE_SENT; // sending response means we don't want to transfer request body bytes, just read it
 				}
 			}
 		} while (again);
 		if (!lateProcessing)
 			conHandle.request.getServicesHandle().finalize();
-		return transferOriginalBody || !lateProcessing; //if we're doing realtime processing with cached body, return value must match !sendResponse = true
+		if (transferOriginalBody)
+			return RequestProcessingResult.ORIGINAL_REQUEST;
+		else
+			return RequestProcessingResult.NEW_REQUEST;
 	}
 
 	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
@@ -374,7 +409,7 @@ public class AdaptiveEngine  {
 		processResponse(con, proceedTask);
 	}
 
-	public boolean cacheResponse(Connection con, HttpHeader response) {
+	public boolean transferResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
 		// conHandle.response.eader was modified meanwhile

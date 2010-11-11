@@ -17,6 +17,7 @@ public class ClientResourceHandler implements BlockListener {
     private boolean sentEndChunk = false;
     protected WebConnection wc;
     protected ClientResourceTransferredListener listener;
+    private  ClientResourceHandler chainedHandler;
     final SendingListener sendingListener;
     private boolean writeBytes = true;
 
@@ -72,23 +73,33 @@ public class ClientResourceHandler implements BlockListener {
     
     @Override
     public void finishedRead() {
-    	if (!chunking)
-			listener.clientResourceTransferred();
-    	else {
+    	if (!chunking) {
+    		transafered();
+    	} else {
 			ChunkEnder ce = new ChunkEnder ();
-			sentEndChunk = true;	
-			ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
-					con.getTrafficLoggerHandler().getNetwork(),
-					sendingListener);
+			if (writeBytes) {
+				sentEndChunk = true;	
+				ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
+						con.getTrafficLoggerHandler().getNetwork(),
+						sendingListener);
+			} else
+				sendingListener.blockSent();
     	}
+    }
+    
+    protected void transafered() {
+    	if (chainedHandler!= null)
+			chainedHandler.transfer(wc, listener);
+    	else
+    		listener.clientResourceTransferred();
     }
     
     class SendingListener implements BlockSentListener {
 		@Override
 		public void blockSent() {
-			if (sentEndChunk)
-	    		listener.clientResourceTransferred();
-	    	else
+			if (sentEndChunk) {
+				transafered();
+			} else
 	    		contentSource.readNextBytes();
 		}
 
@@ -105,5 +116,9 @@ public class ClientResourceHandler implements BlockListener {
     
     public void setDontWritebytes() {
     	writeBytes = false;
+    }
+    
+    public void chainHandler(ClientResourceHandler handler) {
+    	chainedHandler = handler;
     }
 }

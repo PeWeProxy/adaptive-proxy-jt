@@ -19,7 +19,7 @@ public class AdaptiveHandler extends FilterHandler {
 	private static final org.apache.log4j.Logger log
 		= org.apache.log4j.Logger.getLogger(AdaptiveHandler.class);
 	
-	private boolean notCaching = true;
+	private boolean transfering = true;
 	private boolean sendingPhase = false;
 	private InMemBytesStore memStore = null;
 	private ByteBuffer buffer = null;
@@ -56,7 +56,7 @@ public class AdaptiveHandler extends FilterHandler {
 		h.askForCaching = askForCaching;
 		h.setupHandler();
 		if (!askForCaching)
-			h.notCaching = false;
+			h.transfering = false;
 		askForCaching = true;
 		if (log.isDebugEnabled())
 			log.debug(h+" is handling "+con+" (requested "
@@ -74,7 +74,7 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	public void handle() {
-		if (notCaching) {
+		if (transfering) {
 			setHTMLparsing();
 			super.handle();
 		} else 
@@ -84,7 +84,7 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	protected void handleArray(byte[] arr, int off, int len) {
-		if (notCaching || sendingPhase) {
+		if (transfering || sendingPhase) {
 			if (doHTMLparsing)
 				super.handleArray(arr, off, len);
 			else {
@@ -106,8 +106,9 @@ public class AdaptiveHandler extends FilterHandler {
 
 	@Override
 	protected void finishData() {
-		if (notCaching || sendingPhase) {
+		if (transfering || sendingPhase) {
 			Connection con = this.con;
+			log.warn(this+" finishData() with con = "+con);
 			super.finishData();
 			if (!sendingPhase) {
 				if (log.isDebugEnabled())
@@ -169,7 +170,7 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	protected void send(BufferHandle bufHandle) {
-		if (doHTMLparsing && notCaching && !sendingPhase) {
+		if (doHTMLparsing && transfering && !sendingPhase) {
 			// FilterHandler's methods are messing with HTML blocks
 			// 		&& we are not caching for full access processing
 			//		&& we are not sending something already cached
@@ -188,7 +189,7 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	protected void waitForData() {
-		if (notCaching || !sendingPhase) {
+		if (transfering || !sendingPhase) {
 			if (dataRequested) {
 				// data already requested (by passing MainBlockListener to SelectorRunner)
 				// once in this data-processing cycle, so we ignore the request and clear
@@ -222,9 +223,9 @@ public class AdaptiveHandler extends FilterHandler {
 		super.setupHandler();
 		if (askForCaching) {
 			if (isCompressing || super.seeUnpackedData()) {
-				notCaching = !con.getProxy().getAdaptiveEngine().cacheResponse(con, response);
+				transfering = !con.getProxy().getAdaptiveEngine().transferResponse(con, response);
 				if (log.isDebugEnabled())
-					log.debug(this+" caching response data: "+!notCaching);
+					log.debug(this+" caching response data: "+!transfering);
 			}
 		}
 	}

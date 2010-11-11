@@ -71,7 +71,7 @@ public class BaseHandler
     protected boolean emptyChunkSent = false;
     
     private ResponseReadListener responseReadListener = null;
-    protected boolean sendBytes = true;
+    protected boolean writeBytes = true;
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
@@ -179,9 +179,12 @@ public class BaseHandler
 	if (con.getChunking () && !emptyChunkSent) {
 	    emptyChunkSent = true;
 	    BlockSentListener bsl = new Finisher ();
-	    ChunkEnder ce = new ChunkEnder ();
-	    ce.sendChunkEnding (con.getChannel (), con.getNioHandler (),
-				tlh.getClient (), bsl);
+	    if (writeBytes) {
+		    ChunkEnder ce = new ChunkEnder ();
+		    ce.sendChunkEnding (con.getChannel (), con.getNioHandler (),
+					tlh.getClient (), bsl);
+	    } else
+	    	bsl.blockSent();
 	} else {
 	    finish (true);
 	}
@@ -247,10 +250,11 @@ public class BaseHandler
 	}
 	// Not sure why we need this, seems to call finish multiple times.
 	if (con != null) {
-	    if (good && ok)
-		con.logAndRestart ();
-	    else
-		con.logAndClose (null);
+	    if (good && ok) {
+	    	if (writeBytes)
+	    		con.logAndRestart ();
+	    } else
+	    	con.logAndClose (null);
 	}
 	tlh = null;
 	con = null;
@@ -528,7 +532,7 @@ public class BaseHandler
     }
     
     protected void sendBlock(BufferHandle bufHandle) {
-    	 if (sendBytes) {
+    	 if (writeBytes) {
  		    BlockSender bs =
  			new BlockSender (con.getChannel (), con.getNioHandler (), 
  					 tlh.getClient (), bufHandle,
@@ -652,7 +656,7 @@ public class BaseHandler
     
     @Override
     public void setDontSendBytes() {
-    	sendBytes = false;
+    	writeBytes = false;
     }
     
     @Override

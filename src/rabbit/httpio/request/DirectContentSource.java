@@ -35,9 +35,9 @@ public class DirectContentSource extends ContentSource {
 	@Override
 	public void readNextBytes() {
 		if (allDataPassed) {
-			listener.finishedRead();
 			if (cachedListener != null)
 				cachedListener.dataCached(memStore.getBytes(),memStore.getIncrements());
+			listener.finishedRead();
 		} else if (!bufHandle.isEmpty())
 			separateData();
 		else
