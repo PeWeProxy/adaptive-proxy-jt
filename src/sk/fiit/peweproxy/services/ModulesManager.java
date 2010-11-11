@@ -21,7 +21,7 @@ import sk.fiit.peweproxy.plugins.services.ServiceModule;
 
 public class ModulesManager {
 	private static final Logger log = Logger.getLogger(ModulesManager.class);
-	public static final String DEF_PATTERN_TEXTMSGS = "^text/html|^application/xhtml(\\+xml)?";
+	public static final String DEF_PATTERN_TEXTMSGS = "text/html|application/xhtml(\\+xml)?|application/x-www-form-urlencoded";
 	
 	private final AdaptiveEngine adaptiveEngine;
 	private final List<RequestServiceModule> rqModules;
