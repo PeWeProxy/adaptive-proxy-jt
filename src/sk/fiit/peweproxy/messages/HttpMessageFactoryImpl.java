@@ -4,6 +4,7 @@ import java.util.Date;
 import org.apache.log4j.Logger;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
+import rabbit.httpio.ConnectionSetupResolver;
 import rabbit.proxy.Connection;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
@@ -27,8 +28,8 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		HttpHeader proxyHeader = message.getHeader().getBackedHeader();
 		if (contentType != null) {
 			proxyHeader.setHeader ("Content-Type", contentType);
-			// TODO skontrolovat ci toto neurobi pruser potom pri posielani (hint: chunking )
 			proxyHeader.setHeader ("Content-Length", "0");
+			con.fixResponseHeader(proxyHeader, 0, true);
 			message.setData(new byte[0]);
 		} else {
 			message.setData(null);
@@ -42,8 +43,10 @@ public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 		if (baseRequest != null) {
 			retVal = (ModifiableHttpRequestImpl) ((ModifiableHttpRequestImpl)baseRequest).clone();
 		} else {
-			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(new HttpHeader())
+			HttpHeader newHeader = new HttpHeader();
+			retVal = new ModifiableHttpRequestImpl(adaptiveEngine.getModulesManager(),new HeaderWrapper(newHeader)
 						, request);
+			//ConnectionSetupResolver conSetup = new ConnectionSetupResolver(newHeader); 
 		}
 		retVal.setAllowedThread();
 		setContent(retVal, contentType);

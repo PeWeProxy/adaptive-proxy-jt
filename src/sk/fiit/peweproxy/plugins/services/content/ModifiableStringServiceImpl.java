@@ -6,6 +6,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 
 import rabbit.util.CharsetUtils;
+import sk.fiit.peweproxy.headers.ReadableHeader;
 import sk.fiit.peweproxy.headers.WritableHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
@@ -52,12 +53,13 @@ public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableS
 		sb.append(content);
 	}
 	
-	void doChanges() {
+	void doChanges(ReadableHeader origHeader, WritableHeader targetHeader) {
 		String s = sb.toString();
 		httpMessage.setData(s.getBytes(charset));
-		
-		WritableHeader proxyHeader = httpMessage.getHeader();
-		String cType = proxyHeader.getField("Content-Type");
+		if (origHeader.getField("Content-Length") != null) {
+			targetHeader.setField("Content-Length", Integer.toString(httpMessage.getData().length, 10));
+		}
+		String cType = targetHeader.getField("Content-Type");
 		if (cType == null)
 			return;
 		String trailing = "";
@@ -76,7 +78,7 @@ public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableS
 		sbTmp.append(leading);
 		sbTmp.append(charset.toString());
 		sbTmp.append(trailing);
-		proxyHeader.setField("Content-Type", sbTmp.toString());
+		targetHeader.setField("Content-Type", sbTmp.toString());
 	}
 	
 	/*protected void inspectCharset() {
@@ -87,11 +89,11 @@ public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableS
 	
 	@Override
 	public void doChanges(ModifiableHttpRequest request) {
-		doChanges();
+		doChanges(request.getOriginalRequest().getRequestHeader(), request.getRequestHeader());
 	}
-	
+
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {
-		doChanges();
+		doChanges(response.getOriginalResponse().getResponseHeader(), response.getResponseHeader());
 	}
 }

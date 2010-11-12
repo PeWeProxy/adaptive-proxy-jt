@@ -599,22 +599,26 @@ public class Connection {
     private void finalFixesOnWebHeader (RequestHandler rh, Handler handler) {
    	if (rh.getWebHeader () == null)
    	    return;    	
-	if (chunk) {
-	    if (rh.getSize () < 0 || handler.changesContentSize ()) {
-		rh.getWebHeader ().removeHeader ("Content-Length");
-		rh.getWebHeader ().setHeader ("Transfer-Encoding", "chunked");
-	    } else {
-		setChunking (false);
-	    }
-	} else {
-	    if (getKeepalive ()) {
-		rh.getWebHeader ().setHeader ("Proxy-Connection", "Keep-Alive");
-		rh.getWebHeader ().setHeader ("Connection", "Keep-Alive");
-	    } else {
-		rh.getWebHeader ().setHeader ("Proxy-Connection", "close");
-		rh.getWebHeader ().setHeader ("Connection", "close");
-	    }
-	}
+	fixResponseHeader(rh.getWebHeader(), rh.getSize(), handler.changesContentSize());
+    }
+    
+    public void fixResponseHeader(HttpHeader header, long size, boolean sizeToBechanged) {
+    	if (chunk) {
+    	    if (size  < 0 || sizeToBechanged) {
+	    		header.removeHeader ("Content-Length");
+	    		header.setHeader ("Transfer-Encoding", "chunked");
+    	    } else {
+    	    	setChunking (false);
+    	    }
+    	} else {
+    	    if (getKeepalive ()) {
+	    		header.setHeader ("Proxy-Connection", "Keep-Alive");
+	    		header.setHeader ("Connection", "Keep-Alive");
+    	    } else {
+	    		header.setHeader ("Proxy-Connection", "close");
+	    		header.setHeader ("Connection", "close");
+    	    }
+    	}
     }
 
     private void setHandlerFactory (RequestHandler rh) {
