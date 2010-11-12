@@ -250,10 +250,9 @@ public class BaseHandler
 	}
 	// Not sure why we need this, seems to call finish multiple times.
 	if (con != null) {
-	    if (good && ok) {
-	    	if (writeBytes)
-	    		con.logAndRestart ();
-	    } else
+	    if (good && ok)
+	    	con.logAndRestart ();
+	    else
 	    	con.logAndClose (null);
 	}
 	tlh = null;
@@ -661,6 +660,9 @@ public class BaseHandler
     
     @Override
     public void setResponseHeader(HttpHeader header) {
+    	System.out.println(response);
+    	System.out.println("----------------------");
+    	System.out.println(header);
     	response = header;
     }
 }

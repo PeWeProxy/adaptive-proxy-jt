@@ -217,7 +217,7 @@ public class Connection {
 	proxyRequest = request.clone();
 	this.requestHandle = bh;
 	requestVersion = request.getHTTPVersion ();
-	proxy.getAdaptiveEngine().newRequest(this, isChunked);
+	proxy.getAdaptiveEngine().newRequest(this, isChunked, clientRequest, proxyRequest);
 	if (request.isDot9Request ())
 	    requestVersion = "HTTP/0.9";
 	requestVersion = requestVersion.toUpperCase ();

@@ -155,12 +155,12 @@ public class AdaptiveEngine  {
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
 	
-	public void newRequest(Connection con, boolean chunking) {
+	public void newRequest(Connection con, boolean chunking, HttpHeader clientHeader, HttpHeader proxyHeader) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
-		HttpRequestImpl origRequest = new HttpRequestImpl(modulesManager, new HeaderWrapper(con.getClientRHeader()),clientSocketAdr);
+		HttpRequestImpl origRequest = new HttpRequestImpl(modulesManager, new HeaderWrapper(clientHeader),clientSocketAdr);
 		origRequest.setReadOnly();
-		conHandle.request = new ModifiableHttpRequestImpl(modulesManager, origRequest.getHeader().clone(), origRequest);
+		conHandle.request = new ModifiableHttpRequestImpl(modulesManager, new HeaderWrapper(proxyHeader), origRequest);
 		conHandle.messageFactory = new HttpMessageFactoryImpl(this,con,conHandle.request);
 		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getHeader().getBackedHeader());
@@ -389,9 +389,9 @@ public class AdaptiveEngine  {
 	public void newResponse(Connection con, HttpHeader response) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.responseTime = System.currentTimeMillis();
-		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
+		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response.clone()), conHandle.request);
 		origResponse.setReadOnly();
-		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
+		conHandle.response = new ModifiableHttpResponseImpl(modulesManager, new HeaderWrapper(response) ,origResponse);
 		//conHandle.response.getHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
 		conHandle.response.setAllowedThread();
 		conHandle.messageFactory.setResponse(conHandle.response);
@@ -412,9 +412,6 @@ public class AdaptiveEngine  {
 	public boolean transferResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
-		// conHandle.response.eader was modified meanwhile
-		HttpResponseImpl origResponse =  new HttpResponseImpl(modulesManager, new HeaderWrapper(response), conHandle.request);
-		conHandle.response = new ModifiableHttpResponseImpl(modulesManager,origResponse.getHeader().clone(),origResponse);
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
 			try {
@@ -451,8 +448,10 @@ public class AdaptiveEngine  {
 					boolean transferBody = runResponseAdapters(conHandle,false); // header-only real-tie processing
 					if (conHandle.handler != null) {
 						conHandle.handler.setResponseHeader(conHandle.response.getHeader().getBackedHeader());
-						if (!transferBody)
+						//System.out.println("conHandle.handler.setResponseHeader");
+						if (!transferBody) {
 							conHandle.handler.setDontSendBytes();
+						}
 					}
 					proceedWithResponse(conHandle, proceedTask);
 				}

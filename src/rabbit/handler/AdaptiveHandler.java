@@ -66,7 +66,7 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	private void setHTMLparsing() {
 		String ct = response.getHeader("Content-Type");
-		if (ct != null && ct.startsWith("text/html"))
+		if (ct != null && (ct.startsWith("text/html") || ct.startsWith("application/xhtml+xml")))
 			doHTMLparsing = true;
 		if (log.isDebugEnabled())
 			log.debug(this+ " setting"+((doHTMLparsing)? "":" not")+" to parse HTML");
@@ -164,6 +164,7 @@ public class AdaptiveHandler extends FilterHandler {
 		gzu = null;
 		memStore = null;
 		sendingPhase = true;
+		writeBytes = true;
 		setHTMLparsing();
 		sendHeader();
 	}
