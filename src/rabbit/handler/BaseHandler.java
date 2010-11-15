@@ -32,6 +32,7 @@ import rabbit.proxy.Connection;
 import rabbit.proxy.PartialCacher;
 import rabbit.proxy.TrafficLoggerHandler;
 import rabbit.util.SProperties;
+import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 /** This class is an implementation of the Handler interface.
  *  This handler does no filtering, it only sends the data as
@@ -72,12 +73,14 @@ public class BaseHandler
     
     private ResponseReadListener responseReadListener = null;
     protected boolean writeBytes = true;
+    private final InMemBytesStore memStore;
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
 
     /** For creating the factory.
      */
     public BaseHandler () {
+    	memStore = null;
 	// empty
     }
 
@@ -106,6 +109,7 @@ public class BaseHandler
 	this.mayFilter = mayFilter;
 	this.size = size;
 	responseReadListener = new ResponseReadListener();
+	memStore = new InMemBytesStore(size);
     }
 
     public Handler getNewInstance (Connection con, TrafficLoggerHandler tlh,
@@ -151,10 +155,13 @@ public class BaseHandler
 
     protected void sendHeader () {
 	try {
-	    HttpHeaderSender hhs =
-		new HttpHeaderSender (con.getChannel (), con.getNioHandler (),
-				      tlh.getClient (), response, false, this);
-	    hhs.sendHeader ();
+		if (writeBytes) {
+		    HttpHeaderSender hhs =
+			new HttpHeaderSender (con.getChannel (), con.getNioHandler (),
+					      tlh.getClient (), response, false, this);
+		    hhs.sendHeader ();
+		} else
+			httpHeaderSent();
 	} catch (IOException e) {
 	    failed (e);
 	}
@@ -524,6 +531,7 @@ public class BaseHandler
 	    if (cacheChannel != null)
 		writeCache (buffer);
 	    totalRead += buffer.remaining ();
+	    //TODO memStore.writeBufferKeepPosition(buffer);
 	    sendBlock(bufHandle);
 	} catch (IOException e) {
 	    failed (e);
@@ -656,13 +664,5 @@ public class BaseHandler
     @Override
     public void setDontSendBytes() {
     	writeBytes = false;
-    }
-    
-    @Override
-    public void setResponseHeader(HttpHeader header) {
-    	System.out.println(response);
-    	System.out.println("----------------------");
-    	System.out.println(header);
-    	response = header;
     }
 }

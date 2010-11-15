@@ -13,7 +13,7 @@ import rabbit.proxy.Connection;
 public class ClientResourceHandler implements BlockListener {
 	protected final Connection con;
     protected final ContentSource contentSource;
-    private final boolean chunking;
+    private boolean chunking;
     private boolean sentEndChunk = false;
     protected WebConnection wc;
     protected ClientResourceTransferredListener listener;
@@ -116,6 +116,10 @@ public class ClientResourceHandler implements BlockListener {
     
     public void setDontWritebytes() {
     	writeBytes = false;
+    }
+    
+    public void setChunking(boolean shouldUseChunking) {
+    	chunking = shouldUseChunking;
     }
     
     public void chainHandler(ClientResourceHandler handler) {

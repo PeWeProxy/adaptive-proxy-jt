@@ -20,7 +20,5 @@ public interface Handler {
     boolean changesContentSize ();
     
     void setDontSendBytes();
-    
-    void setResponseHeader(HttpHeader header);
 }
 

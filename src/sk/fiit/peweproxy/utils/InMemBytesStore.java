@@ -11,7 +11,7 @@ public class InMemBytesStore {
 	private final ByteArrayOutputStream stream;
 	private final Queue<Integer> dataIncrements;
 	
-	public InMemBytesStore(int initSize) {
+	public InMemBytesStore(long initSize) {
 		if (initSize < 1) {
 			initSize = DEF_ARRAYSIZE;
 		}

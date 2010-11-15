@@ -21,6 +21,7 @@ import rabbit.handler.Handler;
 import rabbit.handler.MultiPartHandler;
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
+import rabbit.httpio.ConnectionSetupResolver;
 import rabbit.httpio.HttpHeaderListener;
 import rabbit.httpio.HttpHeaderReader;
 import rabbit.httpio.HttpHeaderSender;
@@ -217,7 +218,7 @@ public class Connection {
 	proxyRequest = request.clone();
 	this.requestHandle = bh;
 	requestVersion = request.getHTTPVersion ();
-	proxy.getAdaptiveEngine().newRequest(this, isChunked, clientRequest, proxyRequest);
+	proxy.getAdaptiveEngine().newRequest(this, clientRequest, proxyRequest);
 	if (request.isDot9Request ())
 	    requestVersion = "HTTP/0.9";
 	requestVersion = requestVersion.toUpperCase ();
@@ -302,7 +303,7 @@ public class Connection {
 	    if (getMeta ())
 		handleMeta ();
 	    else
-	    proxy.getAdaptiveEngine().cacheRequestIfNeeded(this, separator, dataSize);
+	    proxy.getAdaptiveEngine().cacheRequestIfNeeded(this, separator, isChunked, dataSize);
 	}
     }
 
@@ -602,7 +603,7 @@ public class Connection {
 	fixResponseHeader(rh.getWebHeader(), rh.getSize(), handler.changesContentSize());
     }
     
-    public void fixResponseHeader(HttpHeader header, long size, boolean sizeToBechanged) {
+    private void fixResponseHeader(HttpHeader header, long size, boolean sizeToBechanged) {
     	if (chunk) {
     	    if (size  < 0 || sizeToBechanged) {
 	    		header.removeHeader ("Content-Length");
@@ -619,6 +620,11 @@ public class Connection {
 	    		header.setHeader ("Connection", "close");
     	    }
     	}
+    }
+    
+    public void fixResponseHeader(HttpHeader header, boolean sizeToBechanged) {
+    	ConnectionSetupResolver setupResolver = new ConnectionSetupResolver(header);
+    	fixResponseHeader(header, setupResolver.getDataSize(), sizeToBechanged);
     }
 
     private void setHandlerFactory (RequestHandler rh) {
@@ -1261,6 +1267,10 @@ public class Connection {
     
     public TrafficLoggerHandler getTrafficLoggerHandler() {
     	return tlh;
+    }
+    
+    public HttpHeader filterConstructedRequest(HttpHeader header) {
+    	return proxy.getHttpHeaderFilterer().filterHttpIn(this, channel, header);
     }
     
     public HttpHeader filterConstructedResponse(HttpHeader header) {

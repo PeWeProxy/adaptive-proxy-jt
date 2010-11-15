@@ -23,6 +23,7 @@ import org.apache.log4j.xml.DOMConfigurator;
 import rabbit.handler.AdaptiveHandler;
 import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
+import rabbit.httpio.ConnectionSetupResolver;
 import rabbit.httpio.request.ClientResourceHandler;
 import rabbit.httpio.request.ContentFetcher;
 import rabbit.httpio.request.ContentSeparator;
@@ -77,7 +78,7 @@ public class AdaptiveEngine  {
 		private ModifiableHttpRequestImpl request = null;
 		private ModifiableHttpResponseImpl response = null;
 		private HttpMessageFactoryImpl messageFactory;
-		private boolean requestChunking = false;
+		//private boolean requestChunking = false;
 		private Handler handler = null;
 		private boolean rqLateProcessing = false;
 		private boolean rpLateProcessing = false;
@@ -155,21 +156,20 @@ public class AdaptiveEngine  {
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
 	
-	public void newRequest(Connection con, boolean chunking, HttpHeader clientHeader, HttpHeader proxyHeader) {
+	public void newRequest(Connection con, HttpHeader clientHeader, HttpHeader proxyHeader) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
 		HttpRequestImpl origRequest = new HttpRequestImpl(modulesManager, new HeaderWrapper(clientHeader),clientSocketAdr);
 		origRequest.setReadOnly();
 		conHandle.request = new ModifiableHttpRequestImpl(modulesManager, new HeaderWrapper(proxyHeader), origRequest);
 		conHandle.messageFactory = new HttpMessageFactoryImpl(this,con,conHandle.request);
-		conHandle.requestChunking = chunking;
 		con.setProxyRHeader(conHandle.request.getHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
 					+origRequest.getHeader().getRequestLine()+") - "+conHandle.request);
 	}
 	
-	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, Long dataSize) {
+	public void cacheRequestIfNeeded(final Connection con, ContentSeparator separator, boolean isChunked, Long dataSize) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
 		BufferHandle bufHandle = con.getRequestBufferHandle();
 		ClientResourceHandler resourceHandler = null;
@@ -208,7 +208,7 @@ public class AdaptiveEngine  {
 					log.debug("RQ: "+conHandle+" | No plugin wants content modifying service for request");
 				conHandle.rqLateProcessing = true;
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator,new RequestContentCachedListener(con));
-				resourceHandler = new ClientResourceHandler(con,directSource,conHandle.requestChunking);
+				resourceHandler = new ClientResourceHandler(con,directSource,isChunked);
 				// will run header-only real-time processing, then proceeds in handling request what will
 				// transfer request body data while caching it for late processing
 			}
@@ -223,18 +223,21 @@ public class AdaptiveEngine  {
 			@Override
 			public void run() {
 				ClientResourceHandler handlerToUse = handler;
-				RequestProcessingResult result = runRequestAdapters(conHandle, false); 
-				if (result != RequestProcessingResult.ORIGINAL_REQUEST && handler != null) {
+				RequestProcessingResult result = runRequestAdapters(conHandle, false); //header-only real-time processing 
+				if (result != RequestProcessingResult.ORIGINAL_REQUEST && handlerToUse != null) {
 					// we don't want to transfer original request body data, so we just read bytes (for late processing) but won't send them
 					handler.setDontWritebytes();
 				}
 				if (result == RequestProcessingResult.NEW_REQUEST) {
 					// substitutive request was constructed
+					HttpHeader headerToBeSent = conHandle.request.getHeader().getBackedHeader();
+					con.setProxyRHeader(headerToBeSent);
 					byte[] requestContent = conHandle.request.getData();
 					if (requestContent != null) {
 						// substitutive request with body was constructed
+						boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
-						ClientResourceHandler newHandler = new ClientResourceHandler(conHandle.con,contentSource,conHandle.requestChunking);
+						ClientResourceHandler newHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 						if (handlerToUse == null) {
 							// request without body received, but substitutive request with body was constructed
 							handlerToUse = newHandler;
@@ -280,11 +283,15 @@ public class AdaptiveEngine  {
 				@Override
 				public void run() {
 					if (runRequestAdapters(conHandle, false) != RequestProcessingResult.RESPONSE_SENT) {
+						// substitutive request may have been constructed
+						HttpHeader headerToBeSent = conHandle.request.getHeader().getBackedHeader();
+						con.setProxyRHeader(headerToBeSent);
 						ClientResourceHandler resourceHandler = null;
 						byte[] requestContent = conHandle.request.getData();
 						if (requestContent != null) {
+							boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
 							PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent,dataIncrements);
-							resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,conHandle.requestChunking);
+							resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 						}
 						proceedWithRequest(conHandle, resourceHandler);
 					}
@@ -371,7 +378,9 @@ public class AdaptiveEngine  {
 			return RequestProcessingResult.NEW_REQUEST;
 	}
 
-	void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
+	private void proceedWithRequest(final ConnectionHandle conHandle, final ClientResourceHandler resourceHandler) {
+		HttpHeader header = conHandle.request.getHeader().getBackedHeader(); 
+		conHandle.con.setKeepalive(new ConnectionSetupResolver(header).isKeepalive()); // plugins can decide whether to keep connection with client alive
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -445,19 +454,21 @@ public class AdaptiveEngine  {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
-					boolean transferBody = runResponseAdapters(conHandle,false); // header-only real-tie processing
-					if (conHandle.handler != null) {
-						conHandle.handler.setResponseHeader(conHandle.response.getHeader().getBackedHeader());
-						//System.out.println("conHandle.handler.setResponseHeader");
-						if (!transferBody) {
-							conHandle.handler.setDontSendBytes();
+					boolean transferOrigBody = runResponseAdapters(conHandle,false); // header-only real-time processing
+					if (!transferOrigBody) {
+						// substitutive response was constructed
+						conHandle.handler.setDontSendBytes();
+						byte[] responseContent = conHandle.response.getData();
+						if (responseContent != null) {
+							// substitutive response with body was constructed
+							sendResponse(conHandle, false);
 						}
 					}
 					proceedWithResponse(conHandle, proceedTask);
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 		} else {
-			proceedTask.run(); // let the AdaptiveHandler cache response body (or if proxy dying, dont bother unning task through NioHandler)
+			proceedTask.run(); // let the AdaptiveHandler cache response body (or if proxy dying, don't bother running task through NioHandler)
 			if (proxyDying && log.isTraceEnabled())
 				log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
 		}
@@ -495,7 +506,8 @@ public class AdaptiveEngine  {
 	}
 	
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
-		runResponseAdapters(conHandle,conHandle.rpLateProcessing); // full response processing (real-tie or late)
+		runResponseAdapters(conHandle,conHandle.rpLateProcessing); // full response processing (real-time or late)
+		conHandle.con.fixResponseHeader(conHandle.response.getHeader().getBackedHeader(), handler.changesContentSize());
 		if (!conHandle.rpLateProcessing) {
 			final ModifiableHttpResponseImpl response = conHandle.response;
 			final byte[] modifiedContent = conHandle.response.getData();
@@ -577,7 +589,7 @@ public class AdaptiveEngine  {
 	private void sendResponse(final ConnectionHandle conHandle, boolean processResponse) {
 		if (processResponse) {
 			runResponseAdapters(conHandle,false);
-			// conHandle.handler is null since this method is called from runRequestadapters() 
+			// conHandle.handler is null since this method is called from runRequestAdapters() 
 		} else {
 			conHandle.response.getServicesHandle().finalize();
 		}
@@ -586,15 +598,16 @@ public class AdaptiveEngine  {
 		AdaptiveHandler handlerFactory = (AdaptiveHandler)conHandle.con.getProxy().getNamedHandlerFactory(AdaptiveHandler.class.getName());
 		Connection con = conHandle.con;
 		TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
-		HttpHeader requestHeaders = conHandle.request.getHeader().getBackedHeader();
-		final HttpHeader responseHeaders = conHandle.response.getHeader().getBackedHeader();
+		HttpHeader requestHeader = conHandle.request.getHeader().getBackedHeader();
+		final HttpHeader responseHeader = conHandle.response.getHeader().getBackedHeader();
 		//conHandle.response.getProxyResponseHeaders().setHeader("Transfer-Encoding","chunked");
 		handlerFactory.nextInstanceWillNotCache();
-		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeaders, responseHeaders, null, con.getMayCache(), con.getMayFilter(), -1);
+		final AdaptiveHandler sendingHandler = (AdaptiveHandler)handlerFactory.getNewInstance(conHandle.con, tlh, requestHeader, responseHeader, null, con.getMayCache(), con.getMayFilter(), -1);
+		conHandle.con.fixResponseHeader(responseHeader, sendingHandler.changesContentSize());
 		proceedWithResponse(conHandle, new Runnable() {
 			@Override
 			public void run() {
-				sendingHandler.sendResponse(responseHeaders, conHandle.response.getData());
+				sendingHandler.sendResponse(responseHeader, conHandle.response.getData());
 			}
 		});
 	}
