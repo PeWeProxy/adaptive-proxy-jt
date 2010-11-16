@@ -256,7 +256,7 @@ public class BaseHandler
 	    cacheChannel = null;
 	}
 	// Not sure why we need this, seems to call finish multiple times.
-	if (con != null) {
+	if (con != null && writeBytes) {
 	    if (good && ok)
 	    	con.logAndRestart ();
 	    else

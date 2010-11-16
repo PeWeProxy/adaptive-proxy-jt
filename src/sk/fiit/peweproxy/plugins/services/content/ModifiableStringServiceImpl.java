@@ -75,9 +75,11 @@ public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableS
 		}
 		StringBuilder sbTmp = new StringBuilder();
 		sbTmp.append(cType.substring(0, chsIndex));
-		sbTmp.append(leading);
-		sbTmp.append(charset.toString());
-		sbTmp.append(trailing);
+		if (charset != CharsetUtils.defaultCharset) {
+			sbTmp.append(leading);
+			sbTmp.append(charset.toString());
+			sbTmp.append(trailing);
+		}
 		targetHeader.setField("Content-Type", sbTmp.toString());
 	}
 	

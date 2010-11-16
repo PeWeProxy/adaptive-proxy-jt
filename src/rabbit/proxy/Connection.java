@@ -303,7 +303,7 @@ public class Connection {
 	    if (getMeta ())
 		handleMeta ();
 	    else
-	    proxy.getAdaptiveEngine().cacheRequestIfNeeded(this, separator, isChunked, dataSize);
+	    proxy.getAdaptiveEngine().cacheRequestIfNeeded(this, separator, isChunked);
 	}
     }
 
@@ -623,8 +623,7 @@ public class Connection {
     }
     
     public void fixResponseHeader(HttpHeader header, boolean sizeToBechanged) {
-    	ConnectionSetupResolver setupResolver = new ConnectionSetupResolver(header);
-    	fixResponseHeader(header, setupResolver.getDataSize(), sizeToBechanged);
+    	fixResponseHeader(header, new ConnectionSetupResolver(header).getDataSize(), sizeToBechanged);
     }
 
     private void setHandlerFactory (RequestHandler rh) {

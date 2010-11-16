@@ -17,9 +17,7 @@ public class ClientResourceHandler implements BlockListener {
     private boolean sentEndChunk = false;
     protected WebConnection wc;
     protected ClientResourceTransferredListener listener;
-    private  ClientResourceHandler chainedHandler;
     final SendingListener sendingListener;
-    private boolean writeBytes = true;
 
     public ClientResourceHandler(Connection con, ContentSource contentSource,
     		boolean chunking) {
@@ -62,13 +60,10 @@ public class ClientResourceHandler implements BlockListener {
     @Override
     public void bufferRead(BufferHandle bufHandle) {
     	con.fireResouceDataRead (bufHandle);
-    	if (writeBytes) {
-			BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
-				     con.getTrafficLoggerHandler().getNetwork (),
-				     bufHandle, chunking, sendingListener);
-			bs.write();
-    	} else
-    		sendingListener.blockSent();
+    	BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
+			     con.getTrafficLoggerHandler().getNetwork (),
+			     bufHandle, chunking, sendingListener);
+		bs.write();
     }
     
     @Override
@@ -77,21 +72,15 @@ public class ClientResourceHandler implements BlockListener {
     		transafered();
     	} else {
 			ChunkEnder ce = new ChunkEnder ();
-			if (writeBytes) {
-				sentEndChunk = true;	
-				ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
-						con.getTrafficLoggerHandler().getNetwork(),
-						sendingListener);
-			} else
-				sendingListener.blockSent();
+			sentEndChunk = true;	
+			ce.sendChunkEnding (wc.getChannel(), con.getNioHandler(),
+					con.getTrafficLoggerHandler().getNetwork(),
+					sendingListener);
     	}
     }
     
     protected void transafered() {
-    	if (chainedHandler!= null)
-			chainedHandler.transfer(wc, listener);
-    	else
-    		listener.clientResourceTransferred();
+    	listener.clientResourceTransferred();	
     }
     
     class SendingListener implements BlockSentListener {
@@ -114,15 +103,7 @@ public class ClientResourceHandler implements BlockListener {
 		}
     }
     
-    public void setDontWritebytes() {
-    	writeBytes = false;
-    }
-    
     public void setChunking(boolean shouldUseChunking) {
     	chunking = shouldUseChunking;
-    }
-    
-    public void chainHandler(ClientResourceHandler handler) {
-    	chainedHandler = handler;
     }
 }

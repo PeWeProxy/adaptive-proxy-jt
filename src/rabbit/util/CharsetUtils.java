@@ -77,10 +77,12 @@ public abstract class CharsetUtils {
 		Charset charset = detectCharset(header);
 		if (charset == null && data != null) {
 			InputStream inStream = new ByteArrayInputStream(data);
-			charset = cpDetector.detectCodepage(inStream, data.length);
-			if (charset instanceof UnknownCharset && useJChardet) {
-				inStream = new ByteArrayInputStream(data);
-				charset = cpDetector_JChardet.detectCodepage(inStream, data.length);
+			if (data.length != 0) {
+				charset = cpDetector.detectCodepage(inStream, data.length);
+				if (charset instanceof UnknownCharset && useJChardet) {
+					inStream = new ByteArrayInputStream(data);
+					charset = cpDetector_JChardet.detectCodepage(inStream, data.length);
+				}
 			}
 		}
 		if (charset == null || charset instanceof UnknownCharset)
