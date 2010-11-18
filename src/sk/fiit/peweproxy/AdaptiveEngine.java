@@ -256,7 +256,7 @@ public class AdaptiveEngine  {
 					if (!responseWillBeSent) {
 						boolean processResponse = conHandle.responseAfterRQLate.booleanValue();
 						conHandle.responseAfterRQLate = null;
-						sendResponse(conHandle, processResponse);
+						sendResponse(conHandle, processResponse, false);
 					}
 				} else
 					proceedWithRequest(conHandle, handlerToUse);
@@ -282,17 +282,11 @@ public class AdaptiveEngine  {
 		conHandle.request.setAllowedThread();
 		if (conHandle.rqLateProcessing) {
 			// full message late processing
-			pluginHandler.submitTaskToThreadPool(new Runnable() {
-				@Override
-				public void run() {
-					doRequestProcessing(conHandle, true);
-					conHandle.rqLateProcessing = false; // to avoid saving conHandle in prevRequestHandles
-				}
-			});
+			doRequestLateProcessing(conHandle);
 			if (conHandle.responseAfterRQLate != null) {
 				// now after we've read request body from theconnection it's safe to send
 				// response body constructed by plugins in header-only real-time processing
-				sendResponse(conHandle, conHandle.responseAfterRQLate.booleanValue());
+				sendResponse(conHandle, conHandle.responseAfterRQLate.booleanValue(), false);
 			}
 		} else {
 			// full message real-time processing
@@ -314,11 +308,21 @@ public class AdaptiveEngine  {
 						proceedWithRequest(conHandle, resourceHandler);
 					} else {
 						boolean processResponse = (result == RequestProcessingActions.NEW_RESPONSE) ? true : false;
-						sendResponse(conHandle, processResponse);
+						sendResponse(conHandle, processResponse, false);
 					}
 				}
 			}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 		}
+	}
+	
+	private void doRequestLateProcessing(final ConnectionHandle conHandle) {
+		pluginHandler.submitTaskToThreadPool(new Runnable() {
+			@Override
+			public void run() {
+				doRequestProcessing(conHandle, true);
+				conHandle.rqLateProcessing = false; // to avoid saving conHandle in prevRequestHandles
+			}
+		});
 	}
 	
 	private RequestProcessingActions doRequestProcessing(ConnectionHandle conHandle, boolean lateProcessing) {
@@ -385,6 +389,10 @@ public class AdaptiveEngine  {
 		if (!lateProcessing) {
 			conHandle.request.getServicesHandle().finalize();
 			conHandle.request.setReadOnly();
+			if (!conHandle.rqLateProcessing) {
+				// we just executed real-time processing and no late processing is planned
+				doRequestLateProcessing(conHandle);
+			}
 		}
 		if (sendResponse) {
 			if (processResponse)
@@ -479,11 +487,8 @@ public class AdaptiveEngine  {
 						conHandle.handler.setDontSendBytes();
 						if (conHandle.response.getData() != null) {
 							// substitutive response with body was constructed
-							sendResponse(conHandle, false);
+							sendResponse(conHandle, false, true);
 						}
-					} else {
-						// handler still referencing valid header
-						fixResponseHeader(conHandle);
 					}
 					proceedWithResponse(conHandle, proceedTask, transferOrigBody);
 				}
@@ -536,7 +541,6 @@ public class AdaptiveEngine  {
 	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
 		doResponseProcessing(conHandle,conHandle.rpLateProcessing); // full response processing (real-time or late)
 		if (!conHandle.rpLateProcessing) {
-			fixResponseHeader(conHandle);
 			final ModifiableHttpResponseImpl response = conHandle.response;
 			final byte[] modifiedContent = conHandle.response.getData();
 			proceedWithResponse(conHandle, new Runnable() {
@@ -546,6 +550,16 @@ public class AdaptiveEngine  {
 				}
 			}, true);
 		}
+	}
+	
+	private void doResponseLateProcessing(final ConnectionHandle conHandle) {
+		pluginHandler.submitTaskToThreadPool(new Runnable() {
+			@Override
+			public void run() {
+				doResponseProcessing(conHandle, true);
+				conHandle.rpLateProcessing = false; // to avoid saving conHandle in prevRequestHandles
+			}
+		});
 	}
 	
 	private boolean doResponseProcessing(ConnectionHandle conHandle, boolean lateProcessing) {
@@ -596,6 +610,11 @@ public class AdaptiveEngine  {
 		if (!lateProcessing) {
 			conHandle.response.getServicesHandle().finalize();
 			conHandle.response.setReadOnly();
+			fixResponseHeader(conHandle);
+			if (!conHandle.rpLateProcessing) {
+				// we just executed real-time processing and no late processing is planned
+				doResponseLateProcessing(conHandle);
+			}
 		}
 		return transferOriginalBody;
 	}
@@ -615,7 +634,7 @@ public class AdaptiveEngine  {
 	}
 
 	
-	private void sendResponse(final ConnectionHandle conHandle, final boolean processResponse) {
+	private void sendResponse(final ConnectionHandle conHandle, final boolean processResponse, final boolean processingDone) {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
@@ -623,10 +642,11 @@ public class AdaptiveEngine  {
 				conHandle.handler = handlerFactory;
 				if (processResponse) {
 					doResponseProcessing(conHandle,false);
-					fixResponseHeader(conHandle);
 				} else {
 					conHandle.response.getServicesHandle().finalize();
 				}
+				if (!processResponse && !processingDone)
+					doResponseLateProcessing(conHandle);
 				if (log.isTraceEnabled())
 					log.trace("RQ: "+conHandle+" | Sending response");
 				Connection con = conHandle.con;
