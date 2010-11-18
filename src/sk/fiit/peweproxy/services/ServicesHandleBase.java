@@ -157,6 +157,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	abstract String getText4Logging(LogText type);
 	
 	private ServiceProvider<ByteContentService> getByteService() {
+		readingAttempt(null);
 		if (httpMessage.hasBody())
 			return new ByteServiceImpl(httpMessage);
 		else
@@ -164,6 +165,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	}
 	
 	private ServiceProvider<ModifiableBytesService> getModByteServie()  {
+		readingAttempt(null);
 		if (httpMessage.hasBody())
 			return new ModifiableByteServiceImpl(httpMessage);
 		else
@@ -171,6 +173,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	}
 	
 	private boolean hasTextutalContent () {
+		readingAttempt(null);
 		if (!httpMessage.hasBody())
 			return false;
 		return manager.matchesStringServicePattern(httpMessage.getHeader());
