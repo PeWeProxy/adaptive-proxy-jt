@@ -40,8 +40,6 @@ read-only representation of the HTTP message is passed sequentially (same order 
 all successfully loaded request / response processing plugins (see
 {@link sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin#processTransferedRequest(HttpRequest)} and
 {@link sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin#processTransferedResponse(HttpResponse)}).
-In late processing, there's no need to allow plugins to influence message processing, since
-the message was already fully sent to destination.
 <p>
 For the distinction between real-time and late message processing, see
 {@link sk.fiit.peweproxy.plugins} documentation.

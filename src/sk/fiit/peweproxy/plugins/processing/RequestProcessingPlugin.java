@@ -68,9 +68,9 @@ public interface RequestProcessingPlugin extends RequestPlugin {
 	HttpResponse getResponse(ModifiableHttpRequest request, HttpMessageFactory messageFactory);
 	
 	/**
-	 * Processes passed read-only <code>request</code>, that was already fully transfered by the
-	 * proxy, by this request processing plugin. In this method a request processing plugin
-	 * performs it's late message processing.
+	 * Processes passed read-only <code>request</code>, that already was or is going to be
+	 * sent by the proxy. In this method a request processing plugin  performs it's late
+	 * message processing.
 	 * @param request read-only request message to process
 	 */
 	void processTransferedRequest(HttpRequest request);

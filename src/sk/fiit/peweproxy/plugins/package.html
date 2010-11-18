@@ -36,14 +36,15 @@ Besides this base plugin interface, this package also contains common interfaces
 request (see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins (see
 {@link sk.fiit.peweproxy.plugins.ResponsePlugin}), that define the way a request / response
 plugins (processing plugins or modules) are asked for services they want to be available
- over the HTTP message later in the real-time processing phase. This querying is deone by
+over the HTTP message later in the real-time processing phase. This querying is done by
 Adaptive Proxy platform to find out whether some plugin wants to be able to modify the body
 of a message in <i>real-time processing</i>, or it can transfer the message body without
-changes and run <i>late processing</i> of unmodifiable message afterwards. 
+changes and make it accessible only afterwards in <i>late processing</i> of a message. 
 <p>
 <b>Real-time vs. late message processing</b><br>
-Long messages are transfered in chunks of bytes most of the time. The most straightforward
-implementation of <i>transparent proxy</i> server (see
+Data of the HTTP messages are transfered in chunks of bytes as the source of the message sends
+more bytes through the connection with the proxy. The most straightforward implementation of
+<i>transparent proxy</i> server (see
 <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec1.html#sec1.3"> RFC 2616: 1.3
 Terminology</a>) reads whole HTTP header first, processes it, and then just transfers (sents
 bytes as they are being received) the message body to destination. This is also the fastest
@@ -65,32 +66,36 @@ the message is sent to destination.
 <p>
 When no plugin wants to modify the message body, it's run just after the message header is
 received. During this real-time processing, plugins (processing plugins and modules) are
-allowed to read and / or change the header, but no services that depend on message body will
-be available. After processing, the message header is sent and the platform starts to
-transfer message body, if any. After the message was fully transfered, late processing is
-run.
+allowed to read and / or change the header, but no services that depend on body of the message
+being processed will be available. After processing, the message header is sent and the
+platform starts to transfer message body, if any. In cases when some plugin constructs response
+during this processing, no data is sent to the destination web resource, but proxy reads and
+caches all incoming data of the request body, if any, runs request late processing and then
+starts the process of handling of constructed response as if it was received by the web resource.
 <p>
 When some plugin wants to modify message body, after the message header is received the
 platform starts to cache incoming message body data. After all message data has been received
 and cached, it runs this real-time processing, during which plugins can read and / or modify
-both header and body content (through services). After processing, the message header is sent
-followed by message body data. No late processing for the message is run afterwards.
+both header and body content (through services). After processing, the message late processed and
+then it's header is sent followed by message body data.
 <p>
-<u>Late message processing</u>
-When no plugin wants to modify the message body, real-time processing is run and then the
-message body data is being transfered with caching all data passing through. After all data
-of the message was transfered (and cached in the same time), late processing is run during
-which plugins are only allowed to read unmodifiable content (header and body data) of the
-read-only message. No services that modify the message data will be available during this
-late processing. 
+<u>Late message processing</u> is run every time after all data of the message that was sent or
+will be sent is available.
+<p>
+To simplify the realization of future plugins, that are interested in processing original
+messages (as received from the client or web resource), late processing is also run every time.
+Either it's run after all data of the message was transfered (and cached in the same time)
+without modification (no plugin wanted to), or, when the outgoing message carries no data,
+just after real-time processing. This is the situation when read only representation of a
+HTTP message is passed to plugins as they are not expected / allowed to modify it in any
+way.
 <p>
 <b>Desired services discovery</b><br>
 The decision whether there will be message body accessible during real-time processing (thus
-if there will be slowdown in message handling), or there will be late processing, is made
-by asking all plugins, if any one wishes to modify the message, based on received HTTP header
-of the message. This is recognized as need of 2 base content modifying services,
-<code>ModifiableBytesService</code> and <code>ModifiableStringService</code> (see
-{@link sk.fiit.peweproxy.services.content}).
+if there will be slowdown in message handling), is made by asking all plugins, if any one wishes
+to modify the message, based on received HTTP header of the message. This is recognized as need
+of 2 base content modifying services, <code>ModifiableBytesService</code> and
+<code>ModifiableStringService</code> (see {@link sk.fiit.peweproxy.services.content}).
 <p>
 When a HTTP header for incoming request / response message is received (before any
 message body data is read), Adaptive Proxy platform requests every request / response

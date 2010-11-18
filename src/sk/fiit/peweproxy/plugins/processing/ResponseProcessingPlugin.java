@@ -53,9 +53,9 @@ public interface ResponseProcessingPlugin extends ResponsePlugin {
 	HttpResponse getNewResponse(ModifiableHttpResponse response, HttpMessageFactory messageFactory);
 	
 	/**
-	 * Processes passed read-only <code>response</code>, that was already fully transfered by the
-	 * proxy, by this response processing plugin. In this method a response processing plugin
-	 * performs it's late message processing.
+	 * Processes passed read-only <code>response</code>, that already was or is going to be
+	 * sent by the proxy. In this method a response processing plugin  performs it's late
+	 * message processing.
 	 * @param response read-only response message to process
 	 */
 	void processTransferedResponse(HttpResponse response);

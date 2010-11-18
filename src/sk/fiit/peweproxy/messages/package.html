@@ -13,17 +13,28 @@ There are two types of representations of HTTP messages, representations of requ
 message and HTTP response message. For each type, there are two representations providing
 different level of access to HTTP message data, read only access and full access.
 <p>
-Every representation of a HTTP message provides access to two distinct HTTP header
-representations: one for original HTTP header received by proxy (from the client or
-web source) and one that will be sent by proxy server (to web source or the client).
-Access to the original HTTP header is always read-only.
+During handling of a HTTP message, the AdaptiveProxy platform distinguishes two
+representations of the HTTP message being handled, the representation for the original
+message (as received by the proxy), and the representation for the message that will be
+sent to the destination. The representation of the original HTTP message is always
+read-only. The HTTP message that is / was processed and was / will be sent could be passed
+as both read-only and full access representation, depending on particualr situation. To
+simplify the plugins API, same read-only representations (interfaces) are used for
+messages being processed and original messages.
+<p>
+Plugins are always provided with the representation for the message being processed. To
+make original messages available, this representation provide method that returns the
+representation for the original message. Since both representations are of the same
+interface, this method is available also for representation for original message. For that
+representation, the method returns self.
 <p>
 <b>Read-only messages</b><br>
 For read-only representations of the HTTP messages,
 {@link sk.fiit.peweproxy.messages.HttpRequest} for request message and
-{@link sk.fiit.peweproxy.messages.HttpResponse} for response message, provided
-{@link sk.fiit.peweproxy.services.ServicesHandle} will serve
-only services (implementations of services) that do not modify message data (header or body
+{@link sk.fiit.peweproxy.messages.HttpResponse} for response message, read-only header
+representation will be available and provided
+{@link sk.fiit.peweproxy.services.ServicesHandle} will serve only services
+(implementations of services) that do not modify message data (header or body
 data).
 </body>
 <address>
