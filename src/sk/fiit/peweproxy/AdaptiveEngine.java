@@ -516,7 +516,15 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				processCachedResponse(conHandle, responseContent, handler); // full response real-time processing
+				doResponseProcessing(conHandle,false); // full response real-time processing
+				final ModifiableHttpResponseImpl response = conHandle.response;
+				final byte[] modifiedContent = conHandle.response.getData();
+				proceedWithResponse(conHandle, new Runnable() {
+					@Override
+					public void run() {
+						handler.sendResponse(response.getHeader().getBackedHeader(),modifiedContent);
+					}
+				}, true);
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseProcessing", responseProcessingTaskInfo(conHandle)));
 	}
@@ -530,26 +538,7 @@ public class AdaptiveEngine  {
 		conHandle.response.originalResponse().setData(responseContent);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for late processing");
-		pluginHandler.submitTaskToThreadPool(new Runnable() {
-			@Override
-			public void run() {
-				processCachedResponse(conHandle, responseContent, null); // full response late processing
-			}
-		});
-	}
-	
-	private void processCachedResponse(final ConnectionHandle conHandle, byte[] responseContent, final AdaptiveHandler handler) {
-		doResponseProcessing(conHandle,conHandle.rpLateProcessing); // full response processing (real-time or late)
-		if (!conHandle.rpLateProcessing) {
-			final ModifiableHttpResponseImpl response = conHandle.response;
-			final byte[] modifiedContent = conHandle.response.getData();
-			proceedWithResponse(conHandle, new Runnable() {
-				@Override
-				public void run() {
-					handler.sendResponse(response.getHeader().getBackedHeader(),modifiedContent);
-				}
-			}, true);
-		}
+		doResponseLateProcessing(conHandle);
 	}
 	
 	private void doResponseLateProcessing(final ConnectionHandle conHandle) {
@@ -642,10 +631,7 @@ public class AdaptiveEngine  {
 				conHandle.handler = handlerFactory;
 				if (processResponse) {
 					doResponseProcessing(conHandle,false);
-				} else {
-					conHandle.response.getServicesHandle().finalize();
-				}
-				if (!processResponse && !processingDone)
+				} else if (!processingDone)
 					doResponseLateProcessing(conHandle);
 				if (log.isTraceEnabled())
 					log.trace("RQ: "+conHandle+" | Sending response");
