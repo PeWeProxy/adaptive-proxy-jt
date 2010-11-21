@@ -23,11 +23,6 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	}
 	
 	@Override
-	public HttpRequest getRequest() {
-		return request;
-	}
-
-	@Override
 	public WritableResponseHeader getResponseHeader() {
 		return header;
 	}
