@@ -24,7 +24,7 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	
 	@Override
 	public HttpRequest getRequest() {
-		return getRequest();
+		return request;
 	}
 
 	@Override
