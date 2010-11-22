@@ -39,6 +39,7 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	@Override
 	public void setAllowedThread() {
 		super.setAllowedThread();
+		originalResponse.setAllowedThread();
 		request.setAllowedThread();
 	}
 	

@@ -31,6 +31,13 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 	}
 	
 	@Override
+	public void setAllowedThread() {
+		super.setAllowedThread();
+		originalRequest.setAllowedThread();
+	}
+	
+	
+	@Override
 	public ModifiableHttpRequestImpl clone() {
 		return clone(new ModifiableHttpRequestImpl(getServicesHandle().getManager(),
 				header.clone(), originalRequest));
