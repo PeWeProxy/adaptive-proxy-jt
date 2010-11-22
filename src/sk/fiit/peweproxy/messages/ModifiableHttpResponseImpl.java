@@ -18,6 +18,7 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	public ModifiableHttpResponseImpl(ModulesManager modulesManager, HeaderWrapper header,
 			HttpRequestImpl request) {
 		super(modulesManager, header, request);
+		//this response constructed in request processing is going to be referenced as original response
 		this.originalResponse = this;
 		log.trace(toString()+" has original response set to self");
 	}
@@ -39,7 +40,7 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	@Override
 	public void setAllowedThread() {
 		super.setAllowedThread();
-		if (originalResponse != this)
+		if (originalResponse != this)	//if acting as original response
 			originalResponse.setAllowedThread();
 		request.setAllowedThread();
 	}

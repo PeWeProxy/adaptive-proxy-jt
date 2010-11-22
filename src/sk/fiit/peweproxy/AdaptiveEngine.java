@@ -373,7 +373,8 @@ public class AdaptiveEngine  {
 							else {
 								transferOriginalBody = false; // not needed but still leaving it here
 								sendResponse = true;
-								conHandle.response = (ModifiableHttpResponseImpl) newResponse;
+								ModifiableHttpResponseImpl origResponse = (ModifiableHttpResponseImpl) newResponse;
+								conHandle.response = new ModifiableHttpResponseImpl(modulesManager, origResponse.getHeader().clone(), origResponse);
 								return action;
 							}
 						}
