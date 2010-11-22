@@ -167,7 +167,7 @@ public class AdaptiveEngine  {
 		con.setProxyRHeader(conHandle.request.getHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
-					+origRequest.getHeader().getRequestLine()+") - "+conHandle.request);
+					+origRequest.getHeader().getBackedHeader().getRequestLine()+") - "+conHandle.request);
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, final ContentSeparator separator, boolean isChunked) {
@@ -279,7 +279,6 @@ public class AdaptiveEngine  {
 			else
 				log.trace("RQ: "+conHandle+" | "+requestContent.length+" bytes of request cached for real-time processing");
 		}
-		conHandle.request.setAllowedThread();
 		if (conHandle.rqLateProcessing) {
 			// full message late processing
 			doRequestLateProcessing(conHandle);
@@ -412,7 +411,6 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				conHandle.request.setAllowedThread();
 				if (log.isTraceEnabled()) {
 					log.trace("RQ: "+conHandle+" | Request processing time :"+(System.currentTimeMillis()-conHandle.requestTime));
 					log.trace("RQ: "+conHandle+" | Proceeding in handling request");
@@ -429,12 +427,11 @@ public class AdaptiveEngine  {
 		origResponse.setReadOnly();
 		conHandle.response = new ModifiableHttpResponseImpl(modulesManager, new HeaderWrapper(response) ,origResponse);
 		//conHandle.response.getHeader().setField("AgeORIG", conHandle.response.getWebResponseHeader().getField("Age"));
-		conHandle.response.setAllowedThread();
 		conHandle.messageFactory.setResponse(conHandle.response);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
 					+response.getStatusLine()+" | requested "
-					+conHandle.request.getHeader().getRequestLine()+") - "+conHandle.response);
+					+conHandle.request.getHeader().getBackedHeader().getRequestLine()+") - "+conHandle.response);
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {
@@ -476,7 +473,6 @@ public class AdaptiveEngine  {
 	public void processResponse(final Connection con, final Runnable proceedTask) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
 		boolean adaptiveHandling = conHandle.handler instanceof AdaptiveHandler; 
-		conHandle.response.setAllowedThread();
 		if ((!adaptiveHandling || conHandle.rpLateProcessing) && !proxyDying) {
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
@@ -612,7 +608,6 @@ public class AdaptiveEngine  {
 		proxy.getNioHandler().runThreadTask(new Runnable() {
 			@Override
 			public void run() {
-				conHandle.response.setAllowedThread();
 				if (log.isTraceEnabled() && logProceed) {
 					log.trace("RP: "+conHandle+" | Response processing time :"+(System.currentTimeMillis()-conHandle.responseTime));
 					log.trace("RQ: "+conHandle+" | Proceeding in handling response");
@@ -656,29 +651,29 @@ public class AdaptiveEngine  {
 	
 	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
 		return "Running plugins processing on request \""
-			+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getRequestLine()
+			+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseProcessingTaskInfo (ConnectionHandle conHandle) {
 		return "Running plugins processing on response \""
-			+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getStatusLine()
-			+ "\" for request \"" + conHandle.request.getHeader().getRequestLine()
+			+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getBackedHeader().getStatusLine()
+			+ "\" for request \"" + conHandle.request.getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String requestSendingTaskInfo(ConnectionHandle conHandle) {
 		return "Proceeding in handling request \""
-			+ conHandle.request.getHeader().getRequestLine()
-			+ "\" (orig: \""+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getRequestLine()
+			+ conHandle.request.getHeader().getBackedHeader().getRequestLine()
+			+ "\" (orig: \""+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getBackedHeader().getRequestLine()
 			+ "\") from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseSendingTaskInfo (ConnectionHandle conHandle) {
 		return "Proceeding in handling response \""
-			+ conHandle.response.getHeader().getStatusLine()
-			+ "\" (orig: \""+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getStatusLine()
-			+ "\") for request \"" + conHandle.request.getHeader().getRequestLine()
+			+ conHandle.response.getHeader().getBackedHeader().getStatusLine()
+			+ "\" (orig: \""+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getBackedHeader().getStatusLine()
+			+ "\") for request \"" + conHandle.request.getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
@@ -855,10 +850,9 @@ public class AdaptiveEngine  {
 	public void responseHandlerUsed(Connection connection, Handler handler) {
 		ConnectionHandle conHandle = requestHandles.get(connection);
 		conHandle.handler = handler;
-		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
-					+" on " +conHandle.request.getHeader().getRequestLine());
+					+" on " +conHandle.request.getHeader().getBackedHeader().getRequestLine());
 	}
 
 	public ModulesManager getModulesManager() {

@@ -76,8 +76,7 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 		return backedHeader.getHeaders(name);
 	}
 	
-	@Override
-	public String getHTTPVersionString() {
+	private String getHTTPVersionInternal() {
 		if (backedHeader.isRequest())
 			return backedHeader.getHTTPVersion();
 		else
@@ -85,8 +84,13 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	}
 	
 	@Override
+	public String getHTTPVersionString() {
+		return getHTTPVersionInternal();
+	}
+	
+	@Override
 	public HTTPVersion getHTTPVersion() {
-		return HTTP_Version.getType4String(getHTTPVersionString());
+		return HTTP_Version.getType4String(getHTTPVersionInternal());
 	}
 	
 	@Override
@@ -111,16 +115,16 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	
 	@Override
 	public String getDestionation() {
-		String reqURI = getRequestURI();
-		String host = getField("Host");
+		String reqURI = backedHeader.getRequestURI();
+		String host = backedHeader.getHeader("Host");
 		if (reqURI.charAt(0) == '/') {
 			// Podla RFC by proxy srv VZDY mal dostat plnu URI v Request-Line
 			// tudiz toto by sa NIKDY nemalo stat
 			String protocol = "";
-			String versionString = getHTTPVersionString();
+			String versionString = getHTTPVersionInternal();
 			if (versionString.toLowerCase().contains("http/"))
 				protocol = "http://";
-			else if (getHTTPVersionString().toLowerCase().contains("https/"))
+			else if (versionString.toLowerCase().contains("https/"))
 				protocol = "https://";
 			return protocol+host+reqURI;
 		}
@@ -207,8 +211,8 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	
 	@Override
 	public void setDestination(String destination) {
-		String reqURI = getRequestURI();
-		String host = getField("Host");
+		String reqURI = backedHeader.getRequestURI();
+		String host = backedHeader.getHeader("Host");
 		if (reqURI.charAt(0) == '/' && host != null) {
 			// nemalo by sa vykonat kedze klienti MUSIA posielat uplnu
 			// absolutnu URI ked idu cez proxy
