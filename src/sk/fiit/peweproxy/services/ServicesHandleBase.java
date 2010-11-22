@@ -639,8 +639,9 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 					return getRealService(module, svcInfo.serviceClass);
 				}
 			} catch (ServiceUnavailableException e) {
-				log.info(getLogTextHead()+"ServiceUnavailableException raised while obtaining service providers from "
-							+getText4Logging(LogText.CAPITAL)+"ServiceModule '"+module+"'",e);
+				/*if (logUnavailable)
+					log.info(getLogTextHead()+"ServiceUnavailableException raised while obtaining service provider from "
+							+getText/4Logging(LogText.CAPITAL)+"ServiceModule '"+module+"'",e);*/
 				cause = e;
 			}
 		}
@@ -653,11 +654,14 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	
 	@Override
 	public <Service extends ProxyService> boolean isServiceAvailable(Class<Service> serviceClass) {
+		if (log.isDebugEnabled())
+			log.debug(getLogTextHead()+"Checking availability of service "+serviceClass.getName());
 		try {
-			getService(serviceClass);
+			ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(serviceClass, null);
+			getNextService(svcInfo);
 			return true;
 		} catch (ServiceUnavailableException e) {
-			log.trace(getLogTextHead()+"Service unavailable: "+serviceClass);
+			log.trace(getLogTextHead()+"Service "+serviceClass+" unavailable because of: "+e.getMessage());
 		}
 		return false;
 	}
