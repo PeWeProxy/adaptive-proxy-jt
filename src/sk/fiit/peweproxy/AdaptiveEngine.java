@@ -358,10 +358,11 @@ public class AdaptiveEngine  {
 								conHandle.request = (ModifiableHttpRequestImpl) newRequest;
 								conHandle.messageFactory = new HttpMessageFactoryImpl(this, conHandle.con, conHandle.request);
 								conHandle.request.setAllowedThread();
-							}
-							if (action == RequestProcessingActions.NEW_REQUEST) {
-								pluginsChangedResponse.add(requestPlugin);
-								again = true;
+								if (action == RequestProcessingActions.NEW_REQUEST) {
+									pluginsChangedResponse.add(requestPlugin);
+									again = true;
+								}
+								break;
 							}
 						} else if (action == RequestProcessingActions.NEW_RESPONSE || action == RequestProcessingActions.FINAL_RESPONSE) {
 							if (action == RequestProcessingActions.FINAL_RESPONSE)
@@ -375,10 +376,9 @@ public class AdaptiveEngine  {
 								sendResponse = true;
 								ModifiableHttpResponseImpl origResponse = (ModifiableHttpResponseImpl) newResponse;
 								conHandle.response = new ModifiableHttpResponseImpl(modulesManager, origResponse.getHeader().clone(), origResponse);
-								return action;
+								break;
 							}
 						}
-						break;
 					}
 				} catch (Throwable t) {
 					log.info("RQ: "+conHandle+" | Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
