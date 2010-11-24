@@ -37,6 +37,10 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return data;
 	}
 	
+	public HandleType getServicesHandleInternal() {
+		return serviceHandle;
+	}
+	
 	@Override
 	public HandleType getServicesHandle() {
 		return serviceHandle;

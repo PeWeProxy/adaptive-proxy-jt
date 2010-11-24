@@ -690,6 +690,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		if (changedModelBinding != null) {
 			readingAttempt(null);
 		}
+		httpMessage.setReadOnly();
 	}
 	
 	public ModulesManager getManager() {

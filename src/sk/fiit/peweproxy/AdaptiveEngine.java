@@ -283,7 +283,7 @@ public class AdaptiveEngine  {
 			// full message late processing
 			doRequestLateProcessing(conHandle);
 			if (conHandle.responseAfterRQLate != null) {
-				// now after we've read request body from theconnection it's safe to send
+				// now after we've read request body from the connection it's safe to send
 				// response body constructed by plugins in header-only real-time processing
 				sendResponse(conHandle, conHandle.responseAfterRQLate.booleanValue(), false);
 			}
@@ -375,7 +375,9 @@ public class AdaptiveEngine  {
 								transferOriginalBody = false; // not needed but still leaving it here
 								sendResponse = true;
 								ModifiableHttpResponseImpl origResponse = (ModifiableHttpResponseImpl) newResponse;
+								origResponse.getServicesHandleInternal().finalize();
 								conHandle.response = new ModifiableHttpResponseImpl(modulesManager, origResponse.getHeader().clone(), origResponse);
+								conHandle.response.setData(origResponse.getData());
 								break;
 							}
 						}
@@ -387,8 +389,7 @@ public class AdaptiveEngine  {
 			}
 		} while (again);
 		if (!lateProcessing) {
-			conHandle.request.getServicesHandle().finalize();
-			conHandle.request.setReadOnly();
+			conHandle.request.getServicesHandleInternal().finalize();
 			if (!conHandle.rqLateProcessing) {
 				// we just executed real-time processing and no late processing is planned
 				doRequestLateProcessing(conHandle);
@@ -594,8 +595,7 @@ public class AdaptiveEngine  {
 			}
 		} while (again);
 		if (!lateProcessing) {
-			conHandle.response.getServicesHandle().finalize();
-			conHandle.response.setReadOnly();
+			conHandle.response.getServicesHandleInternal().finalize();
 			fixResponseHeader(conHandle);
 			if (!conHandle.rpLateProcessing) {
 				// we just executed real-time processing and no late processing is planned
@@ -628,6 +628,7 @@ public class AdaptiveEngine  {
 				if (processResponse) {
 					doResponseProcessing(conHandle,false);
 				} else if (!processingDone)
+					conHandle.response.getServicesHandleInternal().finalize();
 					doResponseLateProcessing(conHandle);
 				if (log.isTraceEnabled())
 					log.trace("RQ: "+conHandle+" | Sending response");
