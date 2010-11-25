@@ -207,8 +207,9 @@ public class PluginHandler {
 				if (libFile == null || !libFile.canRead()) {
 					// unable to locate library file (jar/dir)
 					log.info("Library location '"+libLocation+"' for the plugin '"+cfgEntry.name+
-						"' does not point to valid jar/directory, this plugin will not be loaded");
-					libsOK = false;
+						"' does not point to valid jar/directory, this plugin will be loaded, but bad things might happen " +
+						" if you are running in production. You can safely ignore this message in development mode.");
+					libsOK = true;
 					break;
 				}
 				URI libLocURI = libFile.toURI();
