@@ -42,7 +42,6 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 		super.setAllowedThread();
 		if (originalResponse != this)	//if acting as original response
 			originalResponse.setAllowedThread();
-		request.setAllowedThread();
 	}
 	
 	@Override
