@@ -35,6 +35,12 @@ public class HttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
 	public ResponseHeader getResponseHeader() {
 		return header;
 	}
+	
+	@Override
+	public void setAllowedThread() {
+		super.setAllowedThread();
+		request.setAllowedThread();
+	}
 
 	@Override
 	public HttpResponseImpl clone() {
