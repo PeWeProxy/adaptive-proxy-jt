@@ -15,12 +15,6 @@
       <param name="ConversionPattern" value="[%d{dd/MMM/yyyy/HH:mm:ss}] [%-5p] [%t]: [%m]%n"/>
     </layout>
   </appender>
-  <appender name="hoptoad" class="code.lucamarrocco.hoptoad.HoptoadAppender">
-    	<param name="Name" value="Hoptoad appender"/>
-    	<param name="api_key" value="98c15e1b46bdbb1d93229daec24af000"/>
-    	<param name="env" value="production"/>
-    	<param name="enabled" value="true"/>
-  </appender>
   <logger name="org.apache">
     <level value="warn"/>
   </logger>
@@ -49,6 +43,5 @@
   <root>
     <level value="warn"/>
     <appender-ref ref="file"/>
-    <appender-ref ref="hoptoad" />
   </root>
 </log4j:configuration>
