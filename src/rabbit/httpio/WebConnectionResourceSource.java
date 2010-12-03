@@ -3,6 +3,7 @@ package rabbit.httpio;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
+import java.util.logging.Logger;
 import org.khelekore.rnio.NioHandler;
 import org.khelekore.rnio.ReadHandler;
 import rabbit.io.BufferHandle;
@@ -11,10 +12,10 @@ import rabbit.io.WebConnection;
 import rabbit.util.TrafficLogger;
 
 /** A resource source that gets the data from a WebConnection
- * 
+ *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
-public class WebConnectionResourceSource 
+public class WebConnectionResourceSource
     implements ResourceSource, ReadHandler, ChunkDataFeeder {
     private final ConnectionHandler con;
     private final NioHandler nioHandler;
@@ -24,16 +25,27 @@ public class WebConnectionResourceSource
     private BlockListener listener;
     private final boolean isChunked;
     private final long dataSize;
-    private long totalRead = 0;    
+    private long totalRead = 0;
     private int currentMark = 0;
     private ChunkHandler chunkHandler;
     private Long timeout;
     private int fullReads = 0;
-    
-    public WebConnectionResourceSource (ConnectionHandler con, 
-					NioHandler nioHandler, WebConnection wc, 
-					BufferHandle bufHandle, 
-					TrafficLogger tl, boolean isChunked, 
+
+    /** Create a new ConnectionResourceSource that gets the data from the network.
+     * @param con the Connection handling the request
+     * @param nioHandler the NioHandler to use for network and background tasks
+     * @param wc the WebConection connected to the upstream server
+     * @param bufHandle the BufferHandle to use
+     * @param tl the TrafficLogger to use for network statistics
+     * @param isChunked flag indicating if the upstream data is chunked or not
+     * @param dataSize the size of the data, may be -1 if size is unknown
+     * @param strictHttp if true strict http will be used when communcating
+     *        with the upstream server
+     */
+    public WebConnectionResourceSource (ConnectionHandler con,
+					NioHandler nioHandler, WebConnection wc,
+					BufferHandle bufHandle,
+					TrafficLogger tl, boolean isChunked,
 					long dataSize, boolean strictHttp) {
 	this.con = con;
 	this.nioHandler = nioHandler;
@@ -47,8 +59,8 @@ public class WebConnectionResourceSource
     }
 
     public String getDescription () {
-	return "WebConnectionResourceSource: length: "+ dataSize + 
-	    ", read: " + totalRead + ", chunked: " + isChunked + 
+	return "WebConnectionResourceSource: length: "+ dataSize +
+	    ", read: " + totalRead + ", chunked: " + isChunked +
 	    ", address: " + wc.getAddress ();
     }
 
@@ -63,21 +75,25 @@ public class WebConnectionResourceSource
 	return dataSize;
     }
 
-    public long transferTo (long position, long count, 
+    public long transferTo (long position, long count,
 			    WritableByteChannel target)
 	throws IOException {
 	throw new IllegalStateException ("transferTo can not be used.");
     }
-    
+
     public void addBlockListener (BlockListener listener) {
+	if (this.listener != null)
+	    throw new RuntimeException ("Trying to overwrite block listener: " +
+					this.listener + " with: " + listener);
 	this.listener = listener;
 	if (isChunked)
 	    chunkHandler.setBlockListener (listener);
+
 	if (dataSize > -1 && totalRead >= dataSize) {
 	    cleanupAndFinish ();
 	} else if (bufHandle.isEmpty ()) {
 	    register ();
-	} else {       
+	} else {
 	    handleBlock ();
 	}
     }
@@ -96,13 +112,15 @@ public class WebConnectionResourceSource
     }
 
     private void handleBlock () {
+	BlockListener bl = listener;
+	listener = null;
 	if (isChunked) {
 	    chunkHandler.handleData (bufHandle);
 	    totalRead = chunkHandler.getTotalRead ();
 	} else {
 	    ByteBuffer buffer = bufHandle.getBuffer ();
-	    totalRead += buffer.remaining ();		
-	    listener.bufferRead (bufHandle);
+	    totalRead += buffer.remaining ();
+	    bl.bufferRead (bufHandle);
 	}
 	bufHandle.possiblyFlush ();
     }
@@ -118,13 +136,13 @@ public class WebConnectionResourceSource
 
     public void read () {
 	boolean useBig = fullReads > 4;
-	ByteBuffer buffer = 
+	ByteBuffer buffer =
 	    useBig ? bufHandle.getLargeBuffer () : bufHandle.getBuffer ();
 
 	buffer.position (currentMark); // keep our saved data.
 	int limit = buffer.capacity ();
 	if (dataSize > 0  && !isChunked) {
-	    limit = currentMark + (int)Math.min (limit - currentMark, 
+	    limit = currentMark + (int)Math.min (limit - currentMark,
 						 dataSize - totalRead);
 	}
 	buffer.limit (limit);
@@ -154,11 +172,23 @@ public class WebConnectionResourceSource
     }
 
     public void closed () {
-	listener.failed (new IOException ("channel closed"));
+	if (listener != null) {
+	    listener.failed (new IOException ("channel closed"));
+	    listener = null;
+	} else {
+	    Logger logger = Logger.getLogger (getClass ().getName ());
+	    logger.severe ("Got close but no listener to tell!");
+	}
     }
 
     public void timeout () {
-	listener.timeout ();
+	if (listener != null) {
+	    listener.timeout ();
+	    listener = null;
+	} else {
+	    Logger logger = Logger.getLogger (getClass ().getName ());
+	    logger.severe ("Got timeout but no listener to tell!");
+	}
     }
 
     public Long getTimeout () {
@@ -174,7 +204,7 @@ public class WebConnectionResourceSource
 	    ByteBuffer buffer = bufHandle.getBuffer ();
 	    buffer.position (buffer.limit ());
 	}
-	    
+
 	bufHandle.possiblyFlush ();
 	con.releaseConnection (wc);
     }

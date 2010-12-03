@@ -25,6 +25,7 @@ import rabbit.util.SimpleUserHandler;
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
 public class HttpBaseFilter implements HttpFilter {
+    /** Constant for requests that want an unfiltered resource. */
     public static final String NOPROXY = "http://noproxy.";
     private static final BigInteger ZERO = BigInteger.ZERO;
     private static final BigInteger ONE = BigInteger.ONE;
@@ -124,6 +125,7 @@ public class HttpBaseFilter implements HttpFilter {
      * @param requri the requested resource.
      * @param header the actual request.
      * @param con the Connection.
+     * @return null if the request is allowed or an error response header
      */
     private HttpHeader handleURLSetup (String requri, HttpHeader header,
 				       Connection con) {
@@ -234,7 +236,7 @@ public class HttpBaseFilter implements HttpFilter {
 	    if (bi.equals (ZERO)) {
 		if (header.getMethod ().equals ("TRACE")) {
 		    HttpHeader ret = con.getHttpGenerator ().get200 ();
-		    ret.setContent (header.toString ());
+		    ret.setContent (header.toString (), "UTF-8");
 		    return ret;
 		}
 		HttpHeader ret = con.getHttpGenerator ().get200 ();
@@ -252,7 +254,7 @@ public class HttpBaseFilter implements HttpFilter {
 
     public HttpHeader doHttpInFiltering (SocketChannel socket,
 					 HttpHeader header, Connection con) {
-	// ok, no real header then dont do a thing.
+	// ok, no real header then don't do a thing.
 	if (header.isDot9Request ()) {
 	    con.setMayCache (false);
 	    con.setMayUseCache (false);
@@ -374,11 +376,8 @@ public class HttpBaseFilter implements HttpFilter {
 	    return headerr;
 
 	removeConnectionTokens (header);
-	int rsize = removes.size ();
-	for (int i = 0; i < rsize; i++) {
-	    String r = removes.get (i);
+	for (String r : removes)
 	    header.removeHeader (r);
-	}
 
 	ProxyChain proxyChain = con.getProxy ().getProxyChain ();
 	Resolver resolver = proxyChain.getResolver (requri);
@@ -474,6 +473,11 @@ public class HttpBaseFilter implements HttpFilter {
 	return null;
     }
 
+    public HttpHeader doConnectFiltering (SocketChannel socket, 
+					  HttpHeader header, Connection con) {
+	return null;
+    }    
+
     public void setup (SProperties properties) {
 	removes.clear ();
 	String rs = properties.getProperty ("remove", "");
@@ -493,5 +497,5 @@ public class HttpBaseFilter implements HttpFilter {
     public boolean isPublic (URL url) {
 	String file = url.getFile ();
         return file.startsWith ("/FileSender/public/");
-	}
+    }
 }

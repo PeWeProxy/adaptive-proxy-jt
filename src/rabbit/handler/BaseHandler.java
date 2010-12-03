@@ -652,7 +652,8 @@ public class BaseHandler
 
     public void doTimeout () {
 	if (con != null)
-	    getLogger ().warning ("BaseHandler: timeout");
+	    getLogger ().warning ("BaseHandler: timeout: uri: " +
+				  request.getRequestURI ());
 	removeCache ();
 	finish (false);
     }

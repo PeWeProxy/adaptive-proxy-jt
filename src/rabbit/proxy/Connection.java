@@ -152,12 +152,21 @@ public class Connection {
 	}
     }
 
+    private boolean connectionReset (Throwable t) {
+	if (t instanceof IOException)
+	    return "Connection reset by peer".equals (t.getMessage ());
+	return false;
+    }
+
     private void handleFailedRequestRead (Throwable t) {
     proxy.getAdaptiveEngine().getEventsHandler().logRequestReadFailed(this);
 	if (t instanceof RequestLineTooLongException) {
 	    HttpHeader err = getHttpGenerator ().get414 ();
 	    // Send response and close
 	    sendAndClose (err);
+	} else if (connectionReset (t)) {
+	    logger.log (Level.INFO, "Exception when reading request: " + t);
+	    closeDown ();
 	} else {
 	    logger.log (Level.INFO, "Exception when reading request", t);
 	    closeDown ();
@@ -823,7 +832,15 @@ public class Connection {
 	status = "Handling ssl request";
 	SSLHandler sslh = new SSLHandler (proxy, this, proxyRequest, tlh);
 	if (sslh.isAllowed ()) {
-	    sslh.handle (channel, bh);
+	    HttpHeaderFilterer filterer = proxy.getHttpHeaderFilterer ();
+	    HttpHeader badresponse = filterer.filterConnect (this, channel, proxyRequest);
+	    if (badresponse != null) {
+		statusCode = badresponse.getStatusCode ();
+		// Send response and close
+		sendAndClose (badresponse);
+	    } else {
+		sslh.handle (channel, bh);
+	    }
 	} else {
 	    HttpHeader badresponse = responseHandler.get403 ();
 	    sendAndClose (badresponse);

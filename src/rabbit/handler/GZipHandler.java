@@ -32,6 +32,7 @@ public class GZipHandler extends BaseHandler {
     /** For creating the factory.
      */
     public GZipHandler () {
+	// empty
     }
 
     /** Create a new GZipHandler for the given request.

@@ -1,7 +1,5 @@
 package rabbit.handler;
 
-import rabbit.http.HttpHeader;
-
 /** This interface descsribes the methods neccessary to implement a
  *  handler. Besides this a constructor is also nedded 
  *

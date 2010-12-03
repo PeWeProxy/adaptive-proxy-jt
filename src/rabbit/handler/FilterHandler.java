@@ -42,9 +42,13 @@ public class FilterHandler extends GZipHandler {
     protected Iterator<ByteBuffer> sendBlocks = null;
 
     protected GZipUnpacker gzu = null;
+    private GZListener gzListener = null;
 
-    // For creating the factory.
+    /** Create a new FilterHandler that is uninitialized. Normally this should
+     *  only be used for the factory creation.
+     */
     public FilterHandler () {
+	// empty
     }
 
     /** Create a new FilterHandler for the given request.
@@ -57,6 +61,9 @@ public class FilterHandler extends GZipHandler {
      * @param mayFilter May we filter this request?
      * @param size the size of the data beeing handled.
      * @param compress if we want this handler to compress or not.
+     * @param repack if true unpack, filter and possibly repack compressed
+     *        resources.
+     * @param filterClasses the filters to use
      */
     public FilterHandler (Connection con, TrafficLoggerHandler tlh,
 			  HttpHeader request, HttpHeader response,
@@ -104,13 +111,13 @@ public class FilterHandler extends GZipHandler {
 	    Charset charSet = null;
 	    if (cs != null) {
 	    	try {
-	    		charSet = Charset.forName (cs);
+	    		charSet = Charset.forName(cs);
 	    	    } catch (UnsupportedCharsetException e) {
-	    		getLogger ().warning("Bad CharSet: " + cs);
+	    		getLogger().warning("Bad CharSet: " + cs);
 	    	    }
 		}
 	    if (charSet == null)
-			charSet = Charset.forName ("ISO-8859-1");
+			charSet = Charset.forName("ISO-8859-1");
 	    parser = new HtmlParser (charSet);
 	    filters = initFilters ();
 	}
@@ -119,9 +126,11 @@ public class FilterHandler extends GZipHandler {
     private void setupRepacking (String ce) {
 	ce = ce.toLowerCase ();
 	if (ce.equals ("gzip")) {
-	    gzu = new GZipUnpacker (new GZListener (), false);
+	    gzListener = new GZListener ();
+	    gzu = new GZipUnpacker (gzListener, false);
 	} else if (ce.equals("deflate")) {
-	    gzu = new GZipUnpacker (new GZListener (), true);
+	    gzListener = new GZListener ();
+	    gzu = new GZipUnpacker (gzListener, true);
 	} else {
 	    getLogger ().warning ("Do not know how to handle encoding: " + ce);
 	}
@@ -136,13 +145,24 @@ public class FilterHandler extends GZipHandler {
     }
 
     private class GZListener implements GZipUnpackListener {
+	private boolean gotData = false;
 	private final byte[] buffer = new byte[4096];
 	public void unpacked (byte[] buf, int off, int len) {
+	    gotData = true;
 	    handleArray (buf, off, len);
+	}
+
+	public void clearDataFlag () {
+	    gotData = false;
+	}
+
+	public boolean gotData () {
+	    return gotData;
 	}
 
 	public void finished () {
 	    gzu = null;
+	    gzListener = null;
 	    finishData ();
 	}
 
@@ -214,9 +234,10 @@ public class FilterHandler extends GZipHandler {
 
     private void forwardArrayToHandler (byte[] arr, int off, int len) {
 	if (gzu != null) {
+	    gzListener.clearDataFlag ();
 	    gzu.setInput (arr, off, len);
-	    if (!dataRequested && (sendBlocks == null || !sendBlocks.hasNext ()) && 
-		(gzu != null && gzu.needsInput ()))
+	    // gzu may be null if we get into finished mode
+	    if (!dataRequested && gzu != null && gzu.needsInput () && !gzListener.gotData ())
 		waitForData ();
 	} else {
 	    handleArray (arr, off, len);
