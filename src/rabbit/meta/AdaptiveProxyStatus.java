@@ -114,7 +114,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 				}
 			}
 			sb.append ("<b>Services for responses:</b><br>\n");
-			if (rq) {
+			if (rp) {
 				for (Class<? extends ProxyService> svcClass : modulesManager.getProvidedResponseServices((ResponseServiceModule)module)) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
