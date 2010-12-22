@@ -1,4 +1,4 @@
-package sk.fiit.peweproxy.plugins.services.content;
+package sk.fiit.peweproxy.plugins.services.impl.content;
 
 import java.util.Arrays;
 
@@ -7,6 +7,7 @@ import sk.fiit.peweproxy.headers.WritableHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
+import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 
 public class ModifiableByteServiceImpl extends BaseServiceProvider<ModifiableBytesService>

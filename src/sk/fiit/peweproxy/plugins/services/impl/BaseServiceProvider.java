@@ -1,13 +1,13 @@
-package sk.fiit.peweproxy.plugins.services.content;
+package sk.fiit.peweproxy.plugins.services.impl;
 
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceProvider;
 import sk.fiit.peweproxy.services.ProxyService;
 
-abstract class BaseServiceProvider<Service extends ProxyService>
+public abstract class BaseServiceProvider<Service extends ProxyService>
 	implements RequestServiceProvider<Service>, ResponseServiceProvider<Service>, ProxyService {
-	final HttpMessageImpl<?> httpMessage;
+	protected final HttpMessageImpl<?> httpMessage;
 	
 	public BaseServiceProvider(HttpMessageImpl<?> httpMessage) {
 		if (httpMessage == null)
@@ -33,5 +33,5 @@ abstract class BaseServiceProvider<Service extends ProxyService>
 		return false;
 	}
 	
-	abstract Class<Service> getServiceClass();
+	protected abstract Class<Service> getServiceClass();
 }

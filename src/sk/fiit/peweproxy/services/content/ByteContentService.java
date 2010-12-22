@@ -7,7 +7,7 @@ import sk.fiit.peweproxy.services.ProxyService;
  * body on the lowest level of abstraction possible, as an array of bytes.
  * <br><br>
  * <b>Definition and implementation bundled</b><br>
- * <i>This service is one of the four basic services and service plugins are not
+ * <i>This service is one of the five final services and service plugins are not
  * allowed to provide implementations of it. Definition of this service and also
  * its implementation is bundled with every release of the proxy server.</i>
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>

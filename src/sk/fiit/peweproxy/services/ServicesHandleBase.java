@@ -30,15 +30,18 @@ import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceModule;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
-import sk.fiit.peweproxy.plugins.services.content.ByteServiceImpl;
-import sk.fiit.peweproxy.plugins.services.content.ModifiableByteServiceImpl;
-import sk.fiit.peweproxy.plugins.services.content.ModifiableStringServiceImpl;
-import sk.fiit.peweproxy.plugins.services.content.StringServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.content.ByteServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableByteServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableStringServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.content.StringServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.processing.PluginsTogglingServiceImpl;
 import sk.fiit.peweproxy.services.ProxyService.readonly;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
+import sk.fiit.peweproxy.services.processing.PluginsTogglingService;
+import sk.fiit.peweproxy.services.user.UserIdentificationService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class ServicesHandleBase<ModuleType extends ServiceModule> implements ServicesHandle {
@@ -224,6 +227,30 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 				log.warn(getLogTextHead()+"Java heap space saturated, unable to provide string content services \n",e);
 			}  
 		throw new ServiceUnavailableException(ModifiableStringService.class, excMessage, cause);
+	}
+	
+	private ServiceProvider<PluginsTogglingService> getPluginsTogglingService() {
+		ServiceUnavailableException exc = null;
+		UserIdentificationService userSvc = null;
+		do {
+			try {
+				if (userSvc == null)
+					userSvc = getService(UserIdentificationService.class);
+				else
+					userSvc = getNextService(userSvc);
+				String userId = userSvc.getClientIdentification();
+				return new PluginsTogglingServiceImpl(httpMessage, manager.getAdaptiveEngine(), userId);
+			} catch (ServiceUnavailableException e) {
+				if (!e.getMessage().startsWith("No module to provide service")) { // tvarme sa, ze to nie je hrozne
+					exc = e;
+				} else {
+					if (exc == null) {
+						exc = e;
+					}
+				}
+			}
+		} while (userSvc != null);
+		throw exc;
 	}
 	
 	@SuppressWarnings("unchecked")
