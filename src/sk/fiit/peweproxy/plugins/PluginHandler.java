@@ -16,12 +16,12 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -71,10 +71,7 @@ public class PluginHandler {
 	private Set<String> excludeFileNames;
 	private ClassLoader servicesCLoader;
 	
-	private final List<PluginConfigEntry> configEntries;
-	private final Map<PluginConfigEntry, ProxyPlugin> ldPlugin4EntryMap;
-	private final Map<ProxyPlugin, PluginConfigEntry> entry4ldPluginMap;
-	private final Map<String, Set<? extends ProxyPlugin>> ldPlugins4TypeMap;
+	private final List<PluginInstance> pluginInstances;
 	private final Map<Class<?>, String> checksums4ldClassMap;
 	private final Map<URL, String> checksums4ldLibsMap;
 	private final AbcPluginsComparator comparator;
@@ -104,10 +101,7 @@ public class PluginHandler {
 	}
 	
 	public PluginHandler() {
-		configEntries = new LinkedList<PluginConfigEntry>();
-		ldPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
-		entry4ldPluginMap = new LinkedHashMap<ProxyPlugin, PluginConfigEntry>();
-		ldPlugins4TypeMap = new LinkedHashMap<String, Set<? extends ProxyPlugin>>();
+		pluginInstances = new LinkedList<PluginInstance>();
 		checksums4ldClassMap = new HashMap<Class<?>, String>();
 		checksums4ldLibsMap = new HashMap<URL, String>();
 		comparator = new AbcPluginsComparator();
@@ -159,32 +153,93 @@ public class PluginHandler {
 			return name.endsWith(".xml") && !excludeFileNames.contains(name);
 		}
 	}
-
-	class PluginConfigEntry {
-		final String name;
-		final String className;
-		final String classLocation;
-		final List<String> libraries;
-		final List<String> types;
-		final PluginProperties properties;
-		ClassLoader classLoader;
-		final Set<URL> libsrariesURLSet;
-		boolean classLocValid = true;
-		boolean loadError = false;
+	
+	private class PluginConfig {
+		private final String name;
+		private final String className;
+		private final String classLocation;
+		private final List<String> libraries;
+		private final List<String> types;
+		private final Map<String, String> properties;
+		private final String workingDir;
 		
-		public PluginConfigEntry(String name, String className, String classLocation,
-				List<String> libraries, List<String> types, PluginProperties properties) {
+		public PluginConfig(String name, String className, String classLocation, List<String> libraries,
+				List<String> types, Map<String, String> properties, String workingDir) {
 			this.name = name;
 			this.className = className;
 			this.classLocation = classLocation;
 			this.libraries = libraries;
-			this.libsrariesURLSet = new HashSet<URL>();
 			this.types = types;
 			this.properties = properties;
+			this.workingDir = workingDir;
 		}
 	}
 
-	private void createClassLoaders(Map<URL, String> newLibChecksums) {
+	public class PluginInstance {
+		final PluginConfig plgConfig;
+		final PluginPropertiesImpl properties;
+		final Set<URL> libsrariesURLSet;
+		List<Class<? extends ProxyPlugin>> realTypes = new LinkedList<Class<? extends ProxyPlugin>>();
+		ClassLoader classLoader = null;
+		ProxyPlugin instance = null;
+		
+		public PluginInstance(PluginConfig plgConfig, Map<String, String> variables) throws PluginConfigurationException {
+			this.plgConfig = plgConfig;
+			this.libsrariesURLSet = new HashSet<URL>();
+			File workDir = null;
+			if (plgConfig.workingDir == null) {
+				workDir = pluginRepositoryDir;
+			} else{
+				workDir = new File(pluginRepositoryDir, plgConfig.workingDir);
+				if (!workDir.exists()) {
+					log.info("Plugin '"+plgConfig.name+"' - Creating working directory '"+workDir.getPath()+"'");
+					if (!workDir.mkdir()) {
+						log.info("Plugin '"+plgConfig.name+"' - Unable to create working directory '"+workDir.getPath()+"', no working directory will be used");
+						throw new PluginConfigurationException("Plugin '"+plgConfig.name+"' - Unable to create missing working directory");
+					}
+				} else if (!workDir.isDirectory())
+					throw new PluginConfigurationException("Plugin '"+plgConfig.name+"' - Working directory path '"+workDir.getPath()+"' is pointing to regular"+
+							" file, not a directory");
+				String path = workDir.getAbsolutePath();
+				try {
+					path = workDir.getCanonicalPath();
+				} catch (IOException e) {
+					log.warn("Plugin '"+plgConfig.name+"' - Unable to get cannonical path for file "+workDir,e);
+				}
+				log.info("Plugin '"+plgConfig.name+"' - plugin will use working directory '"+path+"'");
+				// TODO nastavit prava na read/write cez policy
+			}
+			
+			properties = new PluginPropertiesImpl(workDir,threadPool);
+			for (Entry<String, String> property : plgConfig.properties.entrySet()) {
+				properties.addProperty(property.getKey(),replaceVariables(property.getValue(), variables));
+			}
+		}
+		
+		public String getName() {
+			return plgConfig.name;
+		}
+		
+		public Class<? extends ProxyPlugin> getPluginClass() {
+			if (instance == null) 
+				throw new IllegalStateException("Plugin not instantiated");
+			return instance.getClass();
+		}
+		
+		public List<String> getTypes() {
+			List<String> retVal = new LinkedList<String>();
+			for (Class<? extends ProxyPlugin> typeClass : realTypes) {
+				retVal.add(typeClass.getSimpleName());
+			}
+			return retVal;
+		}
+		
+		public ProxyPlugin getInstance() {
+			return instance;
+		}
+	}
+
+	private void createClassLoaders(List<PluginInstance> plgInstances, Map<URL, String> newLibChecksums) {
 		Map<URL, ClassLoader> cLoaders = new HashMap<URL, ClassLoader>();
 		if (servicesLibsURLs != null) {
 			servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
@@ -193,10 +248,9 @@ public class PluginHandler {
 		} else {
 			servicesCLoader = null;
 		}
-		for (Iterator<PluginConfigEntry> iterator = configEntries.iterator(); iterator.hasNext();) {
-			PluginConfigEntry cfgEntry =  iterator.next();
-			boolean libsOK = true;
-			for (String libLocation : cfgEntry.libraries) {
+		for (Iterator<PluginInstance> iterator = plgInstances.iterator(); iterator.hasNext();) {
+			PluginInstance plgInstance =  iterator.next();
+			for (String libLocation : plgInstance.plgConfig.libraries) {
 				File libRelFile = new File(pluginRepositoryDir,libLocation);
 				File libFile = null;
 				try {
@@ -206,21 +260,17 @@ public class PluginHandler {
 				}
 				if (libFile == null || !libFile.canRead()) {
 					// unable to locate library file (jar/dir)
-					log.info("Library location '"+libLocation+"' for the plugin '"+cfgEntry.name+
+					log.info("Library location '"+libLocation+"' for the plugin '"+plgInstance.plgConfig.name+
 						"' does not point to valid jar/directory, this plugin will be loaded, but bad things might happen " +
 						" if you are running in production. You can safely ignore this message in development mode.");
-					libsOK = true;
-					break;
 				}
 				URI libLocURI = libFile.toURI();
 				URL url = null;
 				try {
 					url = libLocURI.toURL();
 				} catch (MalformedURLException e) {
-					log.info("Error when converting valid library file path '"+libFile.getAbsolutePath()+"' to URL, plugin '"+cfgEntry.name
-							+" will not be loaded");
-					libsOK = false;
-					break;
+					log.info("Error when converting valid library file path '"+libFile.getAbsolutePath()+"' to URL (plugin '" +
+							plgInstance.plgConfig.name+"). Library will be considered changed when reloading plugins next time.");
 				}
 				
 				try {
@@ -228,14 +278,9 @@ public class PluginHandler {
 				} catch (IOException e) {
 					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' for MD5 checksum computing");
 				}
-				cfgEntry.libsrariesURLSet.add(url);
+				plgInstance.libsrariesURLSet.add(url);
 			}
-			if (!libsOK) {
-				// something went wrong with computing checksums for libraries
-				iterator.remove();
-				continue;
-			}
-			File pluginRelFile = new File(pluginRepositoryDir,cfgEntry.classLocation); 
+			File pluginRelFile = new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation); 
 			File pluginFile = null;
 			try {
 				pluginFile = pluginRelFile.getCanonicalFile();
@@ -244,8 +289,8 @@ public class PluginHandler {
 			}
 			if (pluginFile == null || !pluginFile.canRead()) {
 				// unable to locate plugin's binary file (jar/dir)
-				log.info("Can not read classpath file/directory '"+pluginFile.getAbsolutePath()+"',  Plugin '"+cfgEntry.name
-					+"' will not be loaded");
+				log.info("Can not read classpath file/directory '"+pluginFile.getAbsolutePath()+"',  Plugin '"
+						+plgInstance.plgConfig.name+"' will not be loaded");
 				iterator.remove();
 				continue;
 			}
@@ -254,8 +299,8 @@ public class PluginHandler {
 			try {
 				classLocURL = classLocURI.toURL();
 			} catch (MalformedURLException e) {
-				log.info("Error when converting valid plugin class file path '"+pluginFile.getAbsolutePath()+"' to URL, plugin '"+cfgEntry.name
-					+" will not be loaded");
+				log.info("Error when converting valid plugin class file path '"+pluginFile.getAbsolutePath()+"' to URL, plugin '"
+						+plgInstance.plgConfig.name+" will not be loaded");
 				continue;
 			}
 			ClassLoader sharedClassLoader = cLoaders.get(classLocURL);
@@ -264,49 +309,50 @@ public class PluginHandler {
 				ClassLoader libsClassLoader = sharedClassLoader.getParent();
 				if (sharedLibsURLs != null)
 					libsClassLoader = libsClassLoader.getParent();
-				if (sameURLsInCLoader(libsClassLoader, cfgEntry.libsrariesURLSet)) {
-					cfgEntry.classLoader = sharedClassLoader;
-					log.debug("Plugin '"+cfgEntry.name+"' shares already created ClassLoader "+cfgEntry.classLoader);
+				if (sameURLsInCLoader(libsClassLoader, plgInstance.libsrariesURLSet)) {
+					plgInstance.classLoader = sharedClassLoader;
+					log.debug("Plugin '"+plgInstance.plgConfig.name+"' shares already created ClassLoader "+plgInstance.classLoader);
 				} else {
-					log.debug("Plugin '"+cfgEntry.name+"' can not share already created ClassLoader "+sharedClassLoader
+					log.debug("Plugin '"+plgInstance.plgConfig.name+"' can not share already created ClassLoader "+sharedClassLoader
 						+" because of different library dependencies");
 				}
 			}
-			if (cfgEntry.classLoader == null) {
+			if (plgInstance.classLoader == null) {
 				// plugin can not share existing ClassLoader
 				ClassLoader parentCLoader = servicesCLoader;
 				URL[] urls = new URL[] {classLocURL};
-				if (!cfgEntry.libsrariesURLSet.isEmpty()) {
-					URL[] libsURLs = cfgEntry.libsrariesURLSet.toArray(new URL[cfgEntry.libsrariesURLSet.size()]);
+				if (!plgInstance.libsrariesURLSet.isEmpty()) {
+					URL[] libsURLs = plgInstance.libsrariesURLSet.toArray(new URL[plgInstance.libsrariesURLSet.size()]);
 					// MAIN <- SVCS <- LIBS
-					parentCLoader = createClassLoader(libsURLs, parentCLoader, cfgEntry);
+					parentCLoader = createClassLoader(libsURLs, parentCLoader, plgInstance.plgConfig.name);
 				}
 				if (sharedLibsURLs != null) {
 					// MAIN <- SVCS <- ?LIBS? <- SHD
-					parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, cfgEntry);
+					parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, plgInstance.plgConfig.name);
 				}
 				// MAIN <- SVCS <- ?LIBS? <- ?SHD? <- PLG
-				cfgEntry.classLoader = createClassLoader(urls, parentCLoader, cfgEntry);
-				cLoaders.put(classLocURL, cfgEntry.classLoader);
+				plgInstance.classLoader = createClassLoader(urls, parentCLoader, plgInstance.plgConfig.name);
+				cLoaders.put(classLocURL, plgInstance.classLoader);
 				if (log.isDebugEnabled()) {
 					String hierarchy = "";
-					for (ClassLoader cLoader = cfgEntry.classLoader; cLoader.getParent() != null; cLoader = cLoader.getParent()) {
+					for (ClassLoader cLoader = plgInstance.classLoader; cLoader.getParent() != null; cLoader = cLoader.getParent()) {
 						hierarchy = cLoader+" <- "+hierarchy;
 					}
-					log.debug("Plugin's '"+cfgEntry.name+"' classloader hierarchy: "+hierarchy);
+					log.debug("Plugin's '"+plgInstance.plgConfig.name+"' classloader hierarchy: "+hierarchy);
 				}
 			}
 		}
 	}
 	
-	private URLClassLoader createClassLoader(URL[] urls, ClassLoader parent, PluginConfigEntry cfgEntry) {
+	private URLClassLoader createClassLoader(URL[] urls, ClassLoader parent, String pluginName) {
 		URLClassLoader retVal = null;
 		if (parent != null)
 			retVal = URLClassLoader.newInstance(urls,parent);
 		else
 			retVal = URLClassLoader.newInstance(urls);
 		log.debug("Creating new ClassLoader "+retVal+" with URLs set to "+Arrays.toString(retVal.getURLs())
-				+" with parent ClassLoader set to "+retVal.getParent()+ " for potential use by plugin '"+cfgEntry.name+"'");
+				+" with parent ClassLoader set to "+retVal.getParent()+ " for potential use by plugin '"
+				+pluginName+"'");
 		return retVal;
 	}
 	
@@ -399,70 +445,55 @@ public class PluginHandler {
 			log.info("Configured not to use shared libraries directory");
 	}
 	
+	private boolean checkLibsChange(File libsDir, Map<URL, String> newLibChecksums, String libsText) {
+		boolean retVal = false;
+		if (libsDir != null) {
+			URL dirURL = null;
+			try {
+				dirURL = libsDir.toURI().toURL();
+			} catch (MalformedURLException e) {
+				log.warn("Error when converting valid "+libsText.toLowerCase()+" directory path '"+libsDir.getAbsolutePath()
+						+"' to URL, no "+libsText.toLowerCase()+" will be available to processing plugins");
+			}
+			if (dirURL != null) { 
+				String newChecksum = newLibChecksums.get(dirURL);
+				if (newChecksum != null)
+					retVal = newChecksum.equals(checksums4ldLibsMap.get(dirURL));
+			}
+			if (retVal)
+				log.info(libsText+" directory has not been changed");
+			else
+				log.info(libsText+" directory has been changed so all plugins will be reloaded");
+		} else
+			retVal = true;
+		return retVal;
+	}
+	
 	public synchronized void reloadPlugins() {
 		if (pluginRepositoryDir == null) {
 			log.info("Plugins home repository not set");
 			return;
 		}
 		//loadingLogBuffer.setLength(0);	//keep previous logs
-		ldPlugins4TypeMap.clear();
-		entry4ldPluginMap.clear();
-		loadPluginsConfigs();
+		List<PluginConfig> plgConfigs = loadPluginsConfigs();
+		Map<String, String> variables = loadVariablesConfiguration();
+		List<PluginInstance> newPlgInstances = createPluginInstances(plgConfigs, variables);
 		Map<URL, String> newLibChecksums = new HashMap<URL, String>();
 		createServicesLibsURLs(newLibChecksums);
 		createSharedLibsURLs(newLibChecksums);
-		createClassLoaders(newLibChecksums);
-		boolean servicesLibsDirSame = false;
-		if (servicesDir != null) {
-			URL servicesDirURL = null;
-			try {
-				servicesDirURL = servicesDir.toURI().toURL();
-			} catch (MalformedURLException e) {
-				log.warn("Error when converting valid services definitions directory path '"+servicesDir.getAbsolutePath()
-						+"' to URL, no services will be available to processing plugins");
-			}
-			if (servicesDirURL != null) { 
-				String newChecksum = newLibChecksums.get(servicesDirURL);
-				if (newChecksum != null)
-					servicesLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(servicesDirURL));
-			}
-			if (servicesLibsDirSame)
-				log.info("Services definitions directory has not been changed");
-			else
-				log.info("Services definitions directory has been changed so all plugins will be reloaded");
-		} else
-			servicesLibsDirSame = true;
-		boolean sharedLibsDirSame = false;
-		if (sharedLibsDir != null) {
-			URL sharedDirURL = null;
-			try {
-				sharedDirURL = sharedLibsDir.toURI().toURL();
-			} catch (MalformedURLException e) {
-				log.warn("Error when converting valid shared libraries directory path '"+sharedLibsDir.getAbsolutePath()
-						+"' to URL, no shared libraries will be used");
-			}
-			if (sharedDirURL != null) { 
-				String newChecksum = newLibChecksums.get(sharedDirURL);
-				if (newChecksum != null)
-					sharedLibsDirSame = newChecksum.equals(checksums4ldLibsMap.get(sharedDirURL));
-			}
-			if (sharedLibsDirSame)
-				log.info("Shared libraries directory has not been changed");
-			else
-				log.info("Shared libraries directory has been changed so all plugins will be reloaded");
-		} else
-			sharedLibsDirSame = true;
-		Map<PluginConfigEntry, ProxyPlugin> tmpPlugin4EntryMap = new LinkedHashMap<PluginConfigEntry, ProxyPlugin>();
-		for (PluginConfigEntry oldCfgEntry : ldPlugin4EntryMap.keySet()) {
-			ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(oldCfgEntry);
-			PluginConfigEntry newCfgEntry = null;
+		createClassLoaders(newPlgInstances,newLibChecksums);
+		boolean servicesLibsDirSame = checkLibsChange(servicesDir, newLibChecksums, "Services definitions");;
+		boolean sharedLibsDirSame = checkLibsChange(sharedLibsDir, newLibChecksums, "Shared libraries");;
+		for (PluginInstance oldplgInstance : pluginInstances) {
+			ProxyPlugin loadedPlugin = oldplgInstance.instance;
+			PluginInstance newPlgInstance = null;
 			if (servicesLibsDirSame) {
 				if (sharedLibsDirSame) {
-					// try to find matching oldCfgEntry
-					for (PluginConfigEntry cfgEntry : configEntries) {
-						if (cfgEntry.className.equals(oldCfgEntry.className) &&
-								cfgEntry.classLocation.equals(oldCfgEntry.classLocation)) {
-							newCfgEntry = cfgEntry;
+					// try to find matching newPlgInstance
+					for (PluginInstance plgInstance : newPlgInstances) {
+						if (plgInstance.plgConfig.className.equals(oldplgInstance.plgConfig.className) &&
+								plgInstance.plgConfig.classLocation.equals(oldplgInstance.plgConfig.classLocation)) {
+							newPlgInstance = plgInstance;
 							break;
 						}
 					};
@@ -470,9 +501,9 @@ public class PluginHandler {
 					log.debug("Shared libraries directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
 			} else
 				log.debug("Services definitions directory has been changed so plugin '"+loadedPlugin+"' will be reloaded");
-			if (newCfgEntry != null && oldCfgEntry.libsrariesURLSet.equals(newCfgEntry.libsrariesURLSet)) {
+			if (newPlgInstance != null && oldplgInstance.libsrariesURLSet.equals(newPlgInstance.libsrariesURLSet)) {
 				boolean libsChanged = false;
-				for (URL libURL : newCfgEntry.libsrariesURLSet) {
+				for (URL libURL : newPlgInstance.libsrariesURLSet) {
 					String newChecksum = newLibChecksums.get(libURL);
 					if (!newChecksum.equals(checksums4ldLibsMap.get(libURL))) {
 						libsChanged = true;
@@ -482,7 +513,7 @@ public class PluginHandler {
 				if (!libsChanged) {
 					boolean supportsReconfigure = false;
 					try {
-						supportsReconfigure = loadedPlugin.supportsReconfigure(newCfgEntry.properties);
+						supportsReconfigure = loadedPlugin.supportsReconfigure(newPlgInstance.properties);
 					} catch (Throwable t) {
 						log.info("Throwable raised while calling supportsReconfigure() on '"+loadedPlugin+"' of class '"+loadedPlugin.getClass()+"'",t);
 					}
@@ -490,10 +521,10 @@ public class PluginHandler {
 						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring with new properties at it's current state");
 						Class<?> newClazz = null;
 						try {
-							newClazz = loadClass(newCfgEntry.className, newCfgEntry.classLoader);
+							newClazz = loadClass(newPlgInstance.plgConfig.className, newPlgInstance.classLoader);
 						} catch (ClassNotFoundException e) {
-							log.info("Plugin '"+newCfgEntry.name+"' | plugin class '"+newCfgEntry.className+"' not found at '"+
-									new File(pluginRepositoryDir,newCfgEntry.classLocation).getAbsolutePath()+"'", e);
+							log.info("Plugin '"+newPlgInstance.plgConfig.name+"' | plugin class '"+newPlgInstance.plgConfig.className+"' not found at '"+
+									new File(pluginRepositoryDir,newPlgInstance.plgConfig.classLocation).getAbsolutePath()+"'", e);
 						}
 						Class<?> oldClass = loadedPlugin.getClass();
 						String newClassChecksum = null;
@@ -501,51 +532,66 @@ public class PluginHandler {
 							newClassChecksum = checksums4ldClassMap.get(newClazz);
 							if (oldClass == newClazz || checksums4ldClassMap.get(oldClass).equals(newClassChecksum)) {
 								log.debug("Seems like class '"+newClazz.getName()+"' hasn't changed, so we try to keep already loaded plugin '"+loadedPlugin+"'");
-								if (startPlugin(loadedPlugin, newCfgEntry.properties)) {
-									tmpPlugin4EntryMap.put(newCfgEntry,loadedPlugin);
-									entry4ldPluginMap.put(loadedPlugin, newCfgEntry);
+								if (startPlugin(loadedPlugin, newPlgInstance.properties)) {
 									if (newClazz != loadedPlugin.getClass())
 										checksums4ldClassMap.remove(newClazz);
-									newCfgEntry.classLoader = oldClass.getClassLoader();
+									newPlgInstance.instance = loadedPlugin;
+									newPlgInstance.classLoader = oldClass.getClassLoader();
+									newPlgInstance.realTypes = oldplgInstance.realTypes;
 									log.debug("Loaded plugin '"+loadedPlugin+"' preserved, no classes (re)loading will ocur");
 									continue;
 								} else
-									log.debug("Plugin of class '"+newCfgEntry.className+"' is not reconfigured properly, it will be stoped and thrown away");
+									log.debug("Plugin of class '"+newPlgInstance.plgConfig.className+"' is not reconfigured properly, it will be stoped and thrown away");
 							} else {
 								log.debug("Seems like class '"+newClazz.getName()+"' has changed, thus plugin '"+loadedPlugin+"' will be reloaded");
 							}
 						}
 					} else
-						log.debug("Loaded plugin '"+loadedPlugin+"' does not support reconfiguring with new properties at it's current state so it'll be reloaded");
+						log.debug("Loaded plugin '"+loadedPlugin+"' does not support reconfiguring with new properties at it's current state, plugin will be reloaded");
 				} else {
-					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed so it'll be reloaded");
+					log.debug("Dependencies of plugin '"+loadedPlugin+"' changed, plugin will be reloaded");
 				}
 			} else {
-				log.debug("New or changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
+				if (newPlgInstance == null)
+					log.debug("Loaded plugin '"+loadedPlugin+"' not to be integrated, plugin will be stopped");
+				else
+					log.debug("Changed configuration of plugin '"+loadedPlugin+"', plugin will be reloaded");
 			}
 			checksums4ldClassMap.remove(loadedPlugin.getClass());
 			stopPlugin(loadedPlugin);
 		}
-		ldPlugin4EntryMap.clear();
-		ldPlugin4EntryMap.putAll(tmpPlugin4EntryMap);
 		checksums4ldLibsMap.clear();
 		checksums4ldLibsMap.putAll(newLibChecksums);
+		pluginInstances.clear();
+		pluginInstances.addAll(newPlgInstances);
+		
+		// now load / start plugins
+		for (PluginInstance pluginInstance : pluginInstances) {
+			if (pluginInstance.instance == null) {
+				getPlugin(pluginInstance);
+			}
+		}
 	}
 	
-	/*private boolean sameURLsInClassLoaders(ClassLoader cLoader1, ClassLoader cLoader2) {
-		return
-	}*/
-	
-	private Set<URL> urlArrayToSet(URL[] urls) {
-		Set<URL> retVal = new HashSet<URL>();
-		for (URL url : urls) {
-			retVal.add(url);
+	private List<PluginInstance> createPluginInstances(List<PluginConfig> plgConfigs, Map<String, String> variables) {
+		List<PluginInstance> retVal = new LinkedList<PluginHandler.PluginInstance>();
+		for (PluginConfig plgConfig : plgConfigs) {
+			try {
+				retVal.add(new PluginInstance(plgConfig, variables));
+			} catch (PluginConfigurationException e) {
+				log.info("Invalid configuration of plugin '"+plgConfig.name+"': "+e.getText());
+			}
 		}
 		return retVal;
 	}
 	
 	private Set<URL> getCLoaderURLSet(URLClassLoader cLoader) {
-		return urlArrayToSet(cLoader.getURLs());
+		URL[] urls = cLoader.getURLs();
+		Set<URL> retVal = new HashSet<URL>();
+		for (URL url : urls) {
+			retVal.add(url);
+		}
+		return retVal;
 	}
 	
 	private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
@@ -611,51 +657,23 @@ public class PluginHandler {
 						if(nameNode != null) {
 							variables.put(nameNode.getTextContent(), node.getTextContent());
 						} else {
-							log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - expected '"+ATTR_VARIABLE_NAME+"' attribute on tag "+node.getTextContent());
+							log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - expected '"
+									+ATTR_VARIABLE_NAME+"' attribute on tag "+node.getTextContent());
 						}
 					} else {
-						log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - '"+node.getTextContent()+"' has no attributes");
+						log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is malformed - '"
+								+node.getTextContent()+"' has no attributes");
 					}
 				}
 			} else {
-				log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is missing the document root element '"+ELEMENT_VARIABLES+"'");
+				log.error("The variable configuration file '"+variablesFile.getAbsolutePath()+"' is missing the document root element '"
+						+ELEMENT_VARIABLES+"'");
 			}
 		} else {
 			log.error("Corrupted variables file '"+variablesFile.getAbsolutePath()+"'");
 		}
 		
 		return variables;
-	}
-	
-	private synchronized void loadPluginsConfigs() {
-		Map<String, String> variables = loadVariablesConfiguration();
-		
-		configEntries.clear();
-		//excludeFileNames.add("services.xml");
-		File[] configFiles = pluginRepositoryDir.listFiles(new PluginsXMLFileFilter(excludeFileNames));
-		Set<String> pluginNames = new HashSet<String>();
-		for (File file : configFiles) {
-			Document document = XMLFileParser.parseFile(file);
-			if (document != null) {
-				PluginConfigEntry cfgEntry = null;
-				try {
-					cfgEntry = loadPluginConfig(document,file.getName(), variables);
-				} catch (PluginConfigurationException e) {
-					log.info("Invalid configuration file '"+file.getAbsolutePath()+"' ("+e.getText()+")");
-					continue;
-				}
-				int num = 1;
-				String configedName = cfgEntry.name;
-				while (pluginNames.contains(cfgEntry.name)) {
-					cfgEntry = new PluginConfigEntry(configedName+"#"+Integer.toString(num++), cfgEntry.className, cfgEntry.classLocation, cfgEntry.libraries, cfgEntry.types, cfgEntry.properties);
-				}
-				if (num > 1)
-					log.info("Duplicate plugin name '"+configedName+"', name of the plugin config of which is stored in file '"+file.getAbsolutePath()+"' is set to '"+cfgEntry.name+"'");
-				configEntries.add(cfgEntry);
-				pluginNames.add(cfgEntry.name);
-			} else
-				log.info("Corrupted plugin configuration file '"+file.getAbsolutePath()+"'");
-		}
 	}
 	
 	/**
@@ -687,7 +705,38 @@ public class PluginHandler {
 		return replacedText.toString();
 	}
 	
-	private PluginConfigEntry loadPluginConfig(Document doc, String xmlName, Map<String, String> variables) throws PluginConfigurationException {
+	private synchronized List<PluginConfig> loadPluginsConfigs() {
+		List<PluginConfig> configs = new LinkedList<PluginHandler.PluginConfig>();
+		File[] configFiles = pluginRepositoryDir.listFiles(new PluginsXMLFileFilter(excludeFileNames));
+		Set<String> pluginNames = new HashSet<String>();
+		for (File file : configFiles) {
+			Document document = XMLFileParser.parseFile(file);
+			if (document != null) {
+				PluginConfig plgConfig = null;
+				try {
+					plgConfig = loadPluginConfig(document,file.getName());
+				} catch (PluginConfigurationException e) {
+					log.info("Invalid configuration file '"+file.getAbsolutePath()+"' ("+e.getText()+")");
+					continue;
+				}
+				int num = 1;
+				String configedName = plgConfig.name;
+				while (pluginNames.contains(plgConfig.name)) {
+					plgConfig = new PluginConfig(configedName+"#"+Integer.toString(num++), plgConfig.className, plgConfig.classLocation, plgConfig.libraries
+							,plgConfig.types,plgConfig.properties, plgConfig.workingDir);
+				}
+				if (num > 1)
+					log.info("Duplicate plugin name '"+configedName+"', name of the plugin config of which is stored in file '"+file.getAbsolutePath()
+							+"' is set to '"+plgConfig.name+"'");
+				configs.add(plgConfig);
+				pluginNames.add(plgConfig.name);
+			} else
+				log.info("Corrupted plugin configuration file '"+file.getAbsolutePath()+"'");
+		}
+		return configs;
+	}
+	
+	private PluginConfig loadPluginConfig(Document doc, String xmlName) throws PluginConfigurationException {
 		Element docRoot = doc.getDocumentElement();
 		if (!ELEMENT_PLUGIN.equals(docRoot.getTagName()))
 			throw new PluginConfigurationException("Configuration '"+xmlName+"' - Missing document root element '"+ELEMENT_PLUGIN+"'");
@@ -714,29 +763,12 @@ public class PluginHandler {
 		String className = classNameElement.getTextContent();
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_WORKDIR);
-		File workDir = null;
+		String workDir = null;
 		if (nodeList.getLength() == 0) {
 			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_WORKDIR+"', plugins directory will be used as working directory");
-			workDir = pluginRepositoryDir;
 		} else {
 			Element workDirElement = (Element)nodeList.item(0);
-			workDir = new File(pluginRepositoryDir, workDirElement.getTextContent());
-			if (!workDir.exists()) {
-				log.info("Plugin '"+pluginName+"' - Creating working directory '"+workDir.getPath()+"'");
-				if (!workDir.mkdir()) {
-					log.info("Plugin '"+pluginName+"' - Unable to create working directory '"+workDir.getPath()+"', no working directory will be used");
-					throw new PluginConfigurationException("Plugin '"+pluginName+"' - Unable to create missing working directory");
-				}
-			} else if (!workDir.isDirectory())
-				throw new PluginConfigurationException("Plugin '"+pluginName+"' - Working directory path '"+workDir.getPath()+"' is pointing to regular file, not a directory");
-			String path = workDir.getAbsolutePath();
-			try {
-				path = workDir.getCanonicalPath();
-			} catch (IOException e) {
-				log.warn("Plugin '"+pluginName+"' - Unable to get cannonical path for file "+workDir,e);
-			}
-			log.info("Plugin '"+pluginName+"' - plugin will use working directory '"+path+"'");
-			// TODO nastavit prava na read/write cez policy
+			workDir = workDirElement.getTextContent();
 		}
 		nodeList = docRoot.getElementsByTagName(ELEMENT_LIBS);
 		List<String> pluginLibs = new LinkedList<String>();
@@ -768,36 +800,28 @@ public class PluginHandler {
 		}
 		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
-		PluginPropertiesImpl properties = new PluginPropertiesImpl(workDir,threadPool);
+		Map<String, String> properties = new  HashMap<String, String>();
 		if (nodeList.getLength() == 0)
 			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at plugin configuration");
 		else {
 			Element parametersElement = (Element)nodeList.item(0);
 			NodeList params = parametersElement.getElementsByTagName(ELEMENT_PARAM);
 			if (params.getLength() == 0)
-				log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at plugin configuration");
+				log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_PARAM+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_PARAMS+"', no parameters will be provided at" +
+						" plugin configuration");
 			else
 				for (int i = 0; i < params.getLength(); i++) {
 					Element param = (Element)params.item(i);
 					String nameAttr = param.getAttribute(ATTR_NAME);
 					if (nameAttr != null && !nameAttr.isEmpty())
-						properties.addProperty(nameAttr, replaceVariables(param.getTextContent(), variables));
+						properties.put(nameAttr, param.getTextContent());
 			}
 		}
-		return new PluginConfigEntry(pluginName,className,classLocation,pluginLibs,pluginTypes,properties);
+		return new PluginConfig(pluginName,className,classLocation,pluginLibs,pluginTypes,properties,workDir);
 	}
 	
-	private List<PluginConfigEntry> getEntriesForType(String type) {
-		List<PluginConfigEntry> retVal = new LinkedList<PluginConfigEntry>();
-		for (PluginConfigEntry cfgEntry : configEntries) {
-			if (cfgEntry.types.contains(type))
-				retVal.add(cfgEntry);
-		}
-		return retVal;
-	}
-	
-	<T> T getInstance(Class<T> clazz) {
-		T instance = null;
+	private ProxyPlugin getInstance(Class<? extends ProxyPlugin> clazz) {
+		ProxyPlugin instance = null;
 		try {
 			instance = clazz.newInstance();
 		} catch (InstantiationException e) {
@@ -810,23 +834,21 @@ public class PluginHandler {
 		return instance;
 	}
 	
-	@SuppressWarnings("unchecked")
-	private <T extends ProxyPlugin> Class<T> getClass(PluginConfigEntry cfgEntry, Class<T> asClass) {
+	private Class<? extends ProxyPlugin> getClass(PluginInstance plgInstance) {
 		Class<?> clazz = null;
 		try {
-			clazz = loadClass(cfgEntry.className, cfgEntry.classLoader);
+			clazz = loadClass(plgInstance.plgConfig.className, plgInstance.classLoader);
 		} catch (ClassNotFoundException e) {
-			cfgEntry.classLocValid = false;
-			log.info("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' not found at '"+
-					new File(pluginRepositoryDir,cfgEntry.classLocation).getAbsolutePath()+"'");
+			log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' not found at '"+
+					new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation).getAbsolutePath()+"'");
 			return null;
 		}
-		if (!asClass.isAssignableFrom(clazz)) {
+		if (!ProxyPlugin.class.isAssignableFrom(clazz)) {
 			log.info("Found class '"+clazz.getName()+"' is not a subclass of '"+
-					asClass.getName()+"' class/interface");
+					ProxyPlugin.class.getName()+"' interface");
 			return null;
 		}
-		return (Class<T>) clazz.asSubclass(asClass);
+		return clazz.asSubclass(ProxyPlugin.class);
 	}
 	
 	private File getClassFile(Class<?> clazz) {
@@ -858,130 +880,72 @@ public class PluginHandler {
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
 			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
-				log.warn("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible to the plugin, " +
-						"and the proxy server won't be able to reload it on the fly if it changes");
+				log.warn("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible" +
+						" to the plugin, " + "and the proxy server won't be able to reload it on the fly if it changes");
 		} catch (IOException e) {
 			log.info("Error while reading class file for MD5 checksum computing");
 		} 
 		return clazz;
 	}
 	
-	private  <T extends ProxyPlugin> T getPlugin(PluginConfigEntry cfgEntry, Class<T> asClass) {
-		if (cfgEntry.loadError)
-			return null;
-		T plugin = null;
-		ProxyPlugin loadedPlugin = ldPlugin4EntryMap.get(cfgEntry);
-		if (loadedPlugin != null) {
-			try {
-				plugin = asClass.cast(loadedPlugin);
-			} catch (ClassCastException e) {
-				log.info("Plugin '"+cfgEntry.name+"' | plugin class '"+cfgEntry.className+"' is not a subclass of '"
-						+asClass.getName()+"' class/interface");
-			}
-		} else if (cfgEntry.classLocValid) {
-			Class<T> clazz = getClass(cfgEntry, asClass);
-			if (clazz != null) {
-				plugin = getInstance(clazz);
-				if (plugin != null) {
-					if (startPlugin(plugin,cfgEntry.properties)) {
-						ldPlugin4EntryMap.put(cfgEntry, plugin);
-						entry4ldPluginMap.put(plugin, cfgEntry);
-					} else {
-						log.debug("Plugin of class '"+cfgEntry.className+"' is not set up properly, it is thrown away");
-						plugin = null;
-					}
+	private ProxyPlugin getPlugin(PluginInstance plgInstance) {
+		ProxyPlugin plugin = null;
+		Class<? extends ProxyPlugin> clazz = getClass(plgInstance);
+		if (clazz != null) {
+			plugin = getInstance(clazz);
+			if (plugin != null) {
+				if (startPlugin(plugin,plgInstance.properties)) {
+					plgInstance.instance = plugin;
 				} else {
-					cfgEntry.loadError = true;
+					log.debug("Plugin of class '"+plgInstance.plgConfig.className+"' is not set up properly, it is thrown away");
+					plugin = null;
 				}
 			}
 		}
 		return plugin;
+	}
+	
+	private class AbcPluginsComparator implements Comparator<PluginInstance> {
+		@Override
+		public int compare(PluginInstance o1, PluginInstance o2) {
+			return o1.plgConfig.name.compareTo(o2.plgConfig.name);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
-	public synchronized <T extends ProxyPlugin> Set<T> getPlugins(String type, Class<T> asClass) {
-		Set<T> plugins = null;
-		Set<? extends ProxyPlugin> loadedPlugins = ldPlugins4TypeMap.get(type);
-		if (loadedPlugins != null) {
-			plugins = (Set<T>) loadedPlugins;
-		} else {
-			plugins = new LinkedHashSet<T>();
-			List<PluginConfigEntry> cfgEntries = getEntriesForType(type);
-			if (cfgEntries != null) {
-				for (PluginConfigEntry cfgEntry : cfgEntries) {
-					T plugin = getPlugin(cfgEntry, asClass);
-					if (plugin != null)
-						plugins.add(plugin);
-				}
-			}
-			ldPlugins4TypeMap.put(type,plugins);
-		}
+	public <T extends ProxyPlugin> Set<T> getPlugins(Class<T> asClass) {
 		Set<T> retVal = new LinkedHashSet<T>();
-		retVal.addAll(plugins);
-		return retVal;
-	}
-
-	public synchronized <T extends ProxyPlugin> Set<T> getPlugins(Class<T> asClass) {
-		return getPlugins(asClass.getSimpleName(), asClass);
-	}
-	
-	public synchronized <T extends ProxyPlugin> T getPlugin(String pluginName, Class<T> asClass) {
-		T plugin = null;
-		// this method is called only at the beginning (when AdaptiveEngine is ordering
-		// processing plugins according to ordering file), so it's not that bad to
-		// iterate over and over again. I've chosen this way instead of another map (names->plugins).
-		for (PluginConfigEntry cfgEntry : configEntries) {
-			if (cfgEntry.name.equals(pluginName))
-				plugin = getPlugin(cfgEntry, asClass);
-		}
-		return plugin;
-	}
-	
-	/*public <T extends ProxyPlugin> List<String> getLoadedPluginNames(Class<T> ofClass) {
-		List<String> retVal = new LinkedList<String>();
-		Set<? extends ProxyPlugin> loadedPlugins = ldPlugins4TypesMap.get(ofClass.getSimpleName());
-		if (loadedPlugins != null) {
-			for (ProxyPlugin proxyPlugin : loadedPlugins) {
-				retVal.add(configs4PluginsMap.get(proxyPlugin).name);
-			}
-		}
-		return retVal;
-	}*/
-	
-	public synchronized String getPluginName(ProxyPlugin plugin) {
-		return entry4ldPluginMap.get(plugin).name;
-	}
-	
-	private class AbcPluginsComparator implements Comparator<ProxyPlugin> {
-		@Override
-		public int compare(ProxyPlugin o1, ProxyPlugin o2) {
-			return entry4ldPluginMap.get(o1).name.compareTo(entry4ldPluginMap.get(o2).name);
-		}
-	}
-	
-	public synchronized <T extends ProxyPlugin> List<String> getLoadedPluginNames() {
-		List<String> retVal = new LinkedList<String>();
-		List<ProxyPlugin> ldPlugins = new LinkedList<ProxyPlugin>();
-		ldPlugins.addAll(entry4ldPluginMap.keySet());
-		Collections.sort(ldPlugins, comparator);
-		for (ProxyPlugin proxyPlugin : ldPlugins) {
-			retVal.add(entry4ldPluginMap.get(proxyPlugin).name);
+		for (PluginInstance plgInstance : pluginInstances) {
+			if (!plgInstance.realTypes.contains(asClass))  { // not an old plugin
+				boolean dynamicTypes = plgInstance.plgConfig.types.isEmpty();
+				if (dynamicTypes || plgInstance.plgConfig.types.contains(asClass.getSimpleName())) {
+					try {
+						asClass.cast(plgInstance.instance);
+						if (dynamicTypes)
+							log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is a "+asClass.getSimpleName());
+						plgInstance.realTypes.add(asClass);
+						retVal.add((T) plgInstance.instance);
+					} catch (ClassCastException e) {
+						log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' is not a subclass of '"
+								+asClass.getName()+"' class/interface");
+					}
+				}
+			} else
+				retVal.add((T) plgInstance.instance);
 		}
 		return retVal;
 	}
 	
-	public synchronized List<String> getTypesOfPlugin(ProxyPlugin plugin) {
-		List<String> retVal = new LinkedList<String>();
-		for (String type : entry4ldPluginMap.get(plugin).types) {
-			if (ldPlugins4TypeMap.get(type).contains(plugin))
-				retVal.add(type);
-		}
-		return retVal;
+	public List<PluginInstance> getAllPlugins() {
+		List<PluginInstance> retVal = new LinkedList<PluginHandler.PluginInstance>();
+		retVal.addAll(pluginInstances);
+		Collections.sort(retVal, comparator);
+		return Collections.unmodifiableList(retVal);
 	}
 	
 	public void stopPlugins() {
-		for (ProxyPlugin plugin : ldPlugin4EntryMap.values()) {
-			stopPlugin(plugin);
+		for (PluginInstance plgInstance : pluginInstances) {
+			stopPlugin(plgInstance.instance);
 		}
 		pluginsStopped = true;
 	}

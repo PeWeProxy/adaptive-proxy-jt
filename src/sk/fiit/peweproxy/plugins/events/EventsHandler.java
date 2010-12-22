@@ -10,6 +10,7 @@ import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.plugins.PluginHandler;
+import sk.fiit.peweproxy.plugins.ProxyPlugin;
 
 public class EventsHandler {
 	static final Logger log = Logger.getLogger(EventsHandler.class);

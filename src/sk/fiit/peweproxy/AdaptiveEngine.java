@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponseImpl;
 import sk.fiit.peweproxy.plugins.PluginHandler;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
+import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
 import sk.fiit.peweproxy.plugins.events.EventsHandler;
 import sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin;
 import sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin;
@@ -798,6 +800,13 @@ public class AdaptiveEngine  {
 		}
 		if (sc == null)
 			return false;
+		
+		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
+		Map<ProxyPlugin, PluginInstance> pluginsMap = new LinkedHashMap<ProxyPlugin, PluginHandler.PluginInstance>();
+		for (PluginInstance pluginInstance : plugins) {
+			pluginsMap.put(pluginInstance.getInstance(), pluginInstance);
+		}
+		
 		boolean wasRequestMark = false;
 		boolean wasResponseMark = false;
 		while (sc.hasNextLine()) {
@@ -814,23 +823,29 @@ public class AdaptiveEngine  {
 			}
 			if (wasRequestMark) {
 				boolean sucess = false;
-				if (wasResponseMark)
-					sucess = loadPlugin(line, responsePlugins, responsePluginsSet, ResponseProcessingPlugin.class);
-				else
-					sucess = loadPlugin(line, requestPlugins, requestPluginsSet, RequestProcessingPlugin.class);
+				ProxyPlugin plugin = null;
+				PluginInstance plgInstance = pluginsMap.get(line);
+				if (plgInstance != null)
+					plugin = plgInstance.getInstance();
+				if (plugin != null) {
+					if (wasResponseMark)
+						sucess = addPlugin(plugin, responsePlugins, responsePluginsSet);
+					else
+						sucess = addPlugin(plugin, requestPlugins, requestPluginsSet);
+				}
 				if (!sucess)
-					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order, because such plugin is not present");
+					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order," +
+							" because such plugin is not present");
 			}
 		}
 		return true;
 	}
 	
-	private <T extends ProxyPlugin> boolean loadPlugin(String pluginName, List<T> pluginsList,
-		Set<T> pluginsSet, Class<T> pluginsClass) {
-		T plugin = pluginHandler.getPlugin(pluginName, pluginsClass);
+	@SuppressWarnings("unchecked")
+	private <T extends ProxyPlugin> boolean addPlugin(ProxyPlugin plugin, List<T> pluginsList, Set<T> pluginsSet) {
 		if (plugin == null)
 			return false;
-		pluginsList.add(plugin);
+		pluginsList.add((T)plugin);
 		pluginsSet.remove(plugin);
 		return true;
 	}

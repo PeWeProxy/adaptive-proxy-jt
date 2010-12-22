@@ -101,7 +101,7 @@ public class ModulesManager {
 		return retVal;
 	}
 	
-	public List<ResponseServiceModule> getLoadedResponsetModules() {
+	public List<ResponseServiceModule> getLoadedResponseModules() {
 		List<ResponseServiceModule> retVal = new LinkedList<ResponseServiceModule>();
 		retVal.addAll(rpModules);
 		return retVal;
