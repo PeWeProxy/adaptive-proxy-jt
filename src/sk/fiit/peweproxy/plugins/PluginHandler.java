@@ -131,14 +131,10 @@ public class PluginHandler {
 			coreThreads = DEF_CORE_THREADS;
 		}
 		threadPool = new PluginsThreadPool(coreThreads);
+		log.info("Plugins home directory is set to '"+getPrinbtablePath(pluginRepositoryDir)+"'");
+		log.info("Shared libraries directory is set to '"+getPrinbtablePath(sharedLibsDir)+"'");
+		log.info("Services definitions directory is set to '"+getPrinbtablePath(servicesDir)+"'");
 		log.info("Thread pool for plugins created with "+coreThreads+" core threads");
-		String path = pluginRepositoryDir.getAbsolutePath();
-		try {
-			path = pluginRepositoryDir.getCanonicalPath();
-		} catch (IOException e) {
-			log.info("Error when converting plugins home directory file '"+path+"' to cannonical form");
-		}
-		log.info("Plugins home directory is set to '"+path+"'");
 	}
 	
 	class PluginsXMLFileFilter implements FilenameFilter {
@@ -237,6 +233,16 @@ public class PluginHandler {
 		public ProxyPlugin getInstance() {
 			return instance;
 		}
+	}
+	
+	private String getPrinbtablePath(File file) {
+		String path = file.getAbsolutePath();
+		try {
+			path = file.getCanonicalPath();
+		} catch (IOException e) {
+			log.info("Error when converting file path '"+path+"' to cannonical form");
+		}
+		return path;
 	}
 
 	private void createClassLoaders(List<PluginInstance> plgInstances, Map<URL, String> newLibChecksums) {
@@ -440,6 +446,7 @@ public class PluginHandler {
 	
 	private void createSharedLibsURLs(Map<URL, String> newLibChecksums) {
 		if (sharedLibsDir != null) {
+			log.info("Shared libraries directory set to "+sharedLibsDir.getAbsolutePath());
 			sharedLibsURLs = createLibsURLs(sharedLibsDir, newLibChecksums, "shared libraries", "shared library");
 		} else
 			log.info("Configured not to use shared libraries directory");
@@ -921,13 +928,15 @@ public class PluginHandler {
 				if (dynamicTypes || plgInstance.plgConfig.types.contains(asClass.getSimpleName())) {
 					try {
 						asClass.cast(plgInstance.instance);
-						if (dynamicTypes)
-							log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is a "+asClass.getSimpleName());
+						log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is a "+asClass.getSimpleName());
 						plgInstance.realTypes.add(asClass);
 						retVal.add((T) plgInstance.instance);
 					} catch (ClassCastException e) {
-						log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' is not a subclass of '"
-								+asClass.getName()+"' class/interface");
+						if (dynamicTypes)
+							log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is not a "+asClass.getSimpleName());
+						else
+							log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' is not a subclass of '"
+									+asClass.getName()+"' class/interface");
 					}
 				}
 			} else
