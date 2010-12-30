@@ -70,10 +70,28 @@ public class AdaptiveEngine  {
 	private PluginHandler pluginHandler;
 	private final EventsHandler loggingHandler;
 	private ModulesManager modulesManager;
-	private final List<RequestProcessingPlugin> requestPlugins;
-	private final List<ResponseProcessingPlugin> responsePlugins;
+	private final List<ProcessingPluginInstance<RequestProcessingPlugin>> requestPlugins;
+	private final List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePlugins;
 	private File pluginsOrderFile = null; 
 	private boolean proxyDying = false;
+	private boolean pluginsToggling = true;
+	private final Map<String, Set<String>> blacklistForUsers;
+	
+	class ProcessingPluginInstance<PluginType extends ProxyPlugin> {
+		private final PluginType plugin;
+		private final String name;
+		
+		@SuppressWarnings("unchecked")
+		public ProcessingPluginInstance(PluginInstance plgInstance) {
+			this.plugin = (PluginType)plgInstance.getInstance();
+			this.name = plgInstance.getName();
+		}
+		
+		@Override
+		public String toString() {
+			return "'"+name+"'("+plugin+")";
+		}
+	}
 	
 	class ConnectionHandle {
 		private final Connection con;
@@ -106,8 +124,9 @@ public class AdaptiveEngine  {
 		loggingHandler = new EventsHandler(this);
 		pluginHandler = new PluginHandler();
 		modulesManager = new ModulesManager(this);
-		requestPlugins = new LinkedList<RequestProcessingPlugin>();
-		responsePlugins = new LinkedList<ResponseProcessingPlugin>();
+		requestPlugins = new LinkedList<ProcessingPluginInstance<RequestProcessingPlugin>>();
+		responsePlugins = new LinkedList<ProcessingPluginInstance<ResponseProcessingPlugin>>();
+		blacklistForUsers = new HashMap<String, Set<String>>();
 	}
 	
 	public ModifiableHttpRequestImpl getRequestForConnection(Connection con) {
@@ -159,6 +178,15 @@ public class AdaptiveEngine  {
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
 	
+	private Set<String> getBlacklistedPlugins(String userId) {
+		Set<String> retVal = blacklistForUsers.get(userId);
+		if (retVal == null) {
+			retVal = new HashSet<String>();
+			blacklistForUsers.put(userId, retVal);
+		}
+		return retVal;
+	}
+	
 	public void newRequest(Connection con, HttpHeader clientHeader, HttpHeader proxyHeader) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
@@ -183,21 +211,26 @@ public class AdaptiveEngine  {
 				log.trace("RQ: "+conHandle+" | Request separator used: "+separator.toString());
 			boolean prefetch = false;
 			Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
-			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
+			for (ProcessingPluginInstance<RequestProcessingPlugin> rqPlgInstance : requestPlugins) {
+				if (pluginsToggling && getBlacklistedPlugins(conHandle.request.userIdentification()).contains(rqPlgInstance.name)) {
+					if (log.isTraceEnabled())
+						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during services need discovery");
+					continue;
+				}
 				try {
 					Set<Class<? extends ProxyService>> pluginsDesiredSvcs
 						= new HashSet<Class<? extends ProxyService>>();
-					requestPlugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
+					rqPlgInstance.plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
 					pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 						if (log.isDebugEnabled())
-							log.debug("RQ: "+conHandle+" | Plugin "+requestPlugin+" wants content modifying service for request");
+							log.debug("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request");
 						prefetch = true;
 						break;
 					} else
 						desiredServices.addAll(pluginsDesiredSvcs);
 				} catch (Throwable t) {
-					log.info("RQ: Throwable raised while obtaining set of desired services from plugin '"+requestPlugin+"'",t);
+					log.info("RQ: Throwable raised while obtaining set of desired services from "+rqPlgInstance,t);
 				}
 			}
 			if (!prefetch)
@@ -338,22 +371,30 @@ public class AdaptiveEngine  {
 		boolean again = false;
 		boolean sendResponse = false;
 		boolean processResponse = true;
-		Set<RequestProcessingPlugin> pluginsChangedResponse = new HashSet<RequestProcessingPlugin>();
+		Set<ProcessingPluginInstance<RequestProcessingPlugin>> pluginsChangedResponse
+			= new HashSet<AdaptiveEngine.ProcessingPluginInstance<RequestProcessingPlugin>>();
+		Set<String> blacklistedPlugins = getBlacklistedPlugins(conHandle.request.userIdentification());
 		do {
 			again = false;
-			for (RequestProcessingPlugin requestPlugin : requestPlugins) {
-				if (pluginsChangedResponse.contains(requestPlugin))
-					// skip this plugin to prevent cycling
+			for (ProcessingPluginInstance<RequestProcessingPlugin> rqPlgInstance : requestPlugins) {
+				if (pluginsChangedResponse.contains(rqPlgInstance)) {
+					if (log.isTraceEnabled())
+						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped since it already procesed the request and returned new one");
 					continue;
+				} if (pluginsToggling && blacklistedPlugins.contains(rqPlgInstance.name)) {
+					if (log.isTraceEnabled())
+						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during processing");
+					continue;
+				}
 				try {
 					if (lateProcessing) {
-						requestPlugin.processTransferedRequest(conHandle.request);
+						rqPlgInstance.plugin.processTransferedRequest(conHandle.request);
 					} else {
-						RequestProcessingActions action = requestPlugin.processRequest(conHandle.request);
+						RequestProcessingActions action = rqPlgInstance.plugin.processRequest(conHandle.request);
 						if (action == RequestProcessingActions.NEW_REQUEST || action == RequestProcessingActions.FINAL_REQUEST) {
-							HttpRequest newRequest = requestPlugin.getNewRequest(conHandle.request, conHandle.messageFactory);
+							HttpRequest newRequest = rqPlgInstance.plugin.getNewRequest(conHandle.request, conHandle.messageFactory);
 							if (newRequest == null)
-								log.warn("Null HttpRequest was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewRequest()," +
+								log.warn("RQ: "+conHandle+" | Null HttpRequest was provided by "+rqPlgInstance+" after calling getNewRequest()," +
 											" substitution is being ignored.");
 							else {
 								// if FINAL_REQUEST and same request was returned just to stop processing, we DO want to transfer original body
@@ -364,7 +405,7 @@ public class AdaptiveEngine  {
 									conHandle.request.setAllowedThread();
 								}
 								if (action == RequestProcessingActions.NEW_REQUEST) {
-									pluginsChangedResponse.add(requestPlugin);
+									pluginsChangedResponse.add(rqPlgInstance);
 									again = true;
 								}
 								break;
@@ -372,9 +413,9 @@ public class AdaptiveEngine  {
 						} else if (action == RequestProcessingActions.NEW_RESPONSE || action == RequestProcessingActions.FINAL_RESPONSE) {
 							if (action == RequestProcessingActions.FINAL_RESPONSE)
 								processResponse = false;
-							HttpResponse newResponse = requestPlugin.getResponse(conHandle.request, conHandle.messageFactory);
+							HttpResponse newResponse = rqPlgInstance.plugin.getResponse(conHandle.request, conHandle.messageFactory);
 							if (newResponse == null)
-								log.warn("Null HttpResponse was provided by RequestProcessingPlugin '"+requestPlugin+"' after calling getNewResponse()," +
+								log.warn("RQ: "+conHandle+" | Null HttpResponse was provided by "+rqPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
 							else {
 								transferOriginalBody = false; // not needed but still leaving it here
@@ -388,7 +429,7 @@ public class AdaptiveEngine  {
 						}
 					}
 				} catch (Throwable t) {
-					log.info("RQ: "+conHandle+" | Throwable raised while processing request with RequestProcessingPlugin '"+requestPlugin+"'",t);
+					log.info("RQ: "+conHandle+" | Throwable raised while processing request by "+rqPlgInstance);
 					// TODO revert changes maybe ?
 				}
 			}
@@ -453,20 +494,25 @@ public class AdaptiveEngine  {
 		con.setMayCache(false);
 		ConnectionHandle conHandle = requestHandles.get(con);
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
-		for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
+		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPlgInstance : responsePlugins) {
+			if (pluginsToggling && getBlacklistedPlugins(conHandle.request.userIdentification()).contains(rpPlgInstance.name)) {
+				if (log.isTraceEnabled())
+					log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped during services need discovery");
+				continue;
+			}
 			try {
 				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
 					= new HashSet<Class<? extends ProxyService>>(); 
-				responsePlugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
+				rpPlgInstance.plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
 				pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
-						log.debug("RP: "+conHandle+" | Plugin "+responsePlugin+" wants content modifying service for response");
+						log.debug("RP: "+conHandle+" | Plugin "+rpPlgInstance+" wants content modifying service for response");
 					return true;
 				} else
 					desiredServices.addAll(pluginsDesiredSvcs);
 			} catch (Throwable t) {
-				log.info("RP: Throwable raised while obtaining set of desired services from plugin '"+responsePlugin+"'",t);
+				log.info("RP: Throwable raised while obtaining set of desired services from "+rpPlgInstance,t);
 			}
 		}
 		if (conHandle.response.getServicesHandle().needContent(desiredServices))
@@ -564,22 +610,30 @@ public class AdaptiveEngine  {
 		}
 		boolean transferOriginalBody = true;
 		boolean again = false;
-		Set<ResponseProcessingPlugin> pluginsChangedResponse = new HashSet<ResponseProcessingPlugin>();
+		Set<ProcessingPluginInstance<ResponseProcessingPlugin>> pluginsChangedResponse
+			= new HashSet<AdaptiveEngine.ProcessingPluginInstance<ResponseProcessingPlugin>>();
+		Set<String> blacklistedPlugins = getBlacklistedPlugins(conHandle.request.userIdentification());
 		do {
 			again = false;
-			for (ResponseProcessingPlugin responsePlugin : responsePlugins) {
-				if (pluginsChangedResponse.contains(responsePlugin))
-					// skip this plugin to prevent cycling
+			for (ProcessingPluginInstance<ResponseProcessingPlugin> responsePlgInstance : responsePlugins) {
+				if (pluginsChangedResponse.contains(responsePlgInstance)) {
+					if (log.isTraceEnabled())
+						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped since it already procesed the response and returned new one");
 					continue;
+				} if (pluginsToggling && blacklistedPlugins.contains(responsePlgInstance.name)) {
+					if (log.isTraceEnabled())
+						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped during processing");
+					continue;
+				}
 				try {
 					if (lateProcessing) {
-						responsePlugin.processTransferedResponse(conHandle.response);
+						responsePlgInstance.plugin.processTransferedResponse(conHandle.response);
 					} else {
-						ResponseProcessingActions action = responsePlugin.processResponse(conHandle.response);
+						ResponseProcessingActions action = responsePlgInstance.plugin.processResponse(conHandle.response);
 						if (action == ResponseProcessingActions.NEW_RESPONSE || action == ResponseProcessingActions.FINAL_RESPONSE) {
-							HttpResponse newResponse = responsePlugin.getNewResponse(conHandle.response, conHandle.messageFactory);
+							HttpResponse newResponse = responsePlgInstance.plugin.getNewResponse(conHandle.response, conHandle.messageFactory);
 							if (newResponse == null)
-								log.warn("Null HttpResponse was provided by ResponseProcessingPlugin '"+responsePlugin+"' after calling getNewResponse()," +
+								log.warn("RP: "+conHandle+" | Null HttpResponse was provided by "+responsePlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
 							else {
 								// if FINAL_RESPONSE and same response was returned just to stop processing, we DO want to transfer original body
@@ -589,7 +643,7 @@ public class AdaptiveEngine  {
 									conHandle.response.setAllowedThread();
 								}
 								if (action == ResponseProcessingActions.NEW_RESPONSE) {
-									pluginsChangedResponse.add(responsePlugin);
+									pluginsChangedResponse.add(responsePlgInstance);
 									again = true;
 								}
 								break;
@@ -597,7 +651,7 @@ public class AdaptiveEngine  {
 						}
 					}
 				} catch (Throwable t) {
-					log.info("RP: "+conHandle+" | Throwable raised while processing response with ResponseProcessingPlugin '"+responsePlugin+"'",t);
+					log.info("RP: "+conHandle+" | Throwable raised while processing response by "+responsePlgInstance,t);
 					// TODO revert changes maybe ?
 				}
 			}
@@ -759,6 +813,7 @@ public class AdaptiveEngine  {
 			}
 			pluginHandler.setup(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles,coreThreads);
 		}
+		pluginsToggling = Boolean.valueOf(prop.getProperty("enable_plugins_toggling","true"));
 		modulesManager.setPattern(prop.getProperty("string_services_pattern"));
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");
@@ -772,9 +827,19 @@ public class AdaptiveEngine  {
 		requestPlugins.clear();
 		responsePlugins.clear();
 		log.info("Loading request processing plugins");
-		Set<RequestProcessingPlugin> requestPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
+		Set<RequestProcessingPlugin> rqPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
 		log.info("Loading response processing plugins");
-		Set<ResponseProcessingPlugin> responsePluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
+		Set<ResponseProcessingPlugin> rpPluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
+		
+		Set<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsSet = new HashSet<ProcessingPluginInstance<RequestProcessingPlugin>>();
+		Set<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsSet = new HashSet<ProcessingPluginInstance<ResponseProcessingPlugin>>();
+		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
+		for (PluginInstance pluginInstance : plugins) {
+			if (rqPluginsSet.contains(pluginInstance))
+				requestPluginsSet.add(new ProcessingPluginInstance<RequestProcessingPlugin>(pluginInstance));
+			if (rpPluginsSet.contains(pluginInstance))
+				responsePluginsSet.add(new ProcessingPluginInstance<ResponseProcessingPlugin>(pluginInstance));
+		}
 		boolean pluginsOrderingSuccess;
 		if (pluginsOrderFile != null && pluginsOrderFile.canRead()) {
 			pluginsOrderingSuccess = addProcessingPluginsInOrder(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
@@ -786,12 +851,14 @@ public class AdaptiveEngine  {
 			log.info("Loading of configuration of plugin ordering failed for some reason. "+
 					"Processing plugins will not be called in some desired fashion");
 		}
+		
 		requestPlugins.addAll(requestPluginsSet);
 		responsePlugins.addAll(responsePluginsSet);
 	}
 	
-	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, Set<RequestProcessingPlugin> requestPluginsSet,
-			Set<ResponseProcessingPlugin> responsePluginsSet) {
+	@SuppressWarnings("unchecked")
+	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, Set<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsSet,
+			Set<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsSet) {
 		Scanner sc = null;
 		try {
 			sc = new Scanner(new FileInputStream(pluginsOrderFile), "UTF-8");
@@ -801,14 +868,15 @@ public class AdaptiveEngine  {
 		if (sc == null)
 			return false;
 		
-		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
-		Map<ProxyPlugin, PluginInstance> pluginsMap = new LinkedHashMap<ProxyPlugin, PluginHandler.PluginInstance>();
-		for (PluginInstance pluginInstance : plugins) {
-			pluginsMap.put(pluginInstance.getInstance(), pluginInstance);
-		}
-		
 		boolean wasRequestMark = false;
 		boolean wasResponseMark = false;
+		Map<String, ProcessingPluginInstance<?>> plgInstances = new HashMap<String, AdaptiveEngine.ProcessingPluginInstance<?>>();
+		for (ProcessingPluginInstance<RequestProcessingPlugin> rqPluginInstance : requestPluginsSet) {
+			plgInstances.put(rqPluginInstance.name, rqPluginInstance);
+		}
+		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPluginInstance : responsePluginsSet) {
+			plgInstances.put(rpPluginInstance.name, rpPluginInstance); // don't care mappings get rewritten
+		}
 		while (sc.hasNextLine()) {
 			String line = sc.nextLine().trim();
 			if (line.startsWith("#") || line.isEmpty())
@@ -823,15 +891,12 @@ public class AdaptiveEngine  {
 			}
 			if (wasRequestMark) {
 				boolean sucess = false;
-				ProxyPlugin plugin = null;
-				PluginInstance plgInstance = pluginsMap.get(line);
-				if (plgInstance != null)
-					plugin = plgInstance.getInstance();
-				if (plugin != null) {
+				ProcessingPluginInstance<?> plgInstance = plgInstances.get(line);
+				if (plgInstance != null) {
 					if (wasResponseMark)
-						sucess = addPlugin(plugin, responsePlugins, responsePluginsSet);
+						sucess = addPlugin((ProcessingPluginInstance<ResponseProcessingPlugin>)plgInstance, responsePlugins, responsePluginsSet);
 					else
-						sucess = addPlugin(plugin, requestPlugins, requestPluginsSet);
+						sucess = addPlugin((ProcessingPluginInstance<RequestProcessingPlugin>)plgInstance, requestPlugins, requestPluginsSet);
 				}
 				if (!sucess)
 					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order," +
@@ -842,23 +907,28 @@ public class AdaptiveEngine  {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends ProxyPlugin> boolean addPlugin(ProxyPlugin plugin, List<T> pluginsList, Set<T> pluginsSet) {
-		if (plugin == null)
+	private <T extends ProxyPlugin> boolean addPlugin(ProcessingPluginInstance<T> pluginInstance, List<ProcessingPluginInstance<T>> pluginsList,
+			Set<ProcessingPluginInstance<T>> pluginsSet) {
+		if (pluginInstance == null)
 			return false;
-		pluginsList.add((T)plugin);
-		pluginsSet.remove(plugin);
+		pluginsList.add(pluginInstance);
+		pluginsSet.remove(pluginInstance);
 		return true;
 	}
 	
 	public List<RequestProcessingPlugin> getLoadedRequestPlugins() {
 		List<RequestProcessingPlugin> retVal = new LinkedList<RequestProcessingPlugin>();
-		retVal.addAll(requestPlugins);
+		for (ProcessingPluginInstance<RequestProcessingPlugin> rqPluginInstance : requestPlugins) {
+			retVal.add(rqPluginInstance.plugin);
+		}
 		return retVal;
 	}
 	
 	public List<ResponseProcessingPlugin> getLoadedResponsePlugins() {
 		List<ResponseProcessingPlugin> retVal = new LinkedList<ResponseProcessingPlugin>();
-		retVal.addAll(responsePlugins);
+		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPluginInstance : responsePlugins) {
+			retVal.add(rpPluginInstance.plugin);
+		}
 		return retVal;
 	}
 	
@@ -880,5 +950,9 @@ public class AdaptiveEngine  {
 
 	public ModulesManager getModulesManager() {
 		return modulesManager;
+	}
+
+	public boolean isPluginsToggling() {
+		return pluginsToggling;
 	}
 }
