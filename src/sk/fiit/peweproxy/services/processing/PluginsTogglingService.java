@@ -1,6 +1,6 @@
 package sk.fiit.peweproxy.services.processing;
 
-import java.util.Map;
+import java.util.Set;
 
 import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
@@ -25,16 +25,39 @@ import sk.fiit.peweproxy.services.user.UserIdentificationService;
  */
 public interface PluginsTogglingService extends ProxyService {
 	
-	@readonly
-	public Map<String, Boolean> getRequestPluginsStatus();
+	public interface PluginStatus {
+		/**
+		 * Returns the name of the processing plugin this status object holds integration flag
+		 * for.
+		 * @return name of the processing plugin
+		 */
+		public String getPluginName();
+		
+		/**
+		 * Returns <code>true</code> if the plugin is called to process the messages of the
+		 * particular user, <code>false</code> if it's skipped during processing of the
+		 * messages.
+		 * @return whether the plugin is integrated into messages processing
+		 */
+		public boolean isEnabled();
+		
+		/**
+		 * Returns <code>true</code> if the processing plugin, this status object holds
+		 * integration flag for, is currently loaded and running, <code>false</code> otherwise. 
+		 * @return whether is the processing plugin currently running
+		 */
+		public boolean isRunning();
+	}
 	
 	@readonly
-	public Map<String, Boolean> getResponsePluginsStatus();
+	public Set<PluginStatus> getRequestPluginsStatus();
 	
 	@readonly
-	public void setRequestPluginsStatus(Map<String, Boolean> newStatuses);
+	public Set<PluginStatus> getResponsePluginsStatus();
 	
 	@readonly
-	public void setResponsePluginsStatus(Map<String, Boolean> newStatuses);
+	public void setRequestPluginStatus(String pluginName, boolean newStatus);
 	
+	@readonly
+	public void setResponsePluginStatus(String pluginName, boolean newStatus);
 }
