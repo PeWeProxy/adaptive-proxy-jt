@@ -1,6 +1,7 @@
 package sk.fiit.peweproxy.messages;
 
 import sk.fiit.peweproxy.services.ServicesHandle;
+import sk.fiit.peweproxy.services.user.UserIdentificationService;
 
 /**
  * Base interface for representations of all HTTP messages.
@@ -23,6 +24,19 @@ public interface HttpMessage {
 	 * @return whether body data of this message is accessible
 	 */
 	boolean hasBody();
+	
+	/**
+	 * Returns the unique textual identifier of the user that initiated this message. This
+	 * identifier is obtained by using plugged in {@link UserIdentificationService}
+	 * realizations. AdaptiveProxy platform calls all available realizations one by one until
+	 * one is able to provide valid ID. Returned ID is then cached for later calls of this
+	 * method. If there's no module to provide valid ID for this message, <code>null</code>
+	 * is cached.
+	 * @return identifier of the user that initiated the message, or <code>null</code> if no
+	 * module is able to prvoide one
+	 * @see UserIdentificationService
+	 */
+	String getUserIdentification();
 	
 	/**
 	 * Returns a copy of this HTTP message for which no thread access checking will be

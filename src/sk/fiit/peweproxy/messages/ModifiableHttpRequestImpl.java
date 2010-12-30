@@ -12,8 +12,10 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 			HttpRequestImpl originalRequest) {
 		super(modulesManager,header, originalRequest.clientSocketAddress());
 		this.originalRequest = originalRequest;
+		this.userId = originalRequest.userId;
 		if (log.isTraceEnabled())
 			log.trace(toString()+" has original request set to "+originalRequest.toString());
+		
 	}
 	
 	@Override

@@ -6,17 +6,20 @@ import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ServicesHandle;
+import sk.fiit.peweproxy.services.ServicesHandleBase;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
 	protected static final Logger log = Logger.getLogger(HttpMessageImpl.class);
+	private static final String VOID_USERID = HttpMessageImpl.class.getSimpleName()+"_VOID_USERID";
 	
 	protected final HeaderWrapper header;
 	byte[] data = null;
 	private HandleType serviceHandle;
 	private boolean checkThread = false;
 	private Thread allowedThread;
-	private boolean isReadonly = false; 
+	private boolean isReadonly = false;
+	protected String userId;
 	
 	public HttpMessageImpl(HeaderWrapper header) {
 		this.header = header;
@@ -49,6 +52,17 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	@Override
 	public boolean hasBody() {
 		return data != null;
+	}
+	
+	@Override
+	public String getUserIdentification() {
+		return userIdentification();
+	}
+	
+	public String userIdentification() {
+		if (userId == VOID_USERID)
+			userId = ((ServicesHandleBase<?>)serviceHandle).getUserId();
+		return userId;
 	}
 	
 	public HeaderWrapper getHeader() {
@@ -116,6 +130,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 			message.data = Arrays.copyOf(data, data.length);
 		message.disableThreadCheck();
 		message.isReadonly = isReadonly;
+		message.userId = userId;
 		return message;
 	}
 }

@@ -16,6 +16,7 @@ public class HttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
 		if (request == null) // temporary assert-like check 
 			throw new NullPointerException("Constructing response with request set to null\n"+StackTraceUtils.getStackTraceText());
 		this.request = request;
+		this.userId = request.userId;
 		setServicesHandle(new ResponseServiceHandleImpl(this,modulesManager));
 	}
 	
