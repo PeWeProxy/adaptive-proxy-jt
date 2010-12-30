@@ -4,9 +4,9 @@ import sk.fiit.peweproxy.services.ProxyService;
 
 /**
  * User identification service is able to provide unique textual identifier of the
- * user that initiated the processing of the HTTP message. For a request message, provided
- * ID string identifies the user that made the request. For a response message it identifies
- * the user that made the request that resulted in actual response. 
+ * user that initiated the HTTP message. For a request message, provided ID string identifies
+ * the user that made the request. For a response message it identifies the user that made the
+ * request that resulted in actual response. 
  * <br><br>
  * <b>Definition bundled</b><br>
  * <i>This service is one of the six basic services definitions of which are bundled
@@ -17,9 +17,9 @@ import sk.fiit.peweproxy.services.ProxyService;
 public interface UserIdentificationService extends ProxyService {
 	
 	/**
-	 * Returns the unique identifier of the user that initiated processing of
-	 * the message.
-	 * @return identifier of the user that initiated processing of the message
+	 * Returns the unique identifier of the user that initiated the message. Returned value
+	 * must not be <code>null</code>.
+	 * @return identifier of the user that initiated the message
 	 */
-	String getClientIdentification();
+	String getUserIdentification();
 }
