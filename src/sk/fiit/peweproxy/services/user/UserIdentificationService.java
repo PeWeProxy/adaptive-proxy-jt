@@ -7,10 +7,6 @@ import sk.fiit.peweproxy.services.ProxyService;
  * user that initiated the HTTP message. For a request message, provided ID string identifies
  * the user that made the request. For a response message it identifies the user that made the
  * request that resulted in actual response. 
- * <br><br>
- * <b>Definition bundled</b><br>
- * <i>This service is one of the six basic services definitions of which are bundled
- * with every release of the proxy server.</i>
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */

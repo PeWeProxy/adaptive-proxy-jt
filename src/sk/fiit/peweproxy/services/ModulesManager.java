@@ -38,11 +38,11 @@ public class ModulesManager {
 		providedRpServices = new HashMap<ResponseServiceModule, Set<Class<? extends ProxyService>>>();
 	}
 	
-	public List<RequestServiceModule> getRequestModules() {
+	List<RequestServiceModule> getLoadedRequestModules() {
 		return rqModules;
 	}
 	
-	public List<ResponseServiceModule> getResponseModules() {
+	List<ResponseServiceModule> getLoadedResponseModules() {
 		return rpModules;
 	}
 	
@@ -93,18 +93,6 @@ public class ModulesManager {
 				// TODO: handle exception
 			}
 		}
-	}
-	
-	public List<RequestServiceModule> getLoadedRequestModules() {
-		List<RequestServiceModule> retVal = new LinkedList<RequestServiceModule>();
-		retVal.addAll(rqModules);
-		return retVal;
-	}
-	
-	public List<ResponseServiceModule> getLoadedResponseModules() {
-		List<ResponseServiceModule> retVal = new LinkedList<ResponseServiceModule>();
-		retVal.addAll(rpModules);
-		return retVal;
 	}
 	
 	public Set<Class<? extends ProxyService>> getProvidedRequestServices(RequestServiceModule module) {

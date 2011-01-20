@@ -253,22 +253,4 @@ public class EventsHandler {
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".logResponseDeliveryTimeout",
 		"Dispatching 'response delivery timeout' message to all TimeoutEventPlugin plugins"));
 	}
-	
-	public List<ConnectionEventPlugin> getLoadedConnectionEventPlugins() {
-		List<ConnectionEventPlugin> retVal = new LinkedList<ConnectionEventPlugin>();
-		retVal.addAll(connectionEventPlugins);
-		return retVal;
-	}
-	
-	public List<TimeoutEventPlugin> getLoadedTimeoutEventPlugins() {
-		List<TimeoutEventPlugin> retVal = new LinkedList<TimeoutEventPlugin>();
-		retVal.addAll(timeoutEventPlugins);
-		return retVal;
-	}
-	
-	public List<FailureEventPlugin> getLoadedFailureEventPlugins() {
-		List<FailureEventPlugin> retVal = new LinkedList<FailureEventPlugin>();
-		retVal.addAll(failureEventPlugins);
-		return retVal;
-	}
 }

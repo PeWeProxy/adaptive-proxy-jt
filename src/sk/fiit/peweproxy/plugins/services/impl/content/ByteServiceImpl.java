@@ -8,7 +8,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 
-public class ByteServiceImpl extends BaseServiceProvider<ByteContentService>
+public class ByteServiceImpl extends BaseMessageServiceProvider<ByteContentService>
 	implements ByteContentService {	
 	public ByteServiceImpl(HttpMessageImpl<?> httpMessage) {
 		super(httpMessage);

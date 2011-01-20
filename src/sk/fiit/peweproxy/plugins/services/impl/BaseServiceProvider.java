@@ -12,8 +12,6 @@ public abstract class BaseServiceProvider<Service extends ProxyService>
 	public BaseServiceProvider(HttpMessageImpl<?> httpMessage) {
 		if (httpMessage == null)
 			throw new IllegalStateException("HTTP message can not be null");
-		if (httpMessage.getData() == null)
-			throw new IllegalStateException("No data in message");
 		this.httpMessage = httpMessage;
 	}
 	

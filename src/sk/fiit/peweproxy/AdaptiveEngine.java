@@ -7,7 +7,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -67,29 +66,28 @@ public class AdaptiveEngine  {
 	private final Map<Connection, ConnectionHandle> requestHandles;
 	private final Map<Connection, ConnectionHandle> prevRequestHandles;
 	private final HttpProxy proxy;
-	private PluginHandler pluginHandler;
-	private final EventsHandler loggingHandler;
-	private ModulesManager modulesManager;
+	private final PluginHandler pluginHandler;
+	private final EventsHandler eventsHandler;
+	private final ModulesManager modulesManager;
+	private final PluginsIntegrationManager integrationManager;
 	private final List<ProcessingPluginInstance<RequestProcessingPlugin>> requestPlugins;
 	private final List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePlugins;
 	private File pluginsOrderFile = null; 
 	private boolean proxyDying = false;
-	private boolean pluginsToggling = true;
-	private final Map<String, Set<String>> blacklistForUsers;
 	
 	class ProcessingPluginInstance<PluginType extends ProxyPlugin> {
+		private final PluginInstance plgInstance;
 		private final PluginType plugin;
-		private final String name;
 		
 		@SuppressWarnings("unchecked")
 		public ProcessingPluginInstance(PluginInstance plgInstance) {
+			this.plgInstance = plgInstance;
 			this.plugin = (PluginType)plgInstance.getInstance();
-			this.name = plgInstance.getName();
 		}
 		
 		@Override
 		public String toString() {
-			return "'"+name+"'("+plugin+")";
+			return plgInstance.toString();
 		}
 	}
 	
@@ -121,12 +119,12 @@ public class AdaptiveEngine  {
 		requestHandles = new HashMap<Connection, ConnectionHandle>();
 		prevRequestHandles = new HashMap<Connection, ConnectionHandle>();
 		this.proxy = proxy;
-		loggingHandler = new EventsHandler(this);
+		eventsHandler = new EventsHandler(this);
 		pluginHandler = new PluginHandler();
 		modulesManager = new ModulesManager(this);
+		integrationManager = new PluginsIntegrationManager();
 		requestPlugins = new LinkedList<ProcessingPluginInstance<RequestProcessingPlugin>>();
 		responsePlugins = new LinkedList<ProcessingPluginInstance<ResponseProcessingPlugin>>();
-		blacklistForUsers = new HashMap<String, Set<String>>();
 	}
 	
 	public ModifiableHttpRequestImpl getRequestForConnection(Connection con) {
@@ -178,15 +176,6 @@ public class AdaptiveEngine  {
 			log.trace("RQ: "+conHandle+" | Removing handle for "+con);
 	}
 	
-	private Set<String> getBlacklistedPlugins(String userId) {
-		Set<String> retVal = blacklistForUsers.get(userId);
-		if (retVal == null) {
-			retVal = new HashSet<String>();
-			blacklistForUsers.put(userId, retVal);
-		}
-		return retVal;
-	}
-	
 	public void newRequest(Connection con, HttpHeader clientHeader, HttpHeader proxyHeader) {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		InetSocketAddress clientSocketAdr = (InetSocketAddress) con.getChannel().socket().getRemoteSocketAddress();
@@ -212,7 +201,7 @@ public class AdaptiveEngine  {
 			boolean prefetch = false;
 			Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 			for (ProcessingPluginInstance<RequestProcessingPlugin> rqPlgInstance : requestPlugins) {
-				if (pluginsToggling && getBlacklistedPlugins(conHandle.request.userIdentification()).contains(rqPlgInstance.name)) {
+				if (!integrationManager.isPluginEnabled(conHandle.request, rqPlgInstance.plgInstance.getName(), RequestProcessingPlugin.class)) {
 					if (log.isTraceEnabled())
 						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during services need discovery");
 					continue;
@@ -373,7 +362,7 @@ public class AdaptiveEngine  {
 		boolean processResponse = true;
 		Set<ProcessingPluginInstance<RequestProcessingPlugin>> pluginsChangedResponse
 			= new HashSet<AdaptiveEngine.ProcessingPluginInstance<RequestProcessingPlugin>>();
-		Set<String> blacklistedPlugins = getBlacklistedPlugins(conHandle.request.userIdentification());
+		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,RequestProcessingPlugin.class);
 		do {
 			again = false;
 			for (ProcessingPluginInstance<RequestProcessingPlugin> rqPlgInstance : requestPlugins) {
@@ -381,7 +370,7 @@ public class AdaptiveEngine  {
 					if (log.isTraceEnabled())
 						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped since it already procesed the request and returned new one");
 					continue;
-				} if (pluginsToggling && blacklistedPlugins.contains(rqPlgInstance.name)) {
+				} if (blacklistedPlugins.contains(rqPlgInstance.plgInstance.getName())) {
 					if (log.isTraceEnabled())
 						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during processing");
 					continue;
@@ -495,7 +484,7 @@ public class AdaptiveEngine  {
 		ConnectionHandle conHandle = requestHandles.get(con);
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPlgInstance : responsePlugins) {
-			if (pluginsToggling && getBlacklistedPlugins(conHandle.request.userIdentification()).contains(rpPlgInstance.name)) {
+			if (!integrationManager.isPluginEnabled(conHandle.response, rpPlgInstance.plgInstance.getName(), ResponseProcessingPlugin.class)) {
 				if (log.isTraceEnabled())
 					log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped during services need discovery");
 				continue;
@@ -612,7 +601,7 @@ public class AdaptiveEngine  {
 		boolean again = false;
 		Set<ProcessingPluginInstance<ResponseProcessingPlugin>> pluginsChangedResponse
 			= new HashSet<AdaptiveEngine.ProcessingPluginInstance<ResponseProcessingPlugin>>();
-		Set<String> blacklistedPlugins = getBlacklistedPlugins(conHandle.request.userIdentification());
+		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.response,ResponseProcessingPlugin.class);
 		do {
 			again = false;
 			for (ProcessingPluginInstance<ResponseProcessingPlugin> responsePlgInstance : responsePlugins) {
@@ -620,7 +609,7 @@ public class AdaptiveEngine  {
 					if (log.isTraceEnabled())
 						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped since it already procesed the response and returned new one");
 					continue;
-				} if (pluginsToggling && blacklistedPlugins.contains(responsePlgInstance.name)) {
+				} if (blacklistedPlugins.contains(responsePlgInstance.plgInstance.getName())) {
 					if (log.isTraceEnabled())
 						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped during processing");
 					continue;
@@ -750,7 +739,7 @@ public class AdaptiveEngine  {
 	}
 
 	public EventsHandler getEventsHandler() {
-		return loggingHandler;
+		return eventsHandler;
 	}
 
 	public void setup(SProperties prop) {
@@ -813,7 +802,8 @@ public class AdaptiveEngine  {
 			}
 			pluginHandler.setup(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles,coreThreads);
 		}
-		pluginsToggling = Boolean.valueOf(prop.getProperty("enable_plugins_toggling","true"));
+		boolean pluginsToggling = Boolean.valueOf(prop.getProperty("enable_plugins_toggling","true"));
+		integrationManager.setToggling(pluginsToggling);
 		modulesManager.setPattern(prop.getProperty("string_services_pattern"));
 		reloadPlugins();
 		log.info("AdaptiveProxy set up and ready for action");
@@ -822,27 +812,27 @@ public class AdaptiveEngine  {
 	public void reloadPlugins() {
 		log.info("Reloading plugins");
 		pluginHandler.reloadPlugins();
-		loggingHandler.setup();
+		eventsHandler.setup();
 		modulesManager.initPlugins(pluginHandler);
 		requestPlugins.clear();
 		responsePlugins.clear();
 		log.info("Loading request processing plugins");
-		Set<RequestProcessingPlugin> rqPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
+		List<RequestProcessingPlugin> rqPluginsSet = pluginHandler.getPlugins(RequestProcessingPlugin.class);
 		log.info("Loading response processing plugins");
-		Set<ResponseProcessingPlugin> rpPluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
+		List<ResponseProcessingPlugin> rpPluginsSet = pluginHandler.getPlugins(ResponseProcessingPlugin.class);
 		
-		Set<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsSet = new HashSet<ProcessingPluginInstance<RequestProcessingPlugin>>();
-		Set<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsSet = new HashSet<ProcessingPluginInstance<ResponseProcessingPlugin>>();
+		List<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsList = new LinkedList<ProcessingPluginInstance<RequestProcessingPlugin>>();
+		List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsList = new LinkedList<ProcessingPluginInstance<ResponseProcessingPlugin>>();
 		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
 		for (PluginInstance pluginInstance : plugins) {
 			if (rqPluginsSet.contains(pluginInstance))
-				requestPluginsSet.add(new ProcessingPluginInstance<RequestProcessingPlugin>(pluginInstance));
+				requestPluginsList.add(new ProcessingPluginInstance<RequestProcessingPlugin>(pluginInstance));
 			if (rpPluginsSet.contains(pluginInstance))
-				responsePluginsSet.add(new ProcessingPluginInstance<ResponseProcessingPlugin>(pluginInstance));
+				responsePluginsList.add(new ProcessingPluginInstance<ResponseProcessingPlugin>(pluginInstance));
 		}
 		boolean pluginsOrderingSuccess;
 		if (pluginsOrderFile != null && pluginsOrderFile.canRead()) {
-			pluginsOrderingSuccess = addProcessingPluginsInOrder(pluginsOrderFile,requestPluginsSet,responsePluginsSet);
+			pluginsOrderingSuccess = addProcessingPluginsInOrder(pluginsOrderFile,requestPluginsList,responsePluginsList);
 		} else {
 			log.info("Unable to find or read plugins ordering file "+pluginsOrderFile.getAbsolutePath());
 			pluginsOrderingSuccess = false;
@@ -852,13 +842,13 @@ public class AdaptiveEngine  {
 					"Processing plugins will not be called in some desired fashion");
 		}
 		
-		requestPlugins.addAll(requestPluginsSet);
-		responsePlugins.addAll(responsePluginsSet);
+		requestPlugins.addAll(requestPluginsList);
+		responsePlugins.addAll(responsePluginsList);
 	}
 	
 	@SuppressWarnings("unchecked")
-	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, Set<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsSet,
-			Set<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsSet) {
+	private boolean addProcessingPluginsInOrder(File pluginsOrderFile, List<ProcessingPluginInstance<RequestProcessingPlugin>> requestPluginsList,
+			List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsList) {
 		Scanner sc = null;
 		try {
 			sc = new Scanner(new FileInputStream(pluginsOrderFile), "UTF-8");
@@ -871,11 +861,11 @@ public class AdaptiveEngine  {
 		boolean wasRequestMark = false;
 		boolean wasResponseMark = false;
 		Map<String, ProcessingPluginInstance<?>> plgInstances = new HashMap<String, AdaptiveEngine.ProcessingPluginInstance<?>>();
-		for (ProcessingPluginInstance<RequestProcessingPlugin> rqPluginInstance : requestPluginsSet) {
-			plgInstances.put(rqPluginInstance.name, rqPluginInstance);
+		for (ProcessingPluginInstance<RequestProcessingPlugin> rqPluginInstance : requestPluginsList) {
+			plgInstances.put(rqPluginInstance.plgInstance.getName(), rqPluginInstance);
 		}
-		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPluginInstance : responsePluginsSet) {
-			plgInstances.put(rpPluginInstance.name, rpPluginInstance); // don't care mappings get rewritten
+		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPluginInstance : responsePluginsList) {
+			plgInstances.put(rpPluginInstance.plgInstance.getName(), rpPluginInstance); // don't care mappings get rewritten
 		}
 		while (sc.hasNextLine()) {
 			String line = sc.nextLine().trim();
@@ -894,9 +884,9 @@ public class AdaptiveEngine  {
 				ProcessingPluginInstance<?> plgInstance = plgInstances.get(line);
 				if (plgInstance != null) {
 					if (wasResponseMark)
-						sucess = addPlugin((ProcessingPluginInstance<ResponseProcessingPlugin>)plgInstance, responsePlugins, responsePluginsSet);
+						sucess = addPlugin((ProcessingPluginInstance<ResponseProcessingPlugin>)plgInstance, responsePlugins, responsePluginsList);
 					else
-						sucess = addPlugin((ProcessingPluginInstance<RequestProcessingPlugin>)plgInstance, requestPlugins, requestPluginsSet);
+						sucess = addPlugin((ProcessingPluginInstance<RequestProcessingPlugin>)plgInstance, requestPlugins, requestPluginsList);
 				}
 				if (!sucess)
 					log.info("Can't insert plugin with name '"+line+"' into "+((wasResponseMark)?"response":"resuest")+" processing order," +
@@ -907,29 +897,13 @@ public class AdaptiveEngine  {
 	}
 	
 	@SuppressWarnings("unchecked")
-	private <T extends ProxyPlugin> boolean addPlugin(ProcessingPluginInstance<T> pluginInstance, List<ProcessingPluginInstance<T>> pluginsList,
-			Set<ProcessingPluginInstance<T>> pluginsSet) {
+	private <T extends ProxyPlugin> boolean addPlugin(ProcessingPluginInstance<T> pluginInstance, List<ProcessingPluginInstance<T>> targetPluginsList,
+			List<ProcessingPluginInstance<T>> sourcePluginsList) {
 		if (pluginInstance == null)
 			return false;
-		pluginsList.add(pluginInstance);
-		pluginsSet.remove(pluginInstance);
+		targetPluginsList.add(pluginInstance);
+		sourcePluginsList.remove(pluginInstance);
 		return true;
-	}
-	
-	public List<RequestProcessingPlugin> getLoadedRequestPlugins() {
-		List<RequestProcessingPlugin> retVal = new LinkedList<RequestProcessingPlugin>();
-		for (ProcessingPluginInstance<RequestProcessingPlugin> rqPluginInstance : requestPlugins) {
-			retVal.add(rqPluginInstance.plugin);
-		}
-		return retVal;
-	}
-	
-	public List<ResponseProcessingPlugin> getLoadedResponsePlugins() {
-		List<ResponseProcessingPlugin> retVal = new LinkedList<ResponseProcessingPlugin>();
-		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPluginInstance : responsePlugins) {
-			retVal.add(rpPluginInstance.plugin);
-		}
-		return retVal;
 	}
 	
 	public void setProxyIsDying() {
@@ -952,7 +926,7 @@ public class AdaptiveEngine  {
 		return modulesManager;
 	}
 
-	public boolean isPluginsToggling() {
-		return pluginsToggling;
+	public PluginsIntegrationManager getIntegrationManager() {
+		return integrationManager;
 	}
 }

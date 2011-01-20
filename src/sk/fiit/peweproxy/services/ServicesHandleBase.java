@@ -34,13 +34,15 @@ import sk.fiit.peweproxy.plugins.services.impl.content.ByteServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableByteServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableStringServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.StringServiceImpl;
-import sk.fiit.peweproxy.plugins.services.impl.processing.PluginsTogglingServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.platform.PlatformContextImpl;
+import sk.fiit.peweproxy.services.ProxyService.messageIdependent;
 import sk.fiit.peweproxy.services.ProxyService.readonly;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
-import sk.fiit.peweproxy.services.processing.PluginsTogglingService;
+import sk.fiit.peweproxy.services.platform.PlatformContextService;
+import sk.fiit.peweproxy.services.platform.PluginsTogglingService;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
@@ -229,28 +231,28 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		throw new ServiceUnavailableException(ModifiableStringService.class, excMessage, cause);
 	}
 	
-	private ServiceProvider<PluginsTogglingService> getPluginsTogglingService() {
-		ServiceUnavailableException exc = null;
+	public String getUserId() {
 		UserIdentificationService userSvc = null;
-		do {
-			try {
-				if (userSvc == null)
-					userSvc = getService(UserIdentificationService.class);
-				else
-					userSvc = getNextService(userSvc);
-				String userId = userSvc.getClientIdentification();
-				return new PluginsTogglingServiceImpl(httpMessage, manager.getAdaptiveEngine(), userId);
-			} catch (ServiceUnavailableException e) {
-				if (!e.getMessage().startsWith("No module to provide service")) { // tvarme sa, ze to nie je hrozne
-					exc = e;
-				} else {
-					if (exc == null) {
-						exc = e;
-					}
-				}
-			}
-		} while (userSvc != null);
-		throw exc;
+		try {
+			userSvc = getService(UserIdentificationService.class);
+		} catch (ServiceUnavailableException e) {
+			return null; // no one to provide the service
+		}
+		try {
+			return userSvc.getUserIdentification();
+		} catch (ServiceUnavailableException e) {
+			log.warn(UserIdentificationService.class.getSimpleName()+" realization threw exception" +
+					"on calling getUserIdentification() right after being provided !", e);
+			return null;
+		}
+	}
+	
+	private ServiceProvider<PlatformContextService> getContextService() {
+		try {
+			return new PlatformContextImpl(httpMessage, manager.getAdaptiveEngine());
+		} catch (ServiceUnavailableException e) {
+			throw new ServiceUnavailableException(PluginsTogglingService.class, "No service to provide user's identification", e);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -263,15 +265,19 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 			return (ServiceProvider<Service>)getModByteServie();
 		if (serviceClass == ByteContentService.class)
 			return (ServiceProvider<Service>)getByteService();
+		if (serviceClass == PluginsTogglingService.class) {
+			return (ServiceProvider<Service>) getContextService();
+		}
 		return null;
 	}
 	
-	boolean isBasicService(Class<? extends ProxyService> serviceClass) {
+	/*boolean isBasicService(Class<? extends ProxyService> serviceClass) {
 		return (serviceClass == ModifiableStringService.class ||
 				serviceClass == StringContentService.class ||
 				serviceClass == ModifiableBytesService.class ||
-				serviceClass == ByteContentService.class);
-	}
+				serviceClass == ByteContentService.class ||
+				serviceClass == PluginsTogglingService.class);
+	}*/
 	
 	private class ServiceInfo<Service extends ProxyService> {
 		final Class<Service> serviceClass;
@@ -307,20 +313,19 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	private class ServiceRealization<Service extends ProxyService> extends RealService<Service> {
 		final ServiceProvider<Service> provider;
 		final ModuleType module;
-		final Map<Method, Boolean> readonlyFlags;
+		final Map<Method, Boolean> readonlyFlags = new HashMap<Method, Boolean>();;
+		Boolean messageIndependent = true;
 		
 		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module, boolean initChangedModel) {
 			super(realService,initChangedModel);
 			this.provider = provider;
 			this.module = module;
-			readonlyFlags = new HashMap<Method, Boolean>();
 		}
 		
 		public ServiceRealization(RealService<Service> realService, ServiceProvider<Service> provider, ModuleType module) {
 			super(realService);
 			this.provider = provider;
 			this.module = module;
-			readonlyFlags = new HashMap<Method, Boolean>();
 		}
 		
 		@Override
@@ -370,6 +375,20 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		return false;
 	}
 	
+	private boolean isMessageIndependent(Method method, ServiceRealization<?> realization) {
+		if (realization.messageIndependent != null)
+			return realization.messageIndependent.booleanValue();
+		if (method.getDeclaringClass().isAnnotationPresent(messageIdependent.class)) {
+			realization.messageIndependent = new Boolean(true);
+			return true;
+		}
+		try {
+			realization.messageIndependent = new Boolean(realization.realService.getClass().isAnnotationPresent(messageIdependent.class));
+			return realization.messageIndependent.booleanValue();
+		} catch (Exception ignored) {}
+		return false;
+	}
+	
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> Service createDecoratedService(final ServiceInfo<Service> svcInfo,
 				final ServiceRealization<Service> realization) {
@@ -378,6 +397,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 			@Override
 			public Object invoke(Object proxy, Method method, Object[] args)
 					throws Throwable {
+				httpMessage.checkThreadAccess();
 				if (method.getDeclaringClass() == Object.class)
 					if (binding.realization != null)
 						return method.invoke(binding.realization.realService, args);
@@ -385,12 +405,19 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 						return method.invoke(binding, args);
 				if (method.getDeclaringClass() == ProxyService.class)
 					return method.invoke(binding.realization.realService, args);
-				httpMessage.checkThreadAccess();
+				boolean messageIndependent  = isMessageIndependent(method, binding.realization);
 				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
-				if (log.isTraceEnabled())
-					log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method "+method.getName()+"("
+				if (log.isTraceEnabled()) {
+					if (messageIndependent)
+						log.trace(getLogTextHead()+"Method "+method.getName()+"("
+								+Arrays.toString(method.getParameterTypes())+") of a message independent service provided by "+realization.realService+" called");
+					else
+						log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method "+method.getName()+"("
 								+Arrays.toString(method.getParameterTypes())
 								+") of a service provided by "+realization.realService+" called");
+				}
+				if (messageIndependent)
+					return method.invoke(binding.realization.realService, args);
 				if (changedModelBinding != binding) {
 					if (!actualServicesBindings.contains(binding)) {
 						// usable service realization is not initialized (within group of others)

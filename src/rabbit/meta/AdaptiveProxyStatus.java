@@ -1,12 +1,8 @@
 package rabbit.meta;
 
 import java.io.IOException;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
-import java.util.Set;
 
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
@@ -16,7 +12,6 @@ import rabbit.util.TrafficLogger;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.plugins.PluginHandler;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
-import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.events.ConnectionEventPlugin;
 import sk.fiit.peweproxy.plugins.events.FailureEventPlugin;
 import sk.fiit.peweproxy.plugins.events.TimeoutEventPlugin;
@@ -24,8 +19,6 @@ import sk.fiit.peweproxy.plugins.processing.RequestProcessingPlugin;
 import sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
-import sk.fiit.peweproxy.plugins.services.ServiceModule;
-import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.ProxyService;
 
 public class AdaptiveProxyStatus extends BaseMetaHandler {
@@ -49,10 +42,6 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 	@Override
 	protected PageCompletion addPageInformation(StringBuilder sb) {
 		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
-		Map<ProxyPlugin, PluginInstance> pluginsMap = new LinkedHashMap<ProxyPlugin, PluginHandler.PluginInstance>();
-		for (PluginInstance pluginInstance : plugins) {
-			pluginsMap.put(pluginInstance.getInstance(), pluginInstance);
-		}
 		addPluginsPart(plugins,sb);
 		
 		sb.append("<table width=\"100%\">\n<tr>\n<td align=\"center\">");
@@ -62,9 +51,9 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append("\" method=\"get\">\n<input type=\"submit\" value=\"Reload plugins\"/>\n</form><br>\n");
 		sb.append("</td>\n</tr>\n</table>");
 
-		addModulesPart(pluginsMap,sb);
-		addProcessingPluginsPart(pluginsMap,sb);
-		addEventPluginsPart(pluginsMap,sb);
+		addModulesPart(plugins,sb);
+		addProcessingPluginsPart(plugins,sb);
+		addEventPluginsPart(plugins,sb);
 		addLogPart(sb);
 		return PageCompletion.PAGE_DONE;
 	}
@@ -82,9 +71,8 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			sb.append ("</td>\n<td>");
 			sb.append(plgInstance.getPluginClass().getName());
 			sb.append ("</td>\n<td>\n");
-			List<String> pluginTypes = plgInstance.getTypes();
-			for (String pluginType : pluginTypes) {
-				sb.append(pluginType);
+			for (Class<?> pluginType : plgInstance.getTypes()) {
+				sb.append(pluginType.getSimpleName());
 				sb.append("<br>\n");
 			}
 			sb.append ("</td></tr>\n");
@@ -92,7 +80,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("</table>\n<br>\n");
 	}
 	
-	private void addModulesPart(Map<ProxyPlugin, PluginInstance> pluginsMap, StringBuilder sb) {
+	private void addModulesPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Service modules summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
@@ -100,28 +88,22 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"70%\">Provided services</th>\n");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
 		sb.append ("<th width=\"5%\">RP</th>\n");
-		ModulesManager modulesManager = adaptiveEngine.getModulesManager();
-		List<RequestServiceModule> rqServicePlugins = modulesManager.getLoadedRequestModules();
-		List<ResponseServiceModule> rpServicePlugins = modulesManager.getLoadedResponseModules();
-		Set<ServiceModule> loadedModules = new LinkedHashSet<ServiceModule>();
-		loadedModules.addAll(rqServicePlugins);
-		loadedModules.addAll(rpServicePlugins);
-		for (ServiceModule module : loadedModules) {
+		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
-			sb.append(pluginsMap.get(module).getName());
+			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>\n");
-			boolean rq = (rqServicePlugins.contains(module));
-			boolean rp = (rpServicePlugins.contains(module));
+			boolean rq = (plgInstance.getTypes().contains(RequestServiceModule.class));
+			boolean rp = (plgInstance.getTypes().contains(ResponseServiceModule.class));
 			sb.append ("<b>Services for requests:</b><br>\n");
 			if (rq) {
-				for (Class<? extends ProxyService> svcClass : modulesManager.getProvidedRequestServices((RequestServiceModule)module)) {
+				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedRequestServices((RequestServiceModule)plgInstance.getInstance())) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
 			}
 			sb.append ("<b>Services for responses:</b><br>\n");
 			if (rp) {
-				for (Class<? extends ProxyService> svcClass : modulesManager.getProvidedResponseServices((ResponseServiceModule)module)) {
+				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedResponseServices((ResponseServiceModule)plgInstance.getInstance())) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
@@ -141,28 +123,23 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("</table>\n<br>\n");
 	}
 	
-	private void addProcessingPluginsPart(Map<ProxyPlugin, PluginInstance> pluginsMap, StringBuilder sb) {
+	private void addProcessingPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Processing plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
 		sb.append ("<th width=\"90%\">Plugin name</th>");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
 		sb.append ("<th width=\"5%\">RP</th>\n");
-		List<RequestProcessingPlugin> rqPlugins = adaptiveEngine.getLoadedRequestPlugins();
-		List<ResponseProcessingPlugin> rpPlugins = adaptiveEngine.getLoadedResponsePlugins();
-		Set<ProxyPlugin> loadedPlugins = new LinkedHashSet<ProxyPlugin>();
-		loadedPlugins.addAll(rqPlugins);
-		loadedPlugins.addAll(rpPlugins);
-		for (ProxyPlugin plugin : loadedPlugins) {
+		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
-			sb.append(pluginsMap.get(plugin).getName());
+			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rqPlugins.contains(plugin))
+			if (plgInstance.getTypes().contains(RequestProcessingPlugin.class.getSimpleName()))
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rpPlugins.contains(plugin))
+			if (plgInstance.getTypes().contains(ResponseProcessingPlugin.class.getSimpleName()))
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");
@@ -171,37 +148,30 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("</table>\n<br>\n");
 	}
 	
-	private void addEventPluginsPart(Map<ProxyPlugin, PluginInstance> pluginsMap, StringBuilder sb) {
+	private void addEventPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Event plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
 		sb.append ("<th width=\"70%\">Plugin name</th>");
 		sb.append ("<th width=\"10%\">Connection</th>\n");
 		sb.append ("<th width=\"10%\">Timeout</th>\n");
-		sb.append ("<th width=\"10%\">Failed</th>\n");
-		List<ConnectionEventPlugin> cePlugins = adaptiveEngine.getEventsHandler().getLoadedConnectionEventPlugins();
-		List<TimeoutEventPlugin> toPlugins = adaptiveEngine.getEventsHandler().getLoadedTimeoutEventPlugins();
-		List<FailureEventPlugin> flPlugins = adaptiveEngine.getEventsHandler().getLoadedFailureEventPlugins();
-		Set<ProxyPlugin> loadedPlugins = new LinkedHashSet<ProxyPlugin>();
-		loadedPlugins.addAll(cePlugins);
-		loadedPlugins.addAll(toPlugins);
-		loadedPlugins.addAll(flPlugins);
+		sb.append ("<th width=\"10%\">Failure</th>\n");
 		synchronized (pluginHandler) {
-			for (ProxyPlugin plugin : loadedPlugins) {
+			for (PluginInstance plgInstance : plugins) {
 				sb.append ("<tr><td>");
-				sb.append(pluginsMap.get(plugin).getName());
+				sb.append(plgInstance.getName());
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (cePlugins.contains(plugin))
+				if (plgInstance.getTypes().contains(ConnectionEventPlugin.class))
 					sb.append ("<b>X</b>");
 				else
 					sb.append ("&nbsp");
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (toPlugins.contains(plugin))
+				if (plgInstance.getTypes().contains(TimeoutEventPlugin.class))
 					sb.append ("<b>X</b>");
 				else
 					sb.append ("&nbsp");
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (flPlugins.contains(plugin))
+				if (plgInstance.getTypes().contains(FailureEventPlugin.class))
 					sb.append ("<b>X</b>");
 				else
 					sb.append ("&nbsp");

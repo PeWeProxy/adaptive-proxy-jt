@@ -14,7 +14,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 
-public class ModifiableStringServiceImpl extends BaseServiceProvider<ModifiableStringService>
+public class ModifiableStringServiceImpl extends BaseMessageServiceProvider<ModifiableStringService>
 	implements ModifiableStringService{
 
 	private final StringBuilder sb;

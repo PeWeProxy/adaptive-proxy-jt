@@ -37,9 +37,10 @@ public aspect MessageAccessAspect {
 	
 	pointcut readableHeaderMethods() : execution(* (RequestHeader || ResponseHeader).*(..));
 	pointcut writableHeaderMethods() : execution(* (WritableRequestHeader|| WritableResponseHeader) .*(..));
-	pointcut inRequestProcessing() : cflow(execution(* AdaptiveEngine.runRequestAdapters(..)));
-	pointcut inResponseProcessing() : cflow(execution(* AdaptiveEngine.runResponseAdapters(..)));
+	pointcut inRequestProcessing() : cflow(execution(* AdaptiveEngine.doRequestProcessing(*,boolean)));
+	pointcut inResponseProcessing() : cflow(execution(* AdaptiveEngine.doResponseProcessing(*,boolean)));
 	pointcut inMessageProcessing() : inRequestProcessing() || inResponseProcessing();
+	
 	@SuppressWarnings("unchecked")
 	before(HeaderWrapper header) : readableHeaderMethods() && this(header)
 			&& !cflowbelow(readableHeaderMethods()) && inMessageProcessing() {

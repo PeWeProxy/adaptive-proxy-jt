@@ -74,7 +74,6 @@ public class PluginHandler {
 	private final List<PluginInstance> pluginInstances;
 	private final Map<Class<?>, String> checksums4ldClassMap;
 	private final Map<URL, String> checksums4ldLibsMap;
-	private final AbcPluginsComparator comparator;
 	private boolean pluginsStopped = false;
 	private final StringBuffer loadingLogBuffer;
 	private PluginsThreadPool threadPool;
@@ -104,7 +103,6 @@ public class PluginHandler {
 		pluginInstances = new LinkedList<PluginInstance>();
 		checksums4ldClassMap = new HashMap<Class<?>, String>();
 		checksums4ldLibsMap = new HashMap<URL, String>();
-		comparator = new AbcPluginsComparator();
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			@Override
 			public void run() {
@@ -175,7 +173,7 @@ public class PluginHandler {
 		final PluginConfig plgConfig;
 		final PluginPropertiesImpl properties;
 		final Set<URL> libsrariesURLSet;
-		List<Class<? extends ProxyPlugin>> realTypes = new LinkedList<Class<? extends ProxyPlugin>>();
+		Set<Class<? extends ProxyPlugin>> realTypes = new LinkedHashSet<Class<? extends ProxyPlugin>>();
 		ClassLoader classLoader = null;
 		ProxyPlugin instance = null;
 		
@@ -222,16 +220,22 @@ public class PluginHandler {
 			return instance.getClass();
 		}
 		
-		public List<String> getTypes() {
-			List<String> retVal = new LinkedList<String>();
+		public Set<Class<? extends ProxyPlugin>> getTypes() {
+			return Collections.unmodifiableSet(realTypes);
+			/*List<String> retVal = new LinkedList<String>();
 			for (Class<? extends ProxyPlugin> typeClass : realTypes) {
 				retVal.add(typeClass.getSimpleName());
 			}
-			return retVal;
+			return retVal;*/
 		}
 		
 		public ProxyPlugin getInstance() {
 			return instance;
+		}
+		
+		@Override
+		public String toString() {
+			return "'"+getName()+"'("+((instance != null) ? instance.toString() : "not instantiated yet")+")";
 		}
 	}
 	
@@ -540,7 +544,7 @@ public class PluginHandler {
 							if (oldClass == newClazz || checksums4ldClassMap.get(oldClass).equals(newClassChecksum)) {
 								log.debug("Seems like class '"+newClazz.getName()+"' hasn't changed, so we try to keep already loaded plugin '"+loadedPlugin+"'");
 								if (startPlugin(loadedPlugin, newPlgInstance.properties)) {
-									if (newClazz != loadedPlugin.getClass())
+									if (newClazz != oldClass)
 										checksums4ldClassMap.remove(newClazz);
 									newPlgInstance.instance = loadedPlugin;
 									newPlgInstance.classLoader = oldClass.getClassLoader();
@@ -912,7 +916,7 @@ public class PluginHandler {
 		return plugin;
 	}
 	
-	private class AbcPluginsComparator implements Comparator<PluginInstance> {
+	public static class AbcPluginsComparator implements Comparator<PluginInstance> {
 		@Override
 		public int compare(PluginInstance o1, PluginInstance o2) {
 			return o1.plgConfig.name.compareTo(o2.plgConfig.name);
@@ -920,10 +924,10 @@ public class PluginHandler {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T extends ProxyPlugin> Set<T> getPlugins(Class<T> asClass) {
-		Set<T> retVal = new LinkedHashSet<T>();
+	public <T extends ProxyPlugin> List<T> getPlugins(Class<T> asClass) {
+		List<T> retVal = new LinkedList<T>();
 		for (PluginInstance plgInstance : pluginInstances) {
-			if (!plgInstance.realTypes.contains(asClass))  { // not an old plugin
+			if (!plgInstance.realTypes.contains(asClass))  {
 				boolean dynamicTypes = plgInstance.plgConfig.types.isEmpty();
 				if (dynamicTypes || plgInstance.plgConfig.types.contains(asClass.getSimpleName())) {
 					try {
@@ -942,14 +946,11 @@ public class PluginHandler {
 			} else
 				retVal.add((T) plgInstance.instance);
 		}
-		return retVal;
+		return Collections.unmodifiableList(retVal);
 	}
 	
 	public List<PluginInstance> getAllPlugins() {
-		List<PluginInstance> retVal = new LinkedList<PluginHandler.PluginInstance>();
-		retVal.addAll(pluginInstances);
-		Collections.sort(retVal, comparator);
-		return Collections.unmodifiableList(retVal);
+		return Collections.unmodifiableList(pluginInstances);
 	}
 	
 	public void stopPlugins() {

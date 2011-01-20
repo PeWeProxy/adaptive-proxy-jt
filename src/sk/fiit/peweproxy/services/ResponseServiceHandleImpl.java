@@ -12,7 +12,7 @@ import sk.fiit.peweproxy.plugins.services.ServiceProvider;
 public final class ResponseServiceHandleImpl extends ServicesHandleBase<ResponseServiceModule> {
 	
 	public ResponseServiceHandleImpl(HttpResponseImpl response, ModulesManager modulesManager) {
-		super(response, modulesManager.getResponseModules(), modulesManager);
+		super(response, modulesManager.getLoadedResponseModules(), modulesManager);
 	}
 	
 	Set<Class<? extends ProxyService>> getProvidedSvcs(ResponseServiceModule module) {
