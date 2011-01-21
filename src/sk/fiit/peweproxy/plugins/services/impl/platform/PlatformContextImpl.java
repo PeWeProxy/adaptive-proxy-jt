@@ -53,7 +53,8 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 		
 		@Override
 		public String toString() {
-			return plgInstance.toString();
+			boolean enabled = isEnabled();
+			return getClass().getSimpleName()+"["+plgInstance.getName()+","+((enabled) ? "enabled" : "disabled")+"]";
 		}
 	}
 	

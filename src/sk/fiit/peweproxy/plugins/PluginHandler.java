@@ -121,17 +121,17 @@ public class PluginHandler {
 		if (!pluginRepositoryDir.isDirectory()) {
 			throw new IllegalArgumentException("Argument does not denote a directory");
 		}
-		this.sharedLibsDir = sharedLibsDir;
-		this.servicesDir = servicesDir;
-		this.pluginRepositoryDir = pluginRepositoryDir;
+		this.sharedLibsDir = tryGetCanonicalFile(sharedLibsDir);
+		this.servicesDir = tryGetCanonicalFile(servicesDir);
+		this.pluginRepositoryDir = tryGetCanonicalFile(pluginRepositoryDir);
 		this.excludeFileNames = excludeFileNames;
 		if (coreThreads < 1) {
 			coreThreads = DEF_CORE_THREADS;
 		}
 		threadPool = new PluginsThreadPool(coreThreads);
-		log.info("Plugins home directory is set to '"+getPrinbtablePath(pluginRepositoryDir)+"'");
-		log.info("Shared libraries directory is set to '"+getPrinbtablePath(sharedLibsDir)+"'");
-		log.info("Services definitions directory is set to '"+getPrinbtablePath(servicesDir)+"'");
+		log.info("Plugins home directory is set to '"+pluginRepositoryDir.getPath()+"'");
+		log.info("Shared libraries directory is set to '"+sharedLibsDir.getPath()+"'");
+		log.info("Services definitions directory is set to '"+servicesDir.getPath()+"'");
 		log.info("Thread pool for plugins created with "+coreThreads+" core threads");
 	}
 	
@@ -172,19 +172,18 @@ public class PluginHandler {
 	public class PluginInstance {
 		final PluginConfig plgConfig;
 		final PluginPropertiesImpl properties;
-		final Set<URL> libsrariesURLSet;
 		Set<Class<? extends ProxyPlugin>> realTypes = new LinkedHashSet<Class<? extends ProxyPlugin>>();
+		final Set<URL> libsrariesURLSet = new HashSet<URL>();
 		ClassLoader classLoader = null;
 		ProxyPlugin instance = null;
 		
 		public PluginInstance(PluginConfig plgConfig, Map<String, String> variables) throws PluginConfigurationException {
 			this.plgConfig = plgConfig;
-			this.libsrariesURLSet = new HashSet<URL>();
 			File workDir = null;
 			if (plgConfig.workingDir == null) {
 				workDir = pluginRepositoryDir;
 			} else{
-				workDir = new File(pluginRepositoryDir, plgConfig.workingDir);
+				workDir = tryGetCanonicalFile(new File(pluginRepositoryDir, plgConfig.workingDir));
 				if (!workDir.exists()) {
 					log.info("Plugin '"+plgConfig.name+"' - Creating working directory '"+workDir.getPath()+"'");
 					if (!workDir.mkdir()) {
@@ -239,18 +238,27 @@ public class PluginHandler {
 		}
 	}
 	
-	private String getPrinbtablePath(File file) {
-		String path = file.getAbsolutePath();
-		try {
-			path = file.getCanonicalPath();
-		} catch (IOException e) {
-			log.info("Error when converting file path '"+path+"' to cannonical form");
+	private class CLoadersChains {
+		final ClassLoader classpathCLoader;
+		final Map<Set<URL>, ClassLoader> libsCLoaders;
+		
+		public CLoadersChains(ClassLoader classpathCLoader) {
+			this.classpathCLoader = classpathCLoader;
+			libsCLoaders = new HashMap<Set<URL>, ClassLoader>();
 		}
-		return path;
 	}
-
+	
+	private File tryGetCanonicalFile(File file) {
+		try {
+			return file.getCanonicalFile();
+		} catch (IOException e) {
+			log.info("Error when converting file '"+file.getAbsolutePath()+"' to cannonical form");
+		}
+		return file.getAbsoluteFile();
+	}
+	
 	private void createClassLoaders(List<PluginInstance> plgInstances, Map<URL, String> newLibChecksums) {
-		Map<URL, ClassLoader> cLoaders = new HashMap<URL, ClassLoader>();
+		Map<URL, CLoadersChains> cLoaders = new HashMap<URL, CLoadersChains>();
 		if (servicesLibsURLs != null) {
 			servicesCLoader = URLClassLoader.newInstance(servicesLibsURLs);
 			log.debug("Creating new services definitions ClassLoader "+servicesCLoader+" with URLs set to "+Arrays.toString(servicesLibsURLs)
@@ -260,15 +268,28 @@ public class PluginHandler {
 		}
 		for (Iterator<PluginInstance> iterator = plgInstances.iterator(); iterator.hasNext();) {
 			PluginInstance plgInstance =  iterator.next();
+			// Construct and validate classpath URL
+			File pluginFile = tryGetCanonicalFile(new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation)); 
+			if (!pluginFile.canRead()) {
+				log.info("Can not read classpath file/directory '"+pluginFile.getPath()+"',  Plugin '"
+						+plgInstance.plgConfig.name+"' will not be loaded");
+				iterator.remove();
+				continue;
+			}
+			URI classLocURI = pluginFile.toURI();
+			URL classLocURL = null;
+			try {
+				classLocURL = classLocURI.toURL();
+			} catch (MalformedURLException e) {
+				log.info("Error when converting valid classpath file/directory path '"+pluginFile.getAbsolutePath()+"' to URL, plugin '"
+						+plgInstance.plgConfig.name+" will not be loaded");
+				iterator.remove();
+				continue;
+			}
+			// Construct and validate libraries URLs
 			for (String libLocation : plgInstance.plgConfig.libraries) {
-				File libRelFile = new File(pluginRepositoryDir,libLocation);
-				File libFile = null;
-				try {
-					libFile = libRelFile.getCanonicalFile();
-				} catch (IOException e1) {
-					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' to cannonical form");
-				}
-				if (libFile == null || !libFile.canRead()) {
+				File libFile = tryGetCanonicalFile(new File(pluginRepositoryDir,libLocation));
+				if (!libFile.canRead()) {
 					// unable to locate library file (jar/dir)
 					log.info("Library location '"+libLocation+"' for the plugin '"+plgInstance.plgConfig.name+
 						"' does not point to valid jar/directory, this plugin will be loaded, but bad things might happen " +
@@ -282,74 +303,53 @@ public class PluginHandler {
 					log.info("Error when converting valid library file path '"+libFile.getAbsolutePath()+"' to URL (plugin '" +
 							plgInstance.plgConfig.name+"). Library will be considered changed when reloading plugins next time.");
 				}
-				
 				try {
 					newLibChecksums.put(url, ChecksumUtils.createHexChecksum(libFile,classFilter));
 				} catch (IOException e) {
-					log.info("Error when converting library file '"+libRelFile.getAbsolutePath()+"' for MD5 checksum computing");
+					log.info("Error when converting library file '"+libFile.getAbsolutePath()+"' for MD5 checksum computing");
 				}
 				plgInstance.libsrariesURLSet.add(url);
 			}
-			File pluginRelFile = new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation); 
-			File pluginFile = null;
-			try {
-				pluginFile = pluginRelFile.getCanonicalFile();
-			} catch (IOException e1) {
-				log.info("Error when converting plugin class file '"+pluginRelFile.getAbsolutePath()+"' to cannonical form");
+			// Try to find created class loader to share
+			CLoadersChains existingChains = cLoaders.get(classLocURL);
+			if (existingChains == null) {
+				existingChains = new CLoadersChains(createClassLoader(new URL[] {classLocURL}, servicesCLoader, plgInstance.getName()));
+				cLoaders.put(classLocURL, existingChains);
 			}
-			if (pluginFile == null || !pluginFile.canRead()) {
-				// unable to locate plugin's binary file (jar/dir)
-				log.info("Can not read classpath file/directory '"+pluginFile.getAbsolutePath()+"',  Plugin '"
-						+plgInstance.plgConfig.name+"' will not be loaded");
-				iterator.remove();
-				continue;
+			
+			ClassLoader tmpFinalCLoader = null;
+			if (plgInstance.libsrariesURLSet.isEmpty()) {
+				tmpFinalCLoader = existingChains.libsCLoaders.get(plgInstance.libsrariesURLSet);
+				if (tmpFinalCLoader == null) {
+					if (sharedLibsURLs != null)
+						// MAIN <- SVCS <- PLG <- SHD
+						tmpFinalCLoader = createClassLoader(sharedLibsURLs, existingChains.classpathCLoader, plgInstance.getName());
+					else
+						// MAIN <- SVCS <- PLG
+						tmpFinalCLoader = existingChains.classpathCLoader;
+					existingChains.libsCLoaders.put(plgInstance.libsrariesURLSet, tmpFinalCLoader);
+				} else
+					log.debug("Plugin '"+plgInstance.getName()+"' shares already created ClassLoader "+tmpFinalCLoader);
+			} else {
+				tmpFinalCLoader = existingChains.libsCLoaders.get(plgInstance.libsrariesURLSet);
+				if (tmpFinalCLoader == null) {
+					// MAIN <- SVCS <- PLG <- LIBS
+					URL[] libsURLS = plgInstance.libsrariesURLSet.toArray(new URL[plgInstance.libsrariesURLSet.size()]);
+					tmpFinalCLoader = createClassLoader(libsURLS, existingChains.classpathCLoader, plgInstance.getName());
+					if (sharedLibsURLs != null)
+						// MAIN <- SVCS <- PLG <- LIBS <- SHD
+						tmpFinalCLoader = createClassLoader(sharedLibsURLs, tmpFinalCLoader, plgInstance.getName());
+					existingChains.libsCLoaders.put(plgInstance.libsrariesURLSet, tmpFinalCLoader);
+				} else
+					log.debug("Plugin '"+plgInstance.getName()+"' shares already created ClassLoader "+tmpFinalCLoader);
 			}
-			URI classLocURI = pluginFile.toURI();
-			URL classLocURL = null;
-			try {
-				classLocURL = classLocURI.toURL();
-			} catch (MalformedURLException e) {
-				log.info("Error when converting valid plugin class file path '"+pluginFile.getAbsolutePath()+"' to URL, plugin '"
-						+plgInstance.plgConfig.name+" will not be loaded");
-				continue;
-			}
-			ClassLoader sharedClassLoader = cLoaders.get(classLocURL);
-			// check if the parent class loader uses the same libraries
-			if (sharedClassLoader != null) {
-				ClassLoader libsClassLoader = sharedClassLoader.getParent();
-				if (sharedLibsURLs != null)
-					libsClassLoader = libsClassLoader.getParent();
-				if (sameURLsInCLoader(libsClassLoader, plgInstance.libsrariesURLSet)) {
-					plgInstance.classLoader = sharedClassLoader;
-					log.debug("Plugin '"+plgInstance.plgConfig.name+"' shares already created ClassLoader "+plgInstance.classLoader);
-				} else {
-					log.debug("Plugin '"+plgInstance.plgConfig.name+"' can not share already created ClassLoader "+sharedClassLoader
-						+" because of different library dependencies");
+			plgInstance.classLoader = tmpFinalCLoader;
+			if (log.isDebugEnabled()) {
+				String hierarchy = "";
+				for (ClassLoader cLoader = plgInstance.classLoader; cLoader.getParent() != null; cLoader = cLoader.getParent()) {
+					hierarchy = cLoader+" <- "+hierarchy;
 				}
-			}
-			if (plgInstance.classLoader == null) {
-				// plugin can not share existing ClassLoader
-				ClassLoader parentCLoader = servicesCLoader;
-				URL[] urls = new URL[] {classLocURL};
-				if (!plgInstance.libsrariesURLSet.isEmpty()) {
-					URL[] libsURLs = plgInstance.libsrariesURLSet.toArray(new URL[plgInstance.libsrariesURLSet.size()]);
-					// MAIN <- SVCS <- LIBS
-					parentCLoader = createClassLoader(libsURLs, parentCLoader, plgInstance.plgConfig.name);
-				}
-				if (sharedLibsURLs != null) {
-					// MAIN <- SVCS <- ?LIBS? <- SHD
-					parentCLoader = createClassLoader(sharedLibsURLs, parentCLoader, plgInstance.plgConfig.name);
-				}
-				// MAIN <- SVCS <- ?LIBS? <- ?SHD? <- PLG
-				plgInstance.classLoader = createClassLoader(urls, parentCLoader, plgInstance.plgConfig.name);
-				cLoaders.put(classLocURL, plgInstance.classLoader);
-				if (log.isDebugEnabled()) {
-					String hierarchy = "";
-					for (ClassLoader cLoader = plgInstance.classLoader; cLoader.getParent() != null; cLoader = cLoader.getParent()) {
-						hierarchy = cLoader+" <- "+hierarchy;
-					}
-					log.debug("Plugin's '"+plgInstance.plgConfig.name+"' classloader hierarchy: "+hierarchy);
-				}
+				log.debug("Plugin's '"+plgInstance.plgConfig.name+"' classloader hierarchy: "+hierarchy);
 			}
 		}
 	}
@@ -396,19 +396,12 @@ public class PluginHandler {
 		if (dir != null && dir.isDirectory() && dir.canRead()) {
 			URL sharedDirURL = null;
 			try {
-				sharedDirURL = dir.toURI().toURL();
+				sharedDirURL = tryGetCanonicalFile(dir).toURI().toURL();
 			} catch (MalformedURLException e) {
 				log.warn("Error when converting valid "+logDirDescr+" directory path '"+dir.getAbsolutePath()
 						+"' to URL, no "+logDirDescr+" will be used");
 			}
 			if (sharedDirURL != null) {
-				String path = dir.getAbsolutePath();
-				try {
-					path = dir.getCanonicalPath();
-				} catch (IOException e) {
-					log.info("Error when converting "+logDirDescr+" directory file '"+path+"' to cannonical form");
-				}
-				log.info("Using "+logDirDescr+" directory '"+path+"'");
 				File[] jarFiles = getNestedFiles(dir, jarFilter);
 				URL[] urls = new URL[jarFiles.length+1];
 				urls[0] = sharedDirURL;
@@ -450,7 +443,6 @@ public class PluginHandler {
 	
 	private void createSharedLibsURLs(Map<URL, String> newLibChecksums) {
 		if (sharedLibsDir != null) {
-			log.info("Shared libraries directory set to "+sharedLibsDir.getAbsolutePath());
 			sharedLibsURLs = createLibsURLs(sharedLibsDir, newLibChecksums, "shared libraries", "shared library");
 		} else
 			log.info("Configured not to use shared libraries directory");
@@ -535,7 +527,7 @@ public class PluginHandler {
 							newClazz = loadClass(newPlgInstance.plgConfig.className, newPlgInstance.classLoader);
 						} catch (ClassNotFoundException e) {
 							log.info("Plugin '"+newPlgInstance.plgConfig.name+"' | plugin class '"+newPlgInstance.plgConfig.className+"' not found at '"+
-									new File(pluginRepositoryDir,newPlgInstance.plgConfig.classLocation).getAbsolutePath()+"'", e);
+									tryGetCanonicalFile(new File(pluginRepositoryDir,newPlgInstance.plgConfig.classLocation)).getPath()+"'", e);
 						}
 						Class<?> oldClass = loadedPlugin.getClass();
 						String newClassChecksum = null;
@@ -605,7 +597,7 @@ public class PluginHandler {
 		return retVal;
 	}
 	
-	private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
+	/*private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
 		ClassLoader appClassLoader = this.getClass().getClassLoader();
 		if (cLoader == null)
 			return false;
@@ -619,7 +611,7 @@ public class PluginHandler {
 		if (!(cLoader instanceof URLClassLoader))
 			return false;
 		return urls.equals(getCLoaderURLSet((URLClassLoader)cLoader));
-	}
+	}*/
 	
 	private boolean startPlugin(ProxyPlugin plugin, PluginProperties props) {
 		log.info("Starting plugin '"+plugin+"'");
@@ -648,9 +640,9 @@ public class PluginHandler {
 	private Map<String, String> loadVariablesConfiguration() {
 		Map<String, String> variables = new HashMap<String, String>();
 		
-		File variablesFile = new File(pluginRepositoryDir.getAbsolutePath() + File.separator + VARIABLE_CONFIGURATION_FILE);
+		File variablesFile = tryGetCanonicalFile(new File(pluginRepositoryDir.getAbsolutePath() + File.separator + VARIABLE_CONFIGURATION_FILE));
 		if (!variablesFile.canRead()) {
-			log.info("Can not read variables file '"+variablesFile.getAbsolutePath()+"', no variables will be loaded");
+			log.info("Can not read variables file '"+variablesFile.getPath()+"', no variables will be loaded");
 			return variables;
 		}
 		Document document = XMLFileParser.parseFile(variablesFile);
@@ -851,7 +843,7 @@ public class PluginHandler {
 			clazz = loadClass(plgInstance.plgConfig.className, plgInstance.classLoader);
 		} catch (ClassNotFoundException e) {
 			log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' not found at '"+
-					new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation).getAbsolutePath()+"'");
+					tryGetCanonicalFile(new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation)).getPath()+"'");
 			return null;
 		}
 		if (!ProxyPlugin.class.isAssignableFrom(clazz)) {
@@ -871,14 +863,14 @@ public class PluginHandler {
 			log.info("Unable to get code source location for class '"+clazz.getName()+"'");
 			return null;
 		}
-		File codeSourceFile = new File(classFileUri);
+		File codeSourceFile = tryGetCanonicalFile(new File(classFileUri));
 		if (codeSourceFile.isFile())
 			classFile = codeSourceFile;
 		else {
 			String classPath = clazz.getName().replace(".", filepathSeparator);
-			classFile = new File(codeSourceFile,classPath+".class");
+			classFile = tryGetCanonicalFile(new File(codeSourceFile,classPath+".class"));
 			if (!classFile.isFile()) {
-				log.info("Unable to find actual class at '"+classFile.getAbsolutePath()+"'");
+				log.info("Unable to find actual class at '"+classFile.getPath()+"'");
 			}
 		}
 		return classFile;
@@ -889,7 +881,7 @@ public class PluginHandler {
 		try {
 			File classFile = getClassFile(clazz);
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
-			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.toString());
+			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.getPath());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
 				log.warn("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible" +
 						" to the plugin, " + "and the proxy server won't be able to reload it on the fly if it changes");
@@ -925,26 +917,32 @@ public class PluginHandler {
 	
 	@SuppressWarnings("unchecked")
 	public <T extends ProxyPlugin> List<T> getPlugins(Class<T> asClass) {
-		List<T> retVal = new LinkedList<T>();
+		List<PluginInstance> recognizedPlugins = new LinkedList<PluginInstance>();
 		for (PluginInstance plgInstance : pluginInstances) {
 			if (!plgInstance.realTypes.contains(asClass))  {
 				boolean dynamicTypes = plgInstance.plgConfig.types.isEmpty();
 				if (dynamicTypes || plgInstance.plgConfig.types.contains(asClass.getSimpleName())) {
 					try {
 						asClass.cast(plgInstance.instance);
-						log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is a "+asClass.getSimpleName());
+						if (dynamicTypes)
+							log.debug("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is a "+asClass.getSimpleName());
 						plgInstance.realTypes.add(asClass);
-						retVal.add((T) plgInstance.instance);
+						recognizedPlugins.add(plgInstance);
 					} catch (ClassCastException e) {
 						if (dynamicTypes)
-							log.info("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is not a "+asClass.getSimpleName());
+							log.debug("Dynamic plugin type discovery: plugin '"+plgInstance.plgConfig.name+"' is not a "+asClass.getSimpleName());
 						else
 							log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' is not a subclass of '"
-									+asClass.getName()+"' class/interface");
+									+asClass.getName()+"' class/interface. Fix plugin's configuration !");
 					}
 				}
 			} else
-				retVal.add((T) plgInstance.instance);
+				recognizedPlugins.add(plgInstance);
+		}
+		log.info("Recognized plugins of type "+asClass.getSimpleName()+": "+recognizedPlugins.toString());
+		List<T> retVal = new LinkedList<T>();
+		for (PluginInstance plgInstance : recognizedPlugins) {
+			retVal.add((T) plgInstance.instance);
 		}
 		return Collections.unmodifiableList(retVal);
 	}
