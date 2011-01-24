@@ -79,9 +79,8 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 		List<PluginStatus> retVal = createdInstances.get(pluginClass);
 		if (retVal == null) {
 			retVal = new LinkedList<PluginStatus>();
-			String plgType = pluginClass.getSimpleName();
 			for (PluginInstance plgInstance : adaptiveEngine.getPluginHandler().getAllPlugins()) {
-				if (plgInstance.getTypes().contains(plgType))
+				if (plgInstance.getTypes().contains(pluginClass))
 					retVal.add(new PluginStatusImpl(plgInstance, pluginClass));
 			}
 		}

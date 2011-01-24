@@ -5,7 +5,6 @@ import java.util.Arrays;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
-import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 
 public class ByteServiceImpl extends BaseMessageServiceProvider<ByteContentService>

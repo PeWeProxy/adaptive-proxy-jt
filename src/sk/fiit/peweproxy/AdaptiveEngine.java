@@ -803,6 +803,7 @@ public class AdaptiveEngine  {
 			pluginHandler.setup(pluginsHomeDir,svcsDir,sharedLibDir,excludeFiles,coreThreads);
 		}
 		boolean pluginsToggling = Boolean.valueOf(prop.getProperty("enable_plugins_toggling","true"));
+		log.info("Plugins toggling is "+((pluginsToggling) ? "enabled" : "disabled"));
 		integrationManager.setToggling(pluginsToggling);
 		modulesManager.setPattern(prop.getProperty("string_services_pattern"));
 		reloadPlugins();
@@ -825,9 +826,9 @@ public class AdaptiveEngine  {
 		List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePluginsList = new LinkedList<ProcessingPluginInstance<ResponseProcessingPlugin>>();
 		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
 		for (PluginInstance pluginInstance : plugins) {
-			if (rqPluginsSet.contains(pluginInstance))
+			if (rqPluginsSet.contains(pluginInstance.getInstance()))
 				requestPluginsList.add(new ProcessingPluginInstance<RequestProcessingPlugin>(pluginInstance));
-			if (rpPluginsSet.contains(pluginInstance))
+			if (rpPluginsSet.contains(pluginInstance.getInstance()))
 				responsePluginsList.add(new ProcessingPluginInstance<ResponseProcessingPlugin>(pluginInstance));
 		}
 		boolean pluginsOrderingSuccess;

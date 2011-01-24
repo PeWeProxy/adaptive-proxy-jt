@@ -8,7 +8,6 @@ import rabbit.util.CharsetUtils;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
-import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
 import sk.fiit.peweproxy.services.content.StringContentService;
 
 public class StringServiceImpl extends BaseMessageServiceProvider<StringContentService>

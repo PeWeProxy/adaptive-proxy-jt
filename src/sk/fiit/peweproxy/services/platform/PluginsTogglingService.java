@@ -4,7 +4,7 @@ import java.util.Set;
 
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.services.ProxyService;
-import sk.fiit.peweproxy.services.ProxyService.readonly;;
+import sk.fiit.peweproxy.services.ProxyService.readonly;
 
 /**
  * Plugins toggling service provides a mechanism to enable or disable integration of the
@@ -19,6 +19,7 @@ import sk.fiit.peweproxy.services.ProxyService.readonly;;
  *
  */
 @readonly
+@SuppressWarnings("all") // to avoid compile time warning
 public interface PluginsTogglingService extends ProxyService {
 
 	public Set<String> getPluginsBlacklist(Class<? extends ProxyPlugin> pluginType);

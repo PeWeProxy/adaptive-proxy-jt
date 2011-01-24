@@ -588,7 +588,7 @@ public class PluginHandler {
 		return retVal;
 	}
 	
-	private Set<URL> getCLoaderURLSet(URLClassLoader cLoader) {
+	/*private Set<URL> getCLoaderURLSet(URLClassLoader cLoader) {
 		URL[] urls = cLoader.getURLs();
 		Set<URL> retVal = new HashSet<URL>();
 		for (URL url : urls) {
@@ -597,7 +597,7 @@ public class PluginHandler {
 		return retVal;
 	}
 	
-	/*private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
+	private boolean sameURLsInCLoader(ClassLoader cLoader, Set<URL> urls) {
 		ClassLoader appClassLoader = this.getClass().getClassLoader();
 		if (cLoader == null)
 			return false;

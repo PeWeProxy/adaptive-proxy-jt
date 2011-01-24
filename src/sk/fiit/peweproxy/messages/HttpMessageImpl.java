@@ -19,7 +19,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	private boolean checkThread = false;
 	private Thread allowedThread;
 	private boolean isReadonly = false;
-	protected String userId;
+	protected String userId = VOID_USERID;
 	
 	public HttpMessageImpl(HeaderWrapper header) {
 		this.header = header;

@@ -19,6 +19,7 @@ import sk.fiit.peweproxy.services.ProxyService.readonly;
  *
  */
 @readonly
+@SuppressWarnings("all") // to avoid compile time warning
 public interface PlatformContextService extends ProxyService {
 	
 	public interface PluginStatus {

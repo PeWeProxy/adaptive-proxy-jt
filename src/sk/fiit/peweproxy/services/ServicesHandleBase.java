@@ -41,7 +41,6 @@ import sk.fiit.peweproxy.services.content.ModifiableBytesService;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 import sk.fiit.peweproxy.services.content.StringContentService;
 import sk.fiit.peweproxy.services.platform.PlatformContextService;
-import sk.fiit.peweproxy.services.platform.PluginsTogglingService;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
@@ -260,7 +259,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 			return (ServiceProvider<Service>)getModByteServie();
 		if (serviceClass == ByteContentService.class)
 			return (ServiceProvider<Service>)getByteService();
-		if (serviceClass == PluginsTogglingService.class) {
+		if (serviceClass == PlatformContextService.class) {
 			return (ServiceProvider<Service>) getContextService();
 		}
 		return null;
@@ -309,7 +308,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		final ServiceProvider<Service> provider;
 		final ModuleType module;
 		final Map<Method, Boolean> readonlyFlags = new HashMap<Method, Boolean>();;
-		Boolean typeReadonly = true;
+		Boolean typeReadonly = null;
 		
 		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module, boolean initChangedModel) {
 			super(realService,initChangedModel);
@@ -400,18 +399,18 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 						return method.invoke(binding, args);
 				if (method.getDeclaringClass() == ProxyService.class)
 					return method.invoke(binding.realization.realService, args);
-				boolean messageIndependent  = isTypeReadonly(method, binding.realization);
+				boolean readOnlyType  = isTypeReadonly(method, binding.realization);
 				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
 				if (log.isTraceEnabled()) {
-					if (messageIndependent)
+					if (readOnlyType)
 						log.trace(getLogTextHead()+"Method "+method.getName()+"("
-								+Arrays.toString(method.getParameterTypes())+") of a message independent service provided by "+realization.realService+" called");
+								+Arrays.toString(method.getParameterTypes())+") of a readonly service provided by "+realization.realService+" called");
 					else
 						log.trace(getLogTextHead()+((readOnlyMethod)? "Read-only": "Modifying")+" method "+method.getName()+"("
 								+Arrays.toString(method.getParameterTypes())
 								+") of a service provided by "+realization.realService+" called");
 				}
-				if (messageIndependent)
+				if (readOnlyType)
 					return method.invoke(binding.realization.realService, args);
 				if (changedModelBinding != binding) {
 					if (!actualServicesBindings.contains(binding)) {
@@ -464,6 +463,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 			actualServicesBindings.clear();
 		}
 		actualServicesBindings.add(binding);
+		serviceBindings.put(binding.proxiedService, binding);
 	}
 	
 	private void readingAttempt(ServiceBinding<?> binding) {

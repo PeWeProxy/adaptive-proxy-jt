@@ -12,6 +12,7 @@ import sk.fiit.peweproxy.services.ProxyService.readonly;
  *
  */
 @readonly
+@SuppressWarnings("all") // to avoid compile time warning
 public interface UserIdentificationService extends ProxyService {
 	
 	/**
