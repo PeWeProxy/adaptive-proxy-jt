@@ -51,7 +51,7 @@ class FiledKey<K> extends FileData<K> {
 	try {
 	    K myData = getData ();
 	    if (data instanceof FiledKey) {
-		data = ((FiledKey)data).getData ();
+		data = ((FiledKey<?>)data).getData ();
 	    }
 	    if (myData != null) {
 		return myData.equals (data);
