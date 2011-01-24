@@ -4,7 +4,7 @@ import java.util.List;
 
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.services.ProxyService;
-import sk.fiit.peweproxy.services.ProxyService.messageIdependent;
+import sk.fiit.peweproxy.services.ProxyService.readonly;
 
 /**
  * Platform context service provides plugins a way to find out which proxy plugins are
@@ -18,7 +18,7 @@ import sk.fiit.peweproxy.services.ProxyService.messageIdependent;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-@messageIdependent
+@readonly
 public interface PlatformContextService extends ProxyService {
 	
 	public interface PluginStatus {

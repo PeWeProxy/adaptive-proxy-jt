@@ -1,6 +1,7 @@
 package sk.fiit.peweproxy.services.user;
 
 import sk.fiit.peweproxy.services.ProxyService;
+import sk.fiit.peweproxy.services.ProxyService.readonly;
 
 /**
  * User identification service is able to provide unique textual identifier of the
@@ -10,6 +11,7 @@ import sk.fiit.peweproxy.services.ProxyService;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
+@readonly
 public interface UserIdentificationService extends ProxyService {
 	
 	/**

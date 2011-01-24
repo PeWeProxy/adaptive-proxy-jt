@@ -43,12 +43,16 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 
 		@Override
 		public boolean isEnabled() {
+			if (userId == null)
+				return true;
 			return adaptiveEngine.getIntegrationManager().isPluginEnabled(httpMessage, plgInstance.getName(), typeClass); 
 		}
 		
 		@Override
 		public void setEnabled(boolean enabled) {
-			adaptiveEngine.getIntegrationManager().setPluginEnabled(httpMessage, plgInstance.getName(), typeClass, enabled);
+			if (userId != null)
+				// change enabled status only when we can identify user
+				adaptiveEngine.getIntegrationManager().setPluginEnabled(httpMessage, plgInstance.getName(), typeClass, enabled);
 		}
 		
 		@Override
@@ -65,8 +69,8 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 	
 	public PlatformContextImpl(HttpMessageImpl<?> httpMessage, AdaptiveEngine adaptiveEngine) {
 		super(httpMessage);
-		this.adaptiveEngine = adaptiveEngine;
 		this.userId = httpMessage.userIdentification();
+		this.adaptiveEngine = adaptiveEngine;
 	}
 
 

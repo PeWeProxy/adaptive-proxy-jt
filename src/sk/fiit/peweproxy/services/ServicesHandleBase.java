@@ -35,7 +35,6 @@ import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableByteServiceImpl
 import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableStringServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.StringServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.platform.PlatformContextImpl;
-import sk.fiit.peweproxy.services.ProxyService.messageIdependent;
 import sk.fiit.peweproxy.services.ProxyService.readonly;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 import sk.fiit.peweproxy.services.content.ModifiableBytesService;
@@ -248,11 +247,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	}
 	
 	private ServiceProvider<PlatformContextService> getContextService() {
-		try {
-			return new PlatformContextImpl(httpMessage, manager.getAdaptiveEngine());
-		} catch (ServiceUnavailableException e) {
-			throw new ServiceUnavailableException(PluginsTogglingService.class, "No service to provide user's identification", e);
-		}
+		return new PlatformContextImpl(httpMessage, manager.getAdaptiveEngine());
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -314,7 +309,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		final ServiceProvider<Service> provider;
 		final ModuleType module;
 		final Map<Method, Boolean> readonlyFlags = new HashMap<Method, Boolean>();;
-		Boolean messageIndependent = true;
+		Boolean typeReadonly = true;
 		
 		public ServiceRealization(Service realService, ServiceProvider<Service> provider, ModuleType module, boolean initChangedModel) {
 			super(realService,initChangedModel);
@@ -375,16 +370,16 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		return false;
 	}
 	
-	private boolean isMessageIndependent(Method method, ServiceRealization<?> realization) {
-		if (realization.messageIndependent != null)
-			return realization.messageIndependent.booleanValue();
-		if (method.getDeclaringClass().isAnnotationPresent(messageIdependent.class)) {
-			realization.messageIndependent = new Boolean(true);
+	private boolean isTypeReadonly(Method method, ServiceRealization<?> realization) {
+		if (realization.typeReadonly != null)
+			return realization.typeReadonly.booleanValue();
+		if (method.getDeclaringClass().isAnnotationPresent(readonly.class)) {
+			realization.typeReadonly = new Boolean(true);
 			return true;
 		}
 		try {
-			realization.messageIndependent = new Boolean(realization.realService.getClass().isAnnotationPresent(messageIdependent.class));
-			return realization.messageIndependent.booleanValue();
+			realization.typeReadonly = new Boolean(realization.realService.getClass().isAnnotationPresent(readonly.class));
+			return realization.typeReadonly.booleanValue();
 		} catch (Exception ignored) {}
 		return false;
 	}
@@ -405,7 +400,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 						return method.invoke(binding, args);
 				if (method.getDeclaringClass() == ProxyService.class)
 					return method.invoke(binding.realization.realService, args);
-				boolean messageIndependent  = isMessageIndependent(method, binding.realization);
+				boolean messageIndependent  = isTypeReadonly(method, binding.realization);
 				boolean readOnlyMethod = isReadOnlyMethod(method, binding.realization);
 				if (log.isTraceEnabled()) {
 					if (messageIndependent)
