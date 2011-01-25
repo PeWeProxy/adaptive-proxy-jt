@@ -1,4 +1,4 @@
-package sk.fiit.peweproxy;
+package sk.fiit.peweproxy.plugins;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,7 +9,6 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
-import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.services.ServiceUnavailableException;
 import sk.fiit.peweproxy.services.platform.PluginsTogglingService;
 

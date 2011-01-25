@@ -25,6 +25,7 @@ import rabbit.handler.Handler;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ConnectionSetupResolver;
 import rabbit.httpio.request.ClientResourceHandler;
+import rabbit.httpio.request.ContentCachingListener;
 import rabbit.httpio.request.ContentFetcher;
 import rabbit.httpio.request.ContentSeparator;
 import rabbit.httpio.request.ContentSource;
@@ -45,6 +46,7 @@ import sk.fiit.peweproxy.messages.HttpResponseImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponseImpl;
 import sk.fiit.peweproxy.plugins.PluginHandler;
+import sk.fiit.peweproxy.plugins.PluginsIntegrationManager;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
 import sk.fiit.peweproxy.plugins.events.EventsHandler;
@@ -112,6 +114,29 @@ public class AdaptiveEngine  {
 		@Override
 		public String toString() {
 			return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
+		}
+	}
+	
+	class RequestContentCachedListener implements ContentCachingListener {
+		final Connection con;
+		
+		public RequestContentCachedListener(Connection con) {
+			this.con = con;
+		}
+		
+		@Override
+		public void dataCached(byte[] contentData, Queue<Integer> dataIncrements) {
+			requestContentCached(con, contentData, dataIncrements);
+		}
+
+		@Override
+		public void failed(Exception e) {
+			con.readFailed(e);
+		}
+
+		@Override
+		public void timeout() {
+			con.readTimeout();
 		}
 	}
 	
