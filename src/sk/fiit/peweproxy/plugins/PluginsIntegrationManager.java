@@ -51,6 +51,9 @@ public class PluginsIntegrationManager {
 		UsersBlacklists blackLists = blacklistsForUsers.get(userId);
 		if (blackLists == null) {
 			blackLists = new UsersBlacklists();
+			blacklistsForUsers.put(userId, blackLists);
+		}
+		if (blackLists.blacklistsForType.get(pluginType) == null) {
 			PluginsTogglingService togglingSvc = null;
 			try {
 				togglingSvc = message.getServicesHandleInternal().getService(PluginsTogglingService.class);
@@ -70,7 +73,6 @@ public class PluginsIntegrationManager {
 					togglingSvc = null;
 				}
 			}
-			blacklistsForUsers.put(userId, blackLists);
 		}
 		return blackLists.getBlackList(pluginType);
 	}
