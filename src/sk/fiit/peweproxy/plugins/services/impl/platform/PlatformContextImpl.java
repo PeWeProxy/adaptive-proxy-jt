@@ -83,6 +83,7 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 				if (plgInstance.getTypes().contains(pluginClass))
 					retVal.add(new PluginStatusImpl(plgInstance, pluginClass));
 			}
+			createdInstances.put(pluginClass, retVal);
 		}
 		return retVal;
 	}
@@ -98,12 +99,12 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {
-		throw new RuntimeException("This service is @messageIdependent, no changes commiting should be called");
+		throw new RuntimeException("This service is @readonly, no changes commiting should be called");
 	}
 
 	@Override
 	public void doChanges(ModifiableHttpRequest request) {
-		throw new RuntimeException("This service is @messageIdependent, no changes commiting should be called");
+		throw new RuntimeException("This service is @readonly, no changes commiting should be called");
 	}
 
 
