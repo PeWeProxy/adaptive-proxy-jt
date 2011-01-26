@@ -23,7 +23,6 @@ import sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.peweproxy.services.ProxyService;
-import sk.fiit.peweproxy.utils.Statistics;
 import sk.fiit.peweproxy.utils.Statistics.PluginStats;
 import sk.fiit.peweproxy.utils.Statistics.ProcessStats;
 import sk.fiit.peweproxy.utils.Statistics.ProcessType;
@@ -70,46 +69,78 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		if (stats == null)
 			return "-";
 		StringBuilder sb = new StringBuilder();
-		sb.append("avg.: ");
 		sb.append(Math.round(stats.getAverage()));
-		sb.append("<br><span style=\"font-size:10px\"># ");
+		sb.append(" ms<br><span style=\"font-size:10px\">");
 		sb.append(stats.getCount());
-		sb.append(", &lt;");
+		sb.append(" #, min:");
 		sb.append(stats.getMin());
-		sb.append(",");
+		sb.append(", max ");
 		sb.append(stats.getMax());
-		sb.append("&gt;</span>");
+		sb.append("</span>");
 		return sb.toString();
 	}
 	
 	private void addPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
-		sb.append ("<p><h2>Loaded proxy plugins</h2></p>\n");
-		sb.append (HtmlPage.getTableHeader (100, 1));
-		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th rowspan=2 width=\"20%\">Plugin name</th>");
-		sb.append ("<th rowspan=2 width=\"40%\">Plugin class</th>");
-		sb.append ("<th rowspan=2 width=\"20%\">Plugin types</th>\n");
-		sb.append ("<th colspan=2 width=\"20%\">Times</th></tr>\n");
-		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"10%\">start()</th><th width=\"10%\">stop()</th></tr>\n");
+		sb.append("<p><h2>Loaded proxy plugins</h2></p>\n");
+		sb.append(HtmlPage.getTableHeader (100, 1));
+		sb.append(HtmlPage.getTableTopicRow ());
+		sb.append("<th rowspan=2 width=\"20%\">Plugin name</th>");
+		sb.append("<th rowspan=2 width=\"49%\">Plugin class</th>");
+		sb.append("<th colspan=7 width=\"21%\">Plugin types</th>\n");
+		sb.append("<th colspan=2 width=\"10%\">Times</th></tr>\n");
+		sb.append(HtmlPage.getTableTopicRow ());
+		sb.append("<th width=\"3%\" title=\"");
+		sb.append(RequestProcessingPlugin.class.getSimpleName());
+		sb.append("\">P&uarr;</th><th width=\"3%\" title=\"");
+		sb.append(ResponseProcessingPlugin.class.getSimpleName());
+		sb.append("\">P&darr;</th>");
+		sb.append("<th width=\"3%\" title=\"");
+		sb.append(RequestServiceModule.class.getSimpleName());
+		sb.append("\">M&uarr;</th><th width=\"3%\" title=\"");
+		sb.append(ResponseServiceModule.class.getSimpleName());
+		sb.append("\">M&darr;</th>");
+		sb.append("<th width=\"3%\" title=\"");
+		sb.append(ConnectionEventPlugin.class.getSimpleName());
+		sb.append("\">C</th><th width=\"3%\" title=\"");
+		sb.append(TimeoutEventPlugin.class.getSimpleName());
+		sb.append("\">T</th><th width=\"3%\" title=\"");
+		sb.append(FailureEventPlugin.class.getSimpleName());
+		sb.append("\">F</th>");
+		sb.append("<th width=\"5%\">start()</th><th width=\"5%\">stop()</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>");
 			sb.append(plgInstance.getPluginClass().getName());
-			sb.append ("</td>\n<td>\n");
+			/*sb.append ("</td>\n<td>\n");
 			for (Class<?> pluginType : plgInstance.getTypes()) {
 				sb.append(pluginType.getSimpleName());
 				sb.append("<br>\n");
-			}
-			sb.append("</td><td align=\"center\">");
+			}*/
+			sb.append("</td>");
+			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
+			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
+			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
+			sb.append(addIsTypeCell(types, RequestServiceModule.class));
+			sb.append(addIsTypeCell(types, ResponseServiceModule.class));
+			sb.append(addIsTypeCell(types, ConnectionEventPlugin.class));
+			sb.append(addIsTypeCell(types, TimeoutEventPlugin.class));
+			sb.append(addIsTypeCell(types, FailureEventPlugin.class));
+			sb.append("<td align=\"center\">");
 			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_START)));
 			sb.append("</td><td align=\"center\">");
 			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_STOP)));
 			sb.append ("</td></tr>\n");
 		}
 		sb.append ("</table>\n<br>\n");
+	}
+	
+	private String addIsTypeCell(Set<Class< ? extends ProxyPlugin>> types, Class<? extends ProxyPlugin> type) {
+		if (types.contains(type))
+			return "<td align=\"center\" title=\"is a "+type.getSimpleName()+"\"><b>X</b></td>";
+		else
+			return "<td align=\"center\" title=\"is not a "+type.getSimpleName()+"\">&nbsp</td>";
 	}
 	
 	private List<PluginInstance> filterPlugins(List<PluginInstance> list, Class<? extends ProxyPlugin> ... types) {
@@ -126,6 +157,24 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		return retVal;
 	}
 	
+	private void addProcessingPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
+		sb.append ("<p><h2>Processing plugins summary</h2></p>\n");
+		sb.append (HtmlPage.getTableHeader (100, 1));
+		sb.append (HtmlPage.getTableTopicRow ());
+		sb.append ("<th width=\"90%\">Plugin name</th>");
+		sb.append ("<th width=\"5%\">RQ</th>\n");
+		sb.append ("<th width=\"5%\">RP</th></tr>\n");
+		for (PluginInstance plgInstance : plugins) {
+			sb.append ("<tr><td>");
+			sb.append(plgInstance.getName());
+			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
+			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
+			sb.append(addIsTypeCell(types, ResponseProcessingPlugin.class));
+			sb.append ("</tr>");
+		}
+		sb.append ("</table>\n<br>\n");
+	}
+	
 	private void addModulesPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Service modules summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
@@ -139,6 +188,8 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>\n");
 			sb.append ("<b>Services for requests:</b><br>\n");
+			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
+			
 			boolean rq = (plgInstance.getTypes().contains(RequestServiceModule.class));
 			boolean rp = (plgInstance.getTypes().contains(ResponseServiceModule.class));
 			if (rq) {
@@ -154,42 +205,10 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 					sb.append("<br>\n");
 				}
 			}
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rq)
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (rp)
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td></tr>");
-		}
-		sb.append ("</table>\n<br>\n");
-	}
-	
-	private void addProcessingPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
-		sb.append ("<p><h2>Processing plugins summary</h2></p>\n");
-		sb.append (HtmlPage.getTableHeader (100, 1));
-		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"90%\">Plugin name</th>");
-		sb.append ("<th width=\"5%\">RQ</th>\n");
-		sb.append ("<th width=\"5%\">RP</th></tr>\n");
-		for (PluginInstance plgInstance : plugins) {
-			sb.append ("<tr><td>");
-			sb.append(plgInstance.getName());
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (plgInstance.getTypes().contains(RequestProcessingPlugin.class))
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td>\n<td align=\"center\">\n");
-			if (plgInstance.getTypes().contains(ResponseProcessingPlugin.class))
-				sb.append ("<b>X</b>");
-			else
-				sb.append ("&nbsp");
-			sb.append ("</td></tr>");
+			sb.append ("</td>\n");
+			sb.append(addIsTypeCell(types, RequestServiceModule.class));
+			sb.append(addIsTypeCell(types, ResponseServiceModule.class));
+			sb.append ("</tr>");
 		}
 		sb.append ("</table>\n<br>\n");
 	}
@@ -206,21 +225,13 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			for (PluginInstance plgInstance : plugins) {
 				sb.append ("<tr><td>");
 				sb.append(plgInstance.getName());
+				Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (plgInstance.getTypes().contains(ConnectionEventPlugin.class))
-					sb.append ("<b>X</b>");
-				else
-					sb.append ("&nbsp");
+				sb.append(addIsTypeCell(types, ConnectionEventPlugin.class));
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (plgInstance.getTypes().contains(TimeoutEventPlugin.class))
-					sb.append ("<b>X</b>");
-				else
-					sb.append ("&nbsp");
+				sb.append(addIsTypeCell(types, TimeoutEventPlugin.class));
 				sb.append ("</td>\n<td align=\"center\">\n");
-				if (plgInstance.getTypes().contains(FailureEventPlugin.class))
-					sb.append ("<b>X</b>");
-				else
-					sb.append ("&nbsp");
+				sb.append(addIsTypeCell(types, FailureEventPlugin.class));
 				sb.append ("</td></tr>");
 			}
 		}
@@ -239,24 +250,27 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		//sb.append("</td>\n</tr>\n</table>\n");
 	}
 	
+	private String logStyle;
+	
 	private String colorLogLine(String lineText) {
 		//13:52:48,797 INFO   - Can not read variables file ...
-		String logLvl = lineText.substring(13, lineText.indexOf(' ', 13));
-		String style = "black";
-		if ("TRACE".equals(logLvl))
-			style = "yellow";
-		else if ("DEBUG".equals(logLvl))
-			style = "green";
-		else if ("INFO".equals(logLvl))
-			style = "blue";
-		else if ("WARN".equals(logLvl))
-			style = "red; font-weight:bold";
-		else if ("ERROR".equals(logLvl))
-			style = "purple; font-weight:bold";
-		else if ("FATAL".equals(logLvl))
-			style = "black; font-weight:bold";
+		if (lineText.matches("\\d\\d:\\d\\d:\\d\\d,\\d\\d\\d.*")) {
+			String logLvl = lineText.substring(13, lineText.indexOf(' ', 13));
+			if ("TRACE".equals(logLvl))
+				logStyle = "grey";
+			else if ("DEBUG".equals(logLvl))
+				logStyle = "green";
+			else if ("INFO".equals(logLvl))
+				logStyle = "blue";
+			else if ("WARN".equals(logLvl))
+				logStyle = "red; font-weight:bold";
+			else if ("ERROR".equals(logLvl))
+				logStyle = "purple; font-weight:bold";
+			else if ("FATAL".equals(logLvl))
+				logStyle = "black; font-weight:bold";
+		}
 		lineText = lineText.replaceAll(" ", "&nbsp;");
-		lineText = "<code style=\"color:" + style + ";\">" + lineText + "</code>";
+		lineText = "<code style=\"color:" + logStyle + ";\">" + lineText + "</code>";
 		return lineText;
 	}
 	@Override
