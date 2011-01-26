@@ -141,7 +141,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
 	
 	abstract void discoverDesiredServices(ModuleType plugin,
-			Set<Class<? extends ProxyService>> desiredServices);
+			Set<Class<? extends ProxyService>> desiredServices) throws Throwable;
 	
 	protected enum LogText {NORMAL,CAPITAL,SHORT};
 	

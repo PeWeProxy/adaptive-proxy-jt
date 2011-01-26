@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,6 +37,8 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import sk.fiit.peweproxy.utils.ChecksumUtils;
+import sk.fiit.peweproxy.utils.Statistics;
+import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 import sk.fiit.peweproxy.utils.XMLFileParser;
 
 public class PluginHandler {
@@ -77,6 +80,7 @@ public class PluginHandler {
 	private boolean pluginsStopped = false;
 	private final StringBuffer loadingLogBuffer;
 	private PluginsThreadPool threadPool;
+	private final Statistics stats;
 	
 	static {
 		jarFilter = new FilenameFilter() {
@@ -99,7 +103,7 @@ public class PluginHandler {
 		};
 	}
 	
-	public PluginHandler() {
+	public PluginHandler(Statistics stats) {
 		pluginInstances = new LinkedList<PluginInstance>();
 		checksums4ldClassMap = new HashMap<Class<?>, String>();
 		checksums4ldLibsMap = new HashMap<URL, String>();
@@ -114,6 +118,7 @@ public class PluginHandler {
 		StringWriter outStream = new StringWriter();
 		loadingLogBuffer = outStream.getBuffer();
 		log.addAppender(new WriterAppender(new PatternLayout("%d{HH:mm:ss,SSS} %-5p %x - %m%n"), outStream));
+		this.stats = stats;
 	}
 	
 	public void setup(File pluginRepositoryDir, File servicesDir, File sharedLibsDir,
@@ -613,20 +618,30 @@ public class PluginHandler {
 		return urls.equals(getCLoaderURLSet((URLClassLoader)cLoader));
 	}*/
 	
-	private boolean startPlugin(ProxyPlugin plugin, PluginProperties props) {
+	private boolean startPlugin(final ProxyPlugin plugin, final PluginProperties props) {
 		log.info("Starting plugin '"+plugin+"'");
 		try {
-			return plugin.start(props);
+			return stats.executeProcess(new Callable<Boolean>() {
+				@Override
+				public Boolean call() throws Exception {
+					return plugin.start(props);
+				}
+			}, plugin, ProcessType.PLUGIN_START).booleanValue();
 		} catch (Throwable t) {
 			log.info("Throwable raised while seting up and starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
 		return false;
 	}
 	
-	private boolean stopPlugin(ProxyPlugin plugin) {
+	private boolean stopPlugin(final ProxyPlugin plugin) {
 		log.info("Stopping loaded plugin '"+plugin+"'");
 		try {
-			plugin.stop();
+			stats.executeProcess(new Runnable() {
+				@Override
+				public void run() {
+					plugin.stop();
+				}
+			}, plugin, ProcessType.PLUGIN_STOP);
 			return true;
 		} catch (Throwable t) {
 			log.info("Throwable raised while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);

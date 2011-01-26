@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
@@ -58,6 +59,8 @@ import sk.fiit.peweproxy.services.ModulesManager;
 import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
+import sk.fiit.peweproxy.utils.Statistics;
+import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
 public class AdaptiveEngine  {
 	private static final Logger log = Logger.getLogger(AdaptiveEngine.class);
@@ -76,6 +79,7 @@ public class AdaptiveEngine  {
 	private final List<ProcessingPluginInstance<ResponseProcessingPlugin>> responsePlugins;
 	private File pluginsOrderFile = null; 
 	private boolean proxyDying = false;
+	private final Statistics stats; 
 	
 	class ProcessingPluginInstance<PluginType extends ProxyPlugin> {
 		private final PluginInstance plgInstance;
@@ -145,7 +149,8 @@ public class AdaptiveEngine  {
 		prevRequestHandles = new HashMap<Connection, ConnectionHandle>();
 		this.proxy = proxy;
 		eventsHandler = new EventsHandler(this);
-		pluginHandler = new PluginHandler();
+		stats = new Statistics();
+		pluginHandler = new PluginHandler(stats);
 		modulesManager = new ModulesManager(this);
 		integrationManager = new PluginsIntegrationManager();
 		requestPlugins = new LinkedList<ProcessingPluginInstance<RequestProcessingPlugin>>();
@@ -232,10 +237,14 @@ public class AdaptiveEngine  {
 					continue;
 				}
 				try {
-					Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-						= new HashSet<Class<? extends ProxyService>>();
-					rqPlgInstance.plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
-					pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
+					final Set<Class<? extends ProxyService>> pluginsDesiredSvcs	= new HashSet<Class<? extends ProxyService>>();
+					final RequestProcessingPlugin plugin = rqPlgInstance.plugin;
+					stats.executeProcess(new Runnable() {
+						@Override
+						public void run() {
+							plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
+						}
+					}, plugin, ProcessType.REQUEST_DESIRED_SERVICES);
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 						if (log.isDebugEnabled())
 							log.debug("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request");
@@ -373,7 +382,7 @@ public class AdaptiveEngine  {
 		});
 	}
 	
-	private RequestProcessingActions doRequestProcessing(ConnectionHandle conHandle, boolean lateProcessing) {
+	private RequestProcessingActions doRequestProcessing(final ConnectionHandle conHandle, boolean lateProcessing) {
 		conHandle.request.setAllowedThread();
 		if (log.isTraceEnabled()) {
 			if (lateProcessing)
@@ -401,12 +410,28 @@ public class AdaptiveEngine  {
 					continue;
 				}
 				try {
+					final RequestProcessingPlugin plugin = rqPlgInstance.plugin;
 					if (lateProcessing) {
-						rqPlgInstance.plugin.processTransferedRequest(conHandle.request);
+						stats.executeProcess(new Runnable() {
+							@Override
+							public void run() {
+								plugin.processTransferedRequest(conHandle.request);
+							}
+						}, plugin, ProcessType.REQUEST_LATE_PROCESSING);
 					} else {
-						RequestProcessingActions action = rqPlgInstance.plugin.processRequest(conHandle.request);
+						RequestProcessingActions action = stats.executeProcess(new Callable<RequestProcessingActions>() {
+							@Override
+							public RequestProcessingActions call() throws Exception {
+								return plugin.processRequest(conHandle.request);
+							}
+						}, plugin, ProcessType.REQUEST_PROCESSING); 
 						if (action == RequestProcessingActions.NEW_REQUEST || action == RequestProcessingActions.FINAL_REQUEST) {
-							HttpRequest newRequest = rqPlgInstance.plugin.getNewRequest(conHandle.request, conHandle.messageFactory);
+							HttpRequest newRequest = stats.executeProcess(new Callable<HttpRequest>() {
+								@Override
+								public HttpRequest call() throws Exception {
+									return plugin.getNewRequest(conHandle.request, conHandle.messageFactory);
+								}
+							}, plugin, ProcessType.REQUEST_CONSTRUCTION); 
 							if (newRequest == null)
 								log.warn("RQ: "+conHandle+" | Null HttpRequest was provided by "+rqPlgInstance+" after calling getNewRequest()," +
 											" substitution is being ignored.");
@@ -427,7 +452,12 @@ public class AdaptiveEngine  {
 						} else if (action == RequestProcessingActions.NEW_RESPONSE || action == RequestProcessingActions.FINAL_RESPONSE) {
 							if (action == RequestProcessingActions.FINAL_RESPONSE)
 								processResponse = false;
-							HttpResponse newResponse = rqPlgInstance.plugin.getResponse(conHandle.request, conHandle.messageFactory);
+							HttpResponse newResponse = stats.executeProcess(new Callable<HttpResponse>() {
+								@Override
+								public HttpResponse call() throws Exception {
+									return plugin.getResponse(conHandle.request, conHandle.messageFactory);
+								}
+							}, plugin, ProcessType.RESPONSE_CONSTRUCTION); 
 							if (newResponse == null)
 								log.warn("RQ: "+conHandle+" | Null HttpResponse was provided by "+rqPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
@@ -506,7 +536,7 @@ public class AdaptiveEngine  {
 
 	public boolean transferResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
-		ConnectionHandle conHandle = requestHandles.get(con);
+		final ConnectionHandle conHandle = requestHandles.get(con);
 		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
 		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPlgInstance : responsePlugins) {
 			if (!integrationManager.isPluginEnabled(conHandle.response, rpPlgInstance.plgInstance.getName(), ResponseProcessingPlugin.class)) {
@@ -515,10 +545,14 @@ public class AdaptiveEngine  {
 				continue;
 			}
 			try {
-				Set<Class<? extends ProxyService>> pluginsDesiredSvcs
-					= new HashSet<Class<? extends ProxyService>>(); 
-				rpPlgInstance.plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
-				pluginsDesiredSvcs = new HashSet<Class<? extends ProxyService>>(pluginsDesiredSvcs); //call this "defensive copy"
+				final Set<Class<? extends ProxyService>> pluginsDesiredSvcs	= new HashSet<Class<? extends ProxyService>>();
+				final ResponseProcessingPlugin plugin = rpPlgInstance.plugin;
+				stats.executeProcess(new Runnable() {
+					@Override
+					public void run() {
+						plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
+					}
+				}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES);
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
 						log.debug("RP: "+conHandle+" | Plugin "+rpPlgInstance+" wants content modifying service for response");
@@ -614,7 +648,7 @@ public class AdaptiveEngine  {
 		});
 	}
 	
-	private boolean doResponseProcessing(ConnectionHandle conHandle, boolean lateProcessing) {
+	private boolean doResponseProcessing(final ConnectionHandle conHandle, boolean lateProcessing) {
 		conHandle.response.setAllowedThread();
 		if (log.isTraceEnabled()) {
 			if (lateProcessing)
@@ -640,12 +674,29 @@ public class AdaptiveEngine  {
 					continue;
 				}
 				try {
+					final ResponseProcessingPlugin plugin = responsePlgInstance.plugin;
 					if (lateProcessing) {
-						responsePlgInstance.plugin.processTransferedResponse(conHandle.response);
+						stats.executeProcess(new Runnable() {
+							@Override
+							public void run() {
+								plugin.processTransferedResponse(conHandle.response);
+							}
+						}, plugin, ProcessType.RESPONSE_LATE_PROCESSING);
 					} else {
-						ResponseProcessingActions action = responsePlgInstance.plugin.processResponse(conHandle.response);
+						ResponseProcessingActions action = stats.executeProcess(new Callable<ResponseProcessingActions>() {
+							@Override
+							public ResponseProcessingActions call()
+									throws Exception {
+								return plugin.processResponse(conHandle.response);
+							}
+						}, plugin, ProcessType.RESPONSE_PROCESSING);
 						if (action == ResponseProcessingActions.NEW_RESPONSE || action == ResponseProcessingActions.FINAL_RESPONSE) {
-							HttpResponse newResponse = responsePlgInstance.plugin.getNewResponse(conHandle.response, conHandle.messageFactory);
+							HttpResponse newResponse = stats.executeProcess(new Callable<HttpResponse>() {
+								@Override
+								public HttpResponse call() throws Exception {
+									return plugin.getNewResponse(conHandle.response, conHandle.messageFactory);
+								}
+							}, plugin, ProcessType.RESPONSE_CONSTRUCTION); 
 							if (newResponse == null)
 								log.warn("RP: "+conHandle+" | Null HttpResponse was provided by "+responsePlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
@@ -870,6 +921,9 @@ public class AdaptiveEngine  {
 		
 		requestPlugins.addAll(requestPluginsList);
 		responsePlugins.addAll(responsePluginsList);
+		
+		stats.pluginsRealoaded(pluginHandler);
+		integrationManager.pluginsReloaded();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -954,5 +1008,9 @@ public class AdaptiveEngine  {
 
 	public PluginsIntegrationManager getIntegrationManager() {
 		return integrationManager;
+	}
+	
+	public Statistics getStatistics() {
+		return stats;
 	}
 }

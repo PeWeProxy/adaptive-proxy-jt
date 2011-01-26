@@ -15,10 +15,13 @@ import sk.fiit.peweproxy.services.platform.PluginsTogglingService;
 public class PluginsIntegrationManager {
 	static final Logger log = Logger.getLogger(PluginsIntegrationManager.class);
 	private final Map<String, UsersBlacklists> blacklistsForUsers = new HashMap<String, UsersBlacklists>();
+	private short loadNumber = 0;
 	
 	private class UsersBlacklists {
 		final Map<Class<? extends ProxyPlugin>, Set<String>> blacklistsForType =
 			new HashMap<Class<? extends ProxyPlugin>, Set<String>>();
+		final Map<Class<? extends ProxyPlugin>, Short> queryTimesForType =
+			new HashMap<Class<? extends ProxyPlugin>, Short>();
 		
 		Set<String> getBlackList(Class<? extends ProxyPlugin> pluginType) {
 			Set<String> retVal = blacklistsForType.get(pluginType);
@@ -53,14 +56,20 @@ public class PluginsIntegrationManager {
 			blackLists = new UsersBlacklists();
 			blacklistsForUsers.put(userId, blackLists);
 		}
-		if (blackLists.blacklistsForType.get(pluginType) == null) {
+		Short queriedOn = blackLists.queryTimesForType.get(pluginType); 
+		if (queriedOn == null || queriedOn.shortValue() < loadNumber) {
+			// PluginsTogglingServices not called after last time plugins were reloaded
+			queriedOn = new Short(loadNumber);
+			blackLists.queryTimesForType.put(pluginType,queriedOn);
+			Set<String> blacklist = blackLists.getBlackList(pluginType);
+			blacklist.clear();
 			PluginsTogglingService togglingSvc = null;
 			try {
 				togglingSvc = message.getServicesHandleInternal().getService(PluginsTogglingService.class);
 			} catch (ServiceUnavailableException ignored) {}
 			while (togglingSvc != null) {
 				try {
-					blackLists.getBlackList(pluginType).addAll(togglingSvc.getPluginsBlacklist(pluginType));
+					blacklist.addAll(togglingSvc.getPluginsBlacklist(pluginType));
 				} catch (ServiceUnavailableException e) {
 					log.warn(PluginsTogglingService.class.getSimpleName()+" realization threw exception" +
 							"on calling getPluginsBlacklist() right after being provided", e);
@@ -88,5 +97,9 @@ public class PluginsIntegrationManager {
 			blacklist.remove(pluginName);
 		else
 			blacklist.add(pluginName);
+	}
+	
+	public void pluginsReloaded() {
+		loadNumber++;
 	}
 }

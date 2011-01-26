@@ -8,6 +8,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpRequestImpl;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
+import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
 public class RequestServiceHandleImpl extends ServicesHandleBase<RequestServiceModule> {
 	
@@ -20,9 +21,14 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<RequestServiceM
 	}
 	
 	@Override
-	void discoverDesiredServices(RequestServiceModule plugin,
-			Set<Class<? extends ProxyService>> desiredServices) {
-		plugin.desiredRequestServices(desiredServices,httpMessage.getHeader());
+	void discoverDesiredServices(final RequestServiceModule plugin,
+			final Set<Class<? extends ProxyService>> desiredServices) throws Throwable {
+		manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
+			@Override
+			public void run() {
+				plugin.desiredRequestServices(desiredServices,httpMessage.getHeader());
+			}
+		}, plugin, ProcessType.REQUEST_DESIRED_SERVICES);
 	}
 	
 	@Override
