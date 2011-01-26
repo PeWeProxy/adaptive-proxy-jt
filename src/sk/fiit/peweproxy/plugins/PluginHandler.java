@@ -318,7 +318,7 @@ public class PluginHandler {
 			// Try to find created class loader to share
 			CLoadersChains existingChains = cLoaders.get(classLocURL);
 			if (existingChains == null) {
-				existingChains = new CLoadersChains(createClassLoader(new URL[] {classLocURL}, servicesCLoader, plgInstance.getName()));
+				existingChains = new CLoadersChains(createClassLoader(new URL[] {classLocURL}, servicesCLoader));
 				cLoaders.put(classLocURL, existingChains);
 			}
 			
@@ -328,7 +328,7 @@ public class PluginHandler {
 				if (tmpFinalCLoader == null) {
 					if (sharedLibsURLs != null)
 						// MAIN <- SVCS <- PLG <- SHD
-						tmpFinalCLoader = createClassLoader(sharedLibsURLs, existingChains.classpathCLoader, plgInstance.getName());
+						tmpFinalCLoader = createClassLoader(sharedLibsURLs, existingChains.classpathCLoader);
 					else
 						// MAIN <- SVCS <- PLG
 						tmpFinalCLoader = existingChains.classpathCLoader;
@@ -340,10 +340,10 @@ public class PluginHandler {
 				if (tmpFinalCLoader == null) {
 					// MAIN <- SVCS <- PLG <- LIBS
 					URL[] libsURLS = plgInstance.libsrariesURLSet.toArray(new URL[plgInstance.libsrariesURLSet.size()]);
-					tmpFinalCLoader = createClassLoader(libsURLS, existingChains.classpathCLoader, plgInstance.getName());
+					tmpFinalCLoader = createClassLoader(libsURLS, existingChains.classpathCLoader);
 					if (sharedLibsURLs != null)
 						// MAIN <- SVCS <- PLG <- LIBS <- SHD
-						tmpFinalCLoader = createClassLoader(sharedLibsURLs, tmpFinalCLoader, plgInstance.getName());
+						tmpFinalCLoader = createClassLoader(sharedLibsURLs, tmpFinalCLoader);
 					existingChains.libsCLoaders.put(plgInstance.libsrariesURLSet, tmpFinalCLoader);
 				} else
 					log.debug("Plugin '"+plgInstance.getName()+"' shares already created ClassLoader "+tmpFinalCLoader);
@@ -359,15 +359,14 @@ public class PluginHandler {
 		}
 	}
 	
-	private URLClassLoader createClassLoader(URL[] urls, ClassLoader parent, String pluginName) {
+	private URLClassLoader createClassLoader(URL[] urls, ClassLoader parent) {
 		URLClassLoader retVal = null;
 		if (parent != null)
 			retVal = URLClassLoader.newInstance(urls,parent);
 		else
 			retVal = URLClassLoader.newInstance(urls);
 		log.debug("Creating new ClassLoader "+retVal+" with URLs set to "+Arrays.toString(retVal.getURLs())
-				+" with parent ClassLoader set to "+retVal.getParent()+ " for potential use by plugin '"
-				+pluginName+"'");
+				+" with parent ClassLoader set to "+retVal.getParent());
 		return retVal;
 	}
 	
@@ -528,20 +527,13 @@ public class PluginHandler {
 					}
 					if (supportsReconfigure) {
 						log.debug("Loaded plugin '"+loadedPlugin+"' supports reconfiguring with new properties at it's current state");
-						Class<?> newClazz = null;
-						try {
-							newClazz = loadClass(newPlgInstance.plgConfig.className, newPlgInstance.classLoader);
-						} catch (ClassNotFoundException e) {
-							log.info("Plugin '"+newPlgInstance.plgConfig.name+"' | plugin class '"+newPlgInstance.plgConfig.className+"' not found at '"+
-									tryGetCanonicalFile(new File(pluginRepositoryDir,newPlgInstance.plgConfig.classLocation)).getPath()+"'", e);
-						}
-						Class<?> oldClass = loadedPlugin.getClass();
-						String newClassChecksum = null;
+						Class<?> newClazz = getClass(newPlgInstance);
 						if (newClazz != null) {
-							newClassChecksum = checksums4ldClassMap.get(newClazz);
+							Class<?> oldClass = loadedPlugin.getClass();
+							String newClassChecksum = checksums4ldClassMap.get(newClazz);
 							if (oldClass == newClazz || checksums4ldClassMap.get(oldClass).equals(newClassChecksum)) {
 								log.debug("Seems like class '"+newClazz.getName()+"' hasn't changed, so we try to keep already loaded plugin '"+loadedPlugin+"'");
-								if (startPlugin(loadedPlugin, newPlgInstance.properties)) {
+								if (startPlugin(loadedPlugin, newPlgInstance.properties, true)) {
 									if (newClazz != oldClass)
 										checksums4ldClassMap.remove(newClazz);
 									newPlgInstance.instance = loadedPlugin;
@@ -574,10 +566,14 @@ public class PluginHandler {
 		pluginInstances.clear();
 		pluginInstances.addAll(newPlgInstances);
 		
-		// now load / start plugins
-		for (PluginInstance pluginInstance : pluginInstances) {
-			if (pluginInstance.instance == null) {
-				getPlugin(pluginInstance);
+		// now load / start plugins that weren't preserved
+		for (Iterator<PluginInstance> iter = pluginInstances.iterator(); iter.hasNext();) {
+			PluginInstance plgInstance = iter.next();
+			if (plgInstance.instance == null) {
+				if (getPlugin(plgInstance) == null) {
+					iter.remove();
+					log.warn("Plugin '"+plgInstance.getName()+"' was not loaded");
+				}
 			}
 		}
 	}
@@ -619,8 +615,8 @@ public class PluginHandler {
 		return urls.equals(getCLoaderURLSet((URLClassLoader)cLoader));
 	}*/
 	
-	private boolean startPlugin(final ProxyPlugin plugin, final PluginProperties props) {
-		log.info("Starting plugin '"+plugin+"'");
+	private boolean startPlugin(final ProxyPlugin plugin, final PluginProperties props, boolean wasStarted) {
+		log.info(((wasStarted) ? "Res" : "S")+"tarting plugin '"+plugin+"'");
 		try {
 			return stats.executeProcess(new Callable<Boolean>() {
 				@Override
@@ -844,22 +840,25 @@ public class PluginHandler {
 		try {
 			instance = clazz.newInstance();
 		} catch (InstantiationException e) {
-			log.info("Unable to create an instance of the class '"+clazz.getName()+"'",e);
+			log.warn("Unable to create an instance of the class '"+clazz.getName()+"'",e);
 		} catch (IllegalAccessException e) {
-			log.info("Instantiation with zero arguments constructor forbidden for class '"+clazz.getName()+"'",e);
+			log.warn("Instantiation with zero arguments constructor forbidden for class '"+clazz.getName()+"'",e);
 		} catch (Throwable t) {
-			log.info("Throwable raised while instantiation of the class '"+clazz.getName()+"'",t);
+			log.warn("Throwable raised on instantiation of the class '"+clazz.getName()+"'",t);
 		}
 		return instance;
 	}
 	
 	private Class<? extends ProxyPlugin> getClass(PluginInstance plgInstance) {
+		if (plgInstance.classLoader == null)
+			return null;
 		Class<?> clazz = null;
 		try {
 			clazz = loadClass(plgInstance.plgConfig.className, plgInstance.classLoader);
 		} catch (ClassNotFoundException e) {
-			log.info("Plugin '"+plgInstance.plgConfig.name+"' | plugin class '"+plgInstance.plgConfig.className+"' not found at '"+
+			log.warn("Plugin '"+plgInstance.getName()+"' | plugin class '"+plgInstance.plgConfig.className+"' not found at '"+
 					tryGetCanonicalFile(new File(pluginRepositoryDir,plgInstance.plgConfig.classLocation)).getPath()+"'");
+			plgInstance.classLoader = null;
 			return null;
 		}
 		if (!ProxyPlugin.class.isAssignableFrom(clazz)) {
@@ -897,7 +896,7 @@ public class PluginHandler {
 		try {
 			File classFile = getClassFile(clazz);
 			checksums4ldClassMap.put(clazz, ChecksumUtils.createHexChecksum(classFile,null));
-			log.debug("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.getPath());
+			log.trace("File from which the class '"+clazz.getSimpleName()+"' was loaded by class loader "+clazz.getClassLoader()+" is "+classFile.getPath());
 			if (clazz.getClassLoader() == ClassLoader.getSystemClassLoader())
 				log.warn("Watch out, class '"+clazz.getSimpleName()+"' is loaded by root class loader so only classes accessible from classpath will be visible" +
 						" to the plugin, " + "and the proxy server won't be able to reload it on the fly if it changes");
@@ -913,7 +912,7 @@ public class PluginHandler {
 		if (clazz != null) {
 			plugin = getInstance(clazz);
 			if (plugin != null) {
-				if (startPlugin(plugin,plgInstance.properties)) {
+				if (startPlugin(plugin,plgInstance.properties, false)) {
 					plgInstance.instance = plugin;
 				} else {
 					log.debug("Plugin of class '"+plgInstance.plgConfig.className+"' is not set up properly, it is thrown away");
