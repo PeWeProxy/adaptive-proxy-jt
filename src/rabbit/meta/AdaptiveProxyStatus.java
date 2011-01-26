@@ -23,6 +23,10 @@ import sk.fiit.peweproxy.plugins.processing.ResponseProcessingPlugin;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.peweproxy.services.ProxyService;
+import sk.fiit.peweproxy.utils.Statistics;
+import sk.fiit.peweproxy.utils.Statistics.PluginStats;
+import sk.fiit.peweproxy.utils.Statistics.ProcessStats;
+import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
 public class AdaptiveProxyStatus extends BaseMetaHandler {
 	AdaptiveEngine adaptiveEngine = null;
@@ -62,14 +66,34 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		return PageCompletion.PAGE_DONE;
 	}
 	
+	private String formatStats(ProcessStats stats) {
+		if (stats == null)
+			return "-";
+		StringBuilder sb = new StringBuilder();
+		sb.append("avg.: ");
+		sb.append(Math.round(stats.getAverage()));
+		sb.append("<br><span style=\"font-size:10px\"># ");
+		sb.append(stats.getCount());
+		sb.append(", &lt;");
+		sb.append(stats.getMin());
+		sb.append(",");
+		sb.append(stats.getMax());
+		sb.append("&gt;</span>");
+		return sb.toString();
+	}
+	
 	private void addPluginsPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Loaded proxy plugins</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"20%\">Plugin name</th>");
-		sb.append ("<th width=\"60%\">Plugin class</th>");
-		sb.append ("<th width=\"20%\">Plugin types</th>\n");
+		sb.append ("<th rowspan=2 width=\"20%\">Plugin name</th>");
+		sb.append ("<th rowspan=2 width=\"40%\">Plugin class</th>");
+		sb.append ("<th rowspan=2 width=\"20%\">Plugin types</th>\n");
+		sb.append ("<th colspan=2 width=\"20%\">Times</th></tr>\n");
+		sb.append (HtmlPage.getTableTopicRow ());
+		sb.append ("<th width=\"10%\">start()</th><th width=\"10%\">stop()</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
+			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>");
@@ -79,6 +103,10 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 				sb.append(pluginType.getSimpleName());
 				sb.append("<br>\n");
 			}
+			sb.append("</td><td align=\"center\">");
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_START)));
+			sb.append("</td><td align=\"center\">");
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_STOP)));
 			sb.append ("</td></tr>\n");
 		}
 		sb.append ("</table>\n<br>\n");
@@ -105,7 +133,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"20%\">Plugin name</th>");
 		sb.append ("<th width=\"70%\">Provided services</th>\n");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
-		sb.append ("<th width=\"5%\">RP</th>\n");
+		sb.append ("<th width=\"5%\">RP</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
@@ -147,7 +175,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append (HtmlPage.getTableTopicRow ());
 		sb.append ("<th width=\"90%\">Plugin name</th>");
 		sb.append ("<th width=\"5%\">RQ</th>\n");
-		sb.append ("<th width=\"5%\">RP</th>\n");
+		sb.append ("<th width=\"5%\">RP</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
@@ -173,7 +201,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<th width=\"70%\">Plugin name</th>");
 		sb.append ("<th width=\"10%\">Connection</th>\n");
 		sb.append ("<th width=\"10%\">Timeout</th>\n");
-		sb.append ("<th width=\"10%\">Failure</th>\n");
+		sb.append ("<th width=\"10%\">Failure</th></tr>\n");
 		synchronized (pluginHandler) {
 			for (PluginInstance plgInstance : plugins) {
 				sb.append ("<tr><td>");
