@@ -111,7 +111,7 @@ public class Statistics {
 			return plgInstance;
 		}
 		
-		ProcessStats getProcessStats(ProcessType type) {
+		public ProcessStats getProcessStats(ProcessType type) {
 			return processStats.get(type);
 		}
 	}
@@ -202,7 +202,7 @@ public class Statistics {
 		processStats.processExecuted((int)executionTime);
 	}*/
 	
-	PluginStats getPluginsStatistics(ProxyPlugin plugin) {
+	public PluginStats getPluginsStatistics(ProxyPlugin plugin) {
 		return statsForPlugins.get(plugin);
 	}
 }

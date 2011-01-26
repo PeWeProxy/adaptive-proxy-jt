@@ -499,7 +499,8 @@ public class PluginHandler {
 				if (sharedLibsDirSame) {
 					// try to find matching newPlgInstance
 					for (PluginInstance plgInstance : newPlgInstances) {
-						if (plgInstance.plgConfig.className.equals(oldplgInstance.plgConfig.className) &&
+						if (plgInstance.getName().equals(oldplgInstance.getName()) &&
+								plgInstance.plgConfig.className.equals(oldplgInstance.plgConfig.className) &&
 								plgInstance.plgConfig.classLocation.equals(oldplgInstance.plgConfig.classLocation)) {
 							newPlgInstance = plgInstance;
 							break;
