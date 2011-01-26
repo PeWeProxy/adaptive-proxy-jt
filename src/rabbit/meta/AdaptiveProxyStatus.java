@@ -1,8 +1,10 @@
 package rabbit.meta;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 
 import rabbit.http.HttpHeader;
 import rabbit.proxy.Connection;
@@ -12,6 +14,7 @@ import rabbit.util.TrafficLogger;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.plugins.PluginHandler;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
+import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.events.ConnectionEventPlugin;
 import sk.fiit.peweproxy.plugins.events.FailureEventPlugin;
 import sk.fiit.peweproxy.plugins.events.TimeoutEventPlugin;
@@ -39,6 +42,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 	}
 
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	protected PageCompletion addPageInformation(StringBuilder sb) {
 		List<PluginInstance> plugins = pluginHandler.getAllPlugins();
@@ -51,9 +55,9 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append("\" method=\"get\">\n<input type=\"submit\" value=\"Reload plugins\"/>\n</form><br>\n");
 		sb.append("</td>\n</tr>\n</table>");
 
-		addModulesPart(plugins,sb);
-		addProcessingPluginsPart(plugins,sb);
-		addEventPluginsPart(plugins,sb);
+		addProcessingPluginsPart(filterPlugins(plugins, RequestProcessingPlugin.class,ResponseProcessingPlugin.class),sb);
+		addModulesPart(filterPlugins(plugins, RequestServiceModule.class,ResponseServiceModule.class),sb);
+		addEventPluginsPart(filterPlugins(plugins, ConnectionEventPlugin.class,FailureEventPlugin.class,TimeoutEventPlugin.class),sb);
 		addLogPart(sb);
 		return PageCompletion.PAGE_DONE;
 	}
@@ -80,6 +84,20 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("</table>\n<br>\n");
 	}
 	
+	private List<PluginInstance> filterPlugins(List<PluginInstance> list, Class<? extends ProxyPlugin> ... types) {
+		List<PluginInstance> retVal = new LinkedList<PluginInstance>();
+		for (PluginInstance plgInstance : list) {
+			Set<Class<? extends ProxyPlugin>> plgTypes = plgInstance.getTypes();
+			for (Class<? extends ProxyPlugin> plgType : types) {
+				if (plgTypes.contains(plgType)) {
+					retVal.add(plgInstance);
+					break;
+				}
+			}
+		}
+		return retVal;
+	}
+	
 	private void addModulesPart(List<PluginInstance> plugins, StringBuilder sb) {
 		sb.append ("<p><h2>Service modules summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
@@ -92,9 +110,9 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>\n");
+			sb.append ("<b>Services for requests:</b><br>\n");
 			boolean rq = (plgInstance.getTypes().contains(RequestServiceModule.class));
 			boolean rp = (plgInstance.getTypes().contains(ResponseServiceModule.class));
-			sb.append ("<b>Services for requests:</b><br>\n");
 			if (rq) {
 				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedRequestServices((RequestServiceModule)plgInstance.getInstance())) {
 					sb.append(svcClass.getName());
@@ -134,12 +152,12 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (plgInstance.getTypes().contains(RequestProcessingPlugin.class.getSimpleName()))
+			if (plgInstance.getTypes().contains(RequestProcessingPlugin.class))
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");
 			sb.append ("</td>\n<td align=\"center\">\n");
-			if (plgInstance.getTypes().contains(ResponseProcessingPlugin.class.getSimpleName()))
+			if (plgInstance.getTypes().contains(ResponseProcessingPlugin.class))
 				sb.append ("<b>X</b>");
 			else
 				sb.append ("&nbsp");
