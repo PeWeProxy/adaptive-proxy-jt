@@ -8,6 +8,7 @@ import sk.fiit.peweproxy.headers.ResponseHeader;
 import sk.fiit.peweproxy.headers.WritableRequestHeader;
 import sk.fiit.peweproxy.headers.WritableResponseHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
+import sk.fiit.peweproxy.messages.HttpMessage;
 import sk.fiit.peweproxy.messages.HttpRequest;
 import sk.fiit.peweproxy.messages.HttpResponse;
 
@@ -36,7 +37,7 @@ public aspect MessageAccessAspect {
 	*/
 	
 	pointcut readableHeaderMethods() : execution(* (RequestHeader || ResponseHeader).*(..));
-	pointcut writableHeaderMethods() : execution(* (WritableRequestHeader|| WritableResponseHeader) .*(..));
+	pointcut writableHeaderMethods() : execution(* (WritableRequestHeader || WritableResponseHeader) .*(..));
 	pointcut inRequestProcessing() : cflow(execution(* AdaptiveEngine.doRequestProcessing(*,boolean)));
 	pointcut inResponseProcessing() : cflow(execution(* AdaptiveEngine.doResponseProcessing(*,boolean)));
 	pointcut inMessageProcessing() : inRequestProcessing() || inResponseProcessing();
@@ -67,7 +68,7 @@ public aspect MessageAccessAspect {
 	
 	@SuppressWarnings("unchecked")
 	pointcut messageMethod(HttpMessageImpl message)
-		: execution(* (HttpRequest || HttpResponse).*(..)) && this(message);
+		: execution(* (HttpMessage || HttpRequest || HttpResponse).*(..)) && this(message);
 	
 	@SuppressWarnings("unchecked")
 	before(ServicesHandleBase svcHandle) : servicesHandleMethod(svcHandle) {

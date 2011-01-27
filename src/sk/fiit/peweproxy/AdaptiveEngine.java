@@ -34,6 +34,8 @@ import rabbit.httpio.request.DirectContentSource;
 import rabbit.httpio.request.PrefetchedContentSource;
 import rabbit.io.BufferHandle;
 import org.khelekore.rnio.impl.DefaultTaskIdentifier;
+import org.xbill.DNS.RPRecord;
+
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
 import rabbit.proxy.TrafficLoggerHandler;
@@ -409,6 +411,7 @@ public class AdaptiveEngine  {
 						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during processing");
 					continue;
 				}
+				log.trace("RQ: "+conHandle+" | Processing request with "+rqPlgInstance);
 				try {
 					final RequestProcessingPlugin plugin = rqPlgInstance.plugin;
 					if (lateProcessing) {
@@ -457,7 +460,7 @@ public class AdaptiveEngine  {
 								public HttpResponse call() throws Exception {
 									return plugin.getResponse(conHandle.request, conHandle.messageFactory);
 								}
-							}, plugin, ProcessType.RESPONSE_CONSTRUCTION); 
+							}, plugin, ProcessType.REQUEST_CONSTRUCTION_REPONSE); 
 							if (newResponse == null)
 								log.warn("RQ: "+conHandle+" | Null HttpResponse was provided by "+rqPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
@@ -473,7 +476,7 @@ public class AdaptiveEngine  {
 						}
 					}
 				} catch (Throwable t) {
-					log.info("RQ: "+conHandle+" | Throwable raised while processing request by "+rqPlgInstance);
+					log.info("RQ: "+conHandle+" | Throwable raised while processing request by "+rqPlgInstance,t);
 					// TODO revert changes maybe ?
 				}
 			}
@@ -663,18 +666,19 @@ public class AdaptiveEngine  {
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.response,ResponseProcessingPlugin.class);
 		do {
 			again = false;
-			for (ProcessingPluginInstance<ResponseProcessingPlugin> responsePlgInstance : responsePlugins) {
-				if (pluginsChangedResponse.contains(responsePlgInstance)) {
+			for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPlgInstance : responsePlugins) {
+				if (pluginsChangedResponse.contains(rpPlgInstance)) {
 					if (log.isTraceEnabled())
-						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped since it already procesed the response and returned new one");
+						log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped since it already procesed the response and returned new one");
 					continue;
-				} if (blacklistedPlugins.contains(responsePlgInstance.plgInstance.getName())) {
+				} if (blacklistedPlugins.contains(rpPlgInstance.plgInstance.getName())) {
 					if (log.isTraceEnabled())
-						log.trace("RP: "+conHandle+" | Plugin "+responsePlgInstance+" skipped during processing");
+						log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped during processing");
 					continue;
 				}
+				log.trace("RP: "+conHandle+" | Processing response with plugin "+rpPlgInstance);
 				try {
-					final ResponseProcessingPlugin plugin = responsePlgInstance.plugin;
+					final ResponseProcessingPlugin plugin = rpPlgInstance.plugin;
 					if (lateProcessing) {
 						stats.executeProcess(new Runnable() {
 							@Override
@@ -698,7 +702,7 @@ public class AdaptiveEngine  {
 								}
 							}, plugin, ProcessType.RESPONSE_CONSTRUCTION); 
 							if (newResponse == null)
-								log.warn("RP: "+conHandle+" | Null HttpResponse was provided by "+responsePlgInstance+" after calling getNewResponse()," +
+								log.warn("RP: "+conHandle+" | Null HttpResponse was provided by "+rpPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
 							else {
 								// if FINAL_RESPONSE and same response was returned just to stop processing, we DO want to transfer original body
@@ -708,7 +712,7 @@ public class AdaptiveEngine  {
 									conHandle.response.setAllowedThread();
 								}
 								if (action == ResponseProcessingActions.NEW_RESPONSE) {
-									pluginsChangedResponse.add(responsePlgInstance);
+									pluginsChangedResponse.add(rpPlgInstance);
 									again = true;
 								}
 								break;
@@ -716,7 +720,7 @@ public class AdaptiveEngine  {
 						}
 					}
 				} catch (Throwable t) {
-					log.info("RP: "+conHandle+" | Throwable raised while processing response by "+responsePlgInstance,t);
+					log.info("RP: "+conHandle+" | Throwable raised while processing response by "+rpPlgInstance,t);
 					// TODO revert changes maybe ?
 				}
 			}
@@ -844,7 +848,7 @@ public class AdaptiveEngine  {
 			root.setLevel(lvl);
 			Logger.getLogger("org.apache").setLevel(Level.WARN);
 			log.setLevel(lvl);
-		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%22t] %-5p %-15c{1} %x - %m%n")));
+		    root.addAppender(new ConsoleAppender(new PatternLayout("%d{HH:mm:ss,SSS} [%22t] %-5p %-27c{1} %x - %m%n")));
 			//BasicConfigurator.configure();
 			log.info("No Log4j configuration file specified, using default configuration");
 		}
@@ -976,7 +980,6 @@ public class AdaptiveEngine  {
 		return true;
 	}
 	
-	@SuppressWarnings("unchecked")
 	private <T extends ProxyPlugin> boolean addPlugin(ProcessingPluginInstance<T> pluginInstance, List<ProcessingPluginInstance<T>> targetPluginsList,
 			List<ProcessingPluginInstance<T>> sourcePluginsList) {
 		if (pluginInstance == null)

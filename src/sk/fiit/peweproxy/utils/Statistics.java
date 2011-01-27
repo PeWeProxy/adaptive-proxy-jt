@@ -24,6 +24,7 @@ public class Statistics {
 		REQUEST_PROCESSING,
 		REQUEST_LATE_PROCESSING,
 		REQUEST_CONSTRUCTION,
+		REQUEST_CONSTRUCTION_REPONSE,
 		RESPONSE_PROCESSING,
 		RESPONSE_LATE_PROCESSING,
 		RESPONSE_CONSTRUCTION,
@@ -31,9 +32,10 @@ public class Statistics {
 		// services
 		REQUEST_PROVIDE_SERVICE,
 		REQUEST_SERVICE_COMMIT,
+		REQUEST_SERVICE_METHOD,
 		RESPONSE_PROVIDE_SERVICE,
 		RESPONSE_SERVICE_COMMIT,
-		SERVICE_METHOD,
+		RESPONSE_SERVICE_METHOD,
 		
 		
 		// events
@@ -166,7 +168,7 @@ public class Statistics {
 			plgStats.processStats.put(type, processStats);
 		}
 		processStats.processExecuted((int)time);
-		System.out.println(((plgStats.plgInstance == null) ? plugin : plgStats.plgInstance)+"\t"+type+"\t"+processStats);
+		//System.out.println(((plgStats.plgInstance == null) ? plugin : plgStats.plgInstance)+"\t"+type+"\t"+processStats);
 		return retVal;
 	}
 	

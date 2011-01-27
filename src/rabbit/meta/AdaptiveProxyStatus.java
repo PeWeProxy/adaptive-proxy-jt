@@ -66,9 +66,11 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 	}
 	
 	private String formatStats(ProcessStats stats) {
-		if (stats == null)
-			return "-";
-		StringBuilder sb = new StringBuilder();
+		StringBuilder sb = new StringBuilder("<td align=\"center\">");
+		if (stats == null) {
+			sb.append("-</td>");
+			return sb.toString();
+		}
 		sb.append(Math.round(stats.getAverage()));
 		sb.append(" ms<br><span style=\"font-size:10px\">");
 		sb.append(stats.getCount());
@@ -76,7 +78,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append(stats.getMin());
 		sb.append(", max ");
 		sb.append(stats.getMax());
-		sb.append("</span>");
+		sb.append("</span></td>");
 		return sb.toString();
 	}
 	
@@ -84,10 +86,10 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append("<p><h2>Loaded proxy plugins</h2></p>\n");
 		sb.append(HtmlPage.getTableHeader (100, 1));
 		sb.append(HtmlPage.getTableTopicRow ());
-		sb.append("<th rowspan=2 width=\"20%\">Plugin name</th>");
-		sb.append("<th rowspan=2 width=\"49%\">Plugin class</th>");
-		sb.append("<th colspan=7 width=\"21%\">Plugin types</th>\n");
-		sb.append("<th colspan=2 width=\"10%\">Times</th></tr>\n");
+		sb.append("<th rowspan=\"2\" width=\"20%\">Plugin name</th>");
+		sb.append("<th rowspan=\"2\" width=\"49%\">Plugin class</th>");
+		sb.append("<th colspan=\"7\" width=\"21%\">Plugin types</th>\n");
+		sb.append("<th colspan=\"2\" width=\"10%\">Times</th></tr>\n");
 		sb.append(HtmlPage.getTableTopicRow ());
 		sb.append("<th width=\"3%\" title=\"");
 		sb.append(RequestProcessingPlugin.class.getSimpleName());
@@ -106,7 +108,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append("\">T</th><th width=\"3%\" title=\"");
 		sb.append(FailureEventPlugin.class.getSimpleName());
 		sb.append("\">F</th>");
-		sb.append("<th width=\"5%\">start()</th><th width=\"5%\">stop()</th></tr>\n");
+		sb.append("<th width=\"5%\" title=\"calls to start()\">start()</th><th width=\"5%\" title=\"calls to start()\">stop()</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
 			sb.append ("<tr><td>");
@@ -121,17 +123,15 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			sb.append("</td>");
 			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
 			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
-			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
+			sb.append(addIsTypeCell(types, ResponseProcessingPlugin.class));
 			sb.append(addIsTypeCell(types, RequestServiceModule.class));
 			sb.append(addIsTypeCell(types, ResponseServiceModule.class));
 			sb.append(addIsTypeCell(types, ConnectionEventPlugin.class));
 			sb.append(addIsTypeCell(types, TimeoutEventPlugin.class));
 			sb.append(addIsTypeCell(types, FailureEventPlugin.class));
-			sb.append("<td align=\"center\">");
 			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_START)));
-			sb.append("</td><td align=\"center\">");
 			sb.append(formatStats(plgStats.getProcessStats(ProcessType.PLUGIN_STOP)));
-			sb.append ("</td></tr>\n");
+			sb.append ("</tr>\n");
 		}
 		sb.append ("</table>\n<br>\n");
 	}
@@ -161,16 +161,34 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<p><h2>Processing plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"90%\">Plugin name</th>");
-		sb.append ("<th width=\"5%\">RQ</th>\n");
-		sb.append ("<th width=\"5%\">RP</th></tr>\n");
+		sb.append ("<th rowspan=\"2\" width=\"55%\">Plugin name</th>");
+		sb.append ("<th colspan=\"5\" width=\"25%\">Requests processing times</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"20%\">Responses processing times</th></tr>\n");
+		sb.append (HtmlPage.getTableTopicRow ());
+		sb.append ("<th width=\"5%\" title=\"calls to desiredRequestServices()\">DS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to processRequest()\">RTP</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to processTransferedRequest(HttpRequest)()\">LTP</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to getNewRequest()\">GRQ</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to getResponse()\">GRP</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to desiredResponseServices()\">DS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to processResponse()\">RLP</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to processTransferedResponse()\">LTP</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to getNewResponse()\">GRP</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
-			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
-			sb.append(addIsTypeCell(types, RequestProcessingPlugin.class));
-			sb.append(addIsTypeCell(types, ResponseProcessingPlugin.class));
-			sb.append ("</tr>");
+			sb.append ("</td>");
+			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_DESIRED_SERVICES)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_PROCESSING)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_LATE_PROCESSING)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_CONSTRUCTION)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_CONSTRUCTION_REPONSE)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_DESIRED_SERVICES)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_PROCESSING)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_LATE_PROCESSING)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_CONSTRUCTION)));
+			sb.append ("</tr>\n");
 		}
 		sb.append ("</table>\n<br>\n");
 	}
@@ -179,36 +197,49 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<p><h2>Service modules summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"20%\">Plugin name</th>");
-		sb.append ("<th width=\"70%\">Provided services</th>\n");
-		sb.append ("<th width=\"5%\">RQ</th>\n");
-		sb.append ("<th width=\"5%\">RP</th></tr>\n");
+		sb.append ("<th rowspan=\"2\" width=\"20%\">Plugin name</th>");
+		sb.append ("<th rowspan=\"2\" width=\"40%\">Provided services</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"20%\">Requests processing times</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"20%\">Responses processing times</th></tr>\n");
+		sb.append (HtmlPage.getTableTopicRow ());
+		sb.append ("<th width=\"5%\" title=\"calls to desiredRequestServices()\">DS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to provideRequestService()\">PVS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to doChanges()\">DCH</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to service methods\">SM</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to desiredResponseServices()\">DS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to provideResponseService()\">PVS</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to doChanges()\">DCH</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to service methods\">SM</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
 			sb.append ("</td>\n<td>\n");
 			sb.append ("<b>Services for requests:</b><br>\n");
 			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
-			
-			boolean rq = (plgInstance.getTypes().contains(RequestServiceModule.class));
-			boolean rp = (plgInstance.getTypes().contains(ResponseServiceModule.class));
-			if (rq) {
+			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
+			if (types.contains(RequestServiceModule.class)) {
 				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedRequestServices((RequestServiceModule)plgInstance.getInstance())) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
 			}
 			sb.append ("<b>Services for responses:</b><br>\n");
-			if (rp) {
+			if (types.contains(ResponseServiceModule.class)) {
 				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedResponseServices((ResponseServiceModule)plgInstance.getInstance())) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
 			}
 			sb.append ("</td>\n");
-			sb.append(addIsTypeCell(types, RequestServiceModule.class));
-			sb.append(addIsTypeCell(types, ResponseServiceModule.class));
-			sb.append ("</tr>");
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_DESIRED_SERVICES)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_PROVIDE_SERVICE)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_SERVICE_COMMIT)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_SERVICE_METHOD)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_DESIRED_SERVICES)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_PROVIDE_SERVICE)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_SERVICE_COMMIT)));
+			sb.append(formatStats(plgStats.getProcessStats(ProcessType.RESPONSE_SERVICE_METHOD)));
+			sb.append ("</tr>\n");
 		}
 		sb.append ("</table>\n<br>\n");
 	}
@@ -217,22 +248,28 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<p><h2>Event plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"70%\">Plugin name</th>");
-		sb.append ("<th width=\"10%\">Connection</th>\n");
-		sb.append ("<th width=\"10%\">Timeout</th>\n");
-		sb.append ("<th width=\"10%\">Failure</th></tr>\n");
+		sb.append ("<th rowspan=\"2\" width=\"70%\">Plugin name</th>");
+		sb.append ("<th colspan=\"6\" width=\"30%\">Times</th>\n");
+		sb.append (HtmlPage.getTableTopicRow ());
+		sb.append ("<th width=\"5%\" title=\"calls to clientMadeConnection()\">C-M</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to clientClosedConnection() and proxyClosedConnection()\">C-C</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to requestReadTimeout() and responseReadTimeout()\">T-R</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to requestDeliveryTimeout() and responseDeliveryTimeout()\">T-D</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to requestReadFailed() and responseReadFailed()\">F-R</th>");
+		sb.append ("<th width=\"5%\" title=\"calls to requestDeliveryFailed() and responseDeliveryFailed()\">F-D</th></tr>\n");
 		synchronized (pluginHandler) {
 			for (PluginInstance plgInstance : plugins) {
 				sb.append ("<tr><td>");
 				sb.append(plgInstance.getName());
-				Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
-				sb.append ("</td>\n<td align=\"center\">\n");
-				sb.append(addIsTypeCell(types, ConnectionEventPlugin.class));
-				sb.append ("</td>\n<td align=\"center\">\n");
-				sb.append(addIsTypeCell(types, TimeoutEventPlugin.class));
-				sb.append ("</td>\n<td align=\"center\">\n");
-				sb.append(addIsTypeCell(types, FailureEventPlugin.class));
-				sb.append ("</td></tr>");
+				sb.append ("</td>\n");
+				PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.CONNECTION_CREATE)));
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.CONNECTION_CLOSED)));
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.READ_TIMEOUT)));
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.DELIVERY_TIMEOUT)));
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.READ_FAIL)));
+				sb.append(formatStats(plgStats.getProcessStats(ProcessType.DELIVERY_FAIL)));
+				sb.append ("</tr>\n");
 			}
 		}
 		sb.append ("</table>\n<br>\n");

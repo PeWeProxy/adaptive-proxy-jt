@@ -69,7 +69,12 @@ public class PluginsIntegrationManager {
 			} catch (ServiceUnavailableException ignored) {}
 			while (togglingSvc != null) {
 				try {
-					blacklist.addAll(togglingSvc.getPluginsBlacklist(pluginType));
+					Set<String> retBlacklist = togglingSvc.getPluginsBlacklist(pluginType);
+					if (retBlacklist != null && !retBlacklist.isEmpty()) {
+						log.trace(togglingSvc+" returned blacklist "+retBlacklist);
+						blacklist.addAll(retBlacklist);
+					} else
+						log.trace(togglingSvc+" returned no blacklist");
 				} catch (ServiceUnavailableException e) {
 					log.warn(PluginsTogglingService.class.getSimpleName()+" realization threw exception" +
 							"on calling getPluginsBlacklist() right after being provided", e);
@@ -88,15 +93,19 @@ public class PluginsIntegrationManager {
 	
 	
 	public void setPluginEnabled(HttpMessageImpl<?> message, String pluginName, Class<? extends ProxyPlugin> pluginType, boolean enabled) {
-		if (!togglingEnabled || message.userIdentification() == null)
+		String userId = message.userIdentification();
+		if (!togglingEnabled || userId == null)
 			return;
 		if (pluginType == null)
 			throw new IllegalArgumentException("Plugin type can not be null");
 		Set<String> blacklist = getBlackList(message, pluginType);
-		if (enabled)
+		if (enabled) {
+			log.trace("Removing '"+pluginName+"' from blacklist of "+pluginType.getSimpleName()+" for user '"+userId+"'");
 			blacklist.remove(pluginName);
-		else
+		} else {
+			log.trace("Adding '"+pluginName+"' to blacklist of "+pluginType.getSimpleName()+" for user '"+userId+"'");
 			blacklist.add(pluginName);
+		}
 	}
 	
 	public void pluginsReloaded() {
