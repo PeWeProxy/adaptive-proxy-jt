@@ -27,6 +27,11 @@ public class HttpResponseImpl extends HttpMessageImpl<ResponseServiceHandleImpl>
 	
 	@Override
 	public HttpResponse getOriginalResponse() {
+		return originalMessage();
+	}
+	
+	@Override
+	public HttpResponseImpl originalMessage() {
 		// this class is for representations of original responses, let them
 		// point to self when asked for original message
 		return this;

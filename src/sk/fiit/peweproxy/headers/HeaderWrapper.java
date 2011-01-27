@@ -115,6 +115,10 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	
 	@Override
 	public String getDestionation() {
+		return getDestionationInternal();
+	}
+	
+	private String getDestionationInternal() {
 		String reqURI = backedHeader.getRequestURI();
 		String host = backedHeader.getHeader("Host");
 		if (reqURI.charAt(0) == '/') {
@@ -272,6 +276,15 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	@Override
 	public int size() {
 		return backedHeader.size();
+	}
+	
+	public String getFullRequestLine() {
+		StringBuilder sb = new StringBuilder(getMethod());
+		sb.append(' ');
+		sb.append(getDestionationInternal());
+		sb.append(' ');
+		sb.append(getHTTPVersionInternal());
+		return sb.toString();
 	}
 	
 	@Override

@@ -36,6 +36,7 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.utils.ChecksumUtils;
 import sk.fiit.peweproxy.utils.Statistics;
 import sk.fiit.peweproxy.utils.Statistics.ProcessType;
@@ -623,7 +624,7 @@ public class PluginHandler {
 				public Boolean call() throws Exception {
 					return plugin.start(props);
 				}
-			}, plugin, ProcessType.PLUGIN_START).booleanValue();
+			}, plugin, ProcessType.PLUGIN_START, (HttpMessageImpl<?>) null).booleanValue();
 		} catch (Throwable t) {
 			log.info("Throwable raised while seting up and starting plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);
 		}
@@ -638,7 +639,7 @@ public class PluginHandler {
 				public void run() {
 					plugin.stop();
 				}
-			}, plugin, ProcessType.PLUGIN_STOP);
+			}, plugin, ProcessType.PLUGIN_STOP, null);
 			return true;
 		} catch (Throwable t) {
 			log.info("Throwable raised while stoping plugin '"+plugin+"' of class '"+plugin.getClass()+"'",t);

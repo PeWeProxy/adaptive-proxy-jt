@@ -87,9 +87,9 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append(HtmlPage.getTableHeader (100, 1));
 		sb.append(HtmlPage.getTableTopicRow ());
 		sb.append("<th rowspan=\"2\" width=\"20%\">Plugin name</th>");
-		sb.append("<th rowspan=\"2\" width=\"49%\">Plugin class</th>");
+		sb.append("<th rowspan=\"2\" width=\"45%\">Plugin class</th>");
 		sb.append("<th colspan=\"7\" width=\"21%\">Plugin types</th>\n");
-		sb.append("<th colspan=\"2\" width=\"10%\">Times</th></tr>\n");
+		sb.append("<th colspan=\"2\" width=\"14%\">Times</th></tr>\n");
 		sb.append(HtmlPage.getTableTopicRow ());
 		sb.append("<th width=\"3%\" title=\"");
 		sb.append(RequestProcessingPlugin.class.getSimpleName());
@@ -108,7 +108,7 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append("\">T</th><th width=\"3%\" title=\"");
 		sb.append(FailureEventPlugin.class.getSimpleName());
 		sb.append("\">F</th>");
-		sb.append("<th width=\"5%\" title=\"calls to start()\">start()</th><th width=\"5%\" title=\"calls to start()\">stop()</th></tr>\n");
+		sb.append("<th width=\"7%\" title=\"calls to start()\">start()</th><th width=\"7%\" title=\"calls to start()\">stop()</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
 			sb.append ("<tr><td>");
@@ -161,19 +161,19 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<p><h2>Processing plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th rowspan=\"2\" width=\"55%\">Plugin name</th>");
-		sb.append ("<th colspan=\"5\" width=\"25%\">Requests processing times</th>\n");
-		sb.append ("<th colspan=\"4\" width=\"20%\">Responses processing times</th></tr>\n");
+		sb.append ("<th rowspan=\"2\" width=\"37%\">Plugin name</th>");
+		sb.append ("<th colspan=\"5\" width=\"35%\">Requests processing times</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"28%\">Responses processing times</th></tr>\n");
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"5%\" title=\"calls to desiredRequestServices()\">DS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to processRequest()\">RTP</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to processTransferedRequest(HttpRequest)()\">LTP</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to getNewRequest()\">GRQ</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to getResponse()\">GRP</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to desiredResponseServices()\">DS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to processResponse()\">RLP</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to processTransferedResponse()\">LTP</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to getNewResponse()\">GRP</th></tr>\n");
+		sb.append ("<th width=\"7%\" title=\"calls to desiredRequestServices()\">DS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to processRequest()\">RTP</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to processTransferedRequest(HttpRequest)()\">LTP</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to getNewRequest()\">GRQ</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to getResponse()\">GRP</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to desiredResponseServices()\">DS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to processResponse()\">RLP</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to processTransferedResponse()\">LTP</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to getNewResponse()\">GRP</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
@@ -198,18 +198,18 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
 		sb.append ("<th rowspan=\"2\" width=\"20%\">Plugin name</th>");
-		sb.append ("<th rowspan=\"2\" width=\"40%\">Provided services</th>\n");
-		sb.append ("<th colspan=\"4\" width=\"20%\">Requests processing times</th>\n");
-		sb.append ("<th colspan=\"4\" width=\"20%\">Responses processing times</th></tr>\n");
+		sb.append ("<th rowspan=\"2\" width=\"24%\">Provided services</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"28%\">Requests processing times</th>\n");
+		sb.append ("<th colspan=\"4\" width=\"28%\">Responses processing times</th></tr>\n");
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"5%\" title=\"calls to desiredRequestServices()\">DS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to provideRequestService()\">PVS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to doChanges()\">DCH</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to service methods\">SM</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to desiredResponseServices()\">DS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to provideResponseService()\">PVS</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to doChanges()\">DCH</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to service methods\">SM</th></tr>\n");
+		sb.append ("<th width=\"7%\" title=\"calls to desiredRequestServices()\">DS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to provideRequestService()\">PVS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to doChanges()\">DCH</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to service methods\">SM</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to desiredResponseServices()\">DS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to provideResponseService()\">PVS</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to doChanges()\">DCH</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to service methods\">SM</th></tr>\n");
 		for (PluginInstance plgInstance : plugins) {
 			sb.append ("<tr><td>");
 			sb.append(plgInstance.getName());
@@ -218,17 +218,27 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 			Set<Class< ? extends ProxyPlugin>> types = plgInstance.getTypes();
 			PluginStats plgStats = adaptiveEngine.getStatistics().getPluginsStatistics(plgInstance.getInstance());
 			if (types.contains(RequestServiceModule.class)) {
-				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedRequestServices((RequestServiceModule)plgInstance.getInstance())) {
+				Set<Class<? extends ProxyService>> providedSvcs = adaptiveEngine.getModulesManager().getProvidedRequestServices((RequestServiceModule)plgInstance.getInstance());
+				if (providedSvcs == null || providedSvcs.isEmpty()) {
+					sb.append("-<br>\n");
+				} else for (Class<? extends ProxyService> svcClass : providedSvcs) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
+			} else {
+				sb.append("N/A<br>\n");
 			}
 			sb.append ("<b>Services for responses:</b><br>\n");
 			if (types.contains(ResponseServiceModule.class)) {
-				for (Class<? extends ProxyService> svcClass : adaptiveEngine.getModulesManager().getProvidedResponseServices((ResponseServiceModule)plgInstance.getInstance())) {
+				Set<Class<? extends ProxyService>> providedSvcs = adaptiveEngine.getModulesManager().getProvidedResponseServices((ResponseServiceModule)plgInstance.getInstance());
+				if (providedSvcs == null || providedSvcs.isEmpty()) {
+					sb.append("-<br>\n");
+				} else 	for (Class<? extends ProxyService> svcClass : providedSvcs) {
 					sb.append(svcClass.getName());
 					sb.append("<br>\n");
 				}
+			} else {
+				sb.append("N/A<br>\n");
 			}
 			sb.append ("</td>\n");
 			sb.append(formatStats(plgStats.getProcessStats(ProcessType.REQUEST_DESIRED_SERVICES)));
@@ -248,15 +258,15 @@ public class AdaptiveProxyStatus extends BaseMetaHandler {
 		sb.append ("<p><h2>Event plugins summary</h2></p>\n");
 		sb.append (HtmlPage.getTableHeader (100, 1));
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th rowspan=\"2\" width=\"70%\">Plugin name</th>");
-		sb.append ("<th colspan=\"6\" width=\"30%\">Times</th>\n");
+		sb.append ("<th rowspan=\"2\" width=\"58%\">Plugin name</th>");
+		sb.append ("<th colspan=\"6\" width=\"42%\">Times</th>\n");
 		sb.append (HtmlPage.getTableTopicRow ());
-		sb.append ("<th width=\"5%\" title=\"calls to clientMadeConnection()\">C-M</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to clientClosedConnection() and proxyClosedConnection()\">C-C</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to requestReadTimeout() and responseReadTimeout()\">T-R</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to requestDeliveryTimeout() and responseDeliveryTimeout()\">T-D</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to requestReadFailed() and responseReadFailed()\">F-R</th>");
-		sb.append ("<th width=\"5%\" title=\"calls to requestDeliveryFailed() and responseDeliveryFailed()\">F-D</th></tr>\n");
+		sb.append ("<th width=\"7%\" title=\"calls to clientMadeConnection()\">C-M</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to clientClosedConnection() and proxyClosedConnection()\">C-C</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to requestReadTimeout() and responseReadTimeout()\">T-R</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to requestDeliveryTimeout() and responseDeliveryTimeout()\">T-D</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to requestReadFailed() and responseReadFailed()\">F-R</th>");
+		sb.append ("<th width=\"7%\" title=\"calls to requestDeliveryFailed() and responseDeliveryFailed()\">F-D</th></tr>\n");
 		synchronized (pluginHandler) {
 			for (PluginInstance plgInstance : plugins) {
 				sb.append ("<tr><td>");

@@ -15,6 +15,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
@@ -43,6 +44,7 @@ import sk.fiit.peweproxy.services.content.StringContentService;
 import sk.fiit.peweproxy.services.platform.PlatformContextService;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
+import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
 public abstract class ServicesHandleBase<ModuleType extends ServiceModule> implements ServicesHandle {
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
@@ -521,7 +523,8 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		modifyingAttempt(binding,false);
 	}
 	
-	private <Service extends ProxyService> RealService<Service> createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) {
+	private <Service extends ProxyService> RealService<Service> createRealService(final ServiceProvider<Service> svcProvider, Class<Service> serviceClass) 
+		throws ServiceUnavailableException {
 		Service svc = null;
 		Throwable cause = null;
 		boolean modifyingInit = true;
@@ -563,33 +566,44 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		return moduleExecutingProvide != null;
 	}
 	
-	private <Service extends ProxyService> ServiceRealization<Service> getRealService(ModuleType module, Class<Service> serviceClass)
+	private <Service extends ProxyService> ServiceRealization<Service> getRealService(final ModuleType module, final Class<Service> serviceClass)
 			throws ServiceUnavailableException {
-		ServiceProvider<Service> svcProvider = null;
-		providingDiscoveryStart(module);
 		try {
-			svcProvider = callProvideService(module, serviceClass);
-		} catch (Throwable e) {
-			if (e instanceof ServiceUnavailableException)
-				throw (ServiceUnavailableException)e;
-			else {
-				log.info(getLogTextHead()+"Module "+module+" raised throwable when asked for provider for service "+serviceClass,e);
-				throw new ServiceUnavailableException(serviceClass, "Module failed at providing service provider", e);
-			}
-		} finally {
-			providingDiscoveryEnd(module);
+			return manager.getAdaptiveEngine().getStatistics().executeProcess(new Callable<ServiceRealization<Service>>() {
+				@Override
+				public ServiceRealization<Service> call() throws Exception {
+					ServiceProvider<Service> svcProvider = null;
+					providingDiscoveryStart(module);
+					try {
+						svcProvider = callProvideService(module, serviceClass);
+					} catch (Throwable e) {
+						if (e instanceof ServiceUnavailableException)
+							throw (ServiceUnavailableException)e;
+						else {
+							log.info(getLogTextHead()+"Module "+module+" raised throwable when asked for provider for service "+serviceClass,e);
+							throw new ServiceUnavailableException(serviceClass, "Module failed at providing service provider", e);
+						}
+					} finally {
+						providingDiscoveryEnd(module);
+					}
+					if (svcProvider == null)
+						throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
+					RealService<Service> svcImpl = createRealService(svcProvider, serviceClass);;
+					if (log.isTraceEnabled())
+						log.trace(getLogTextHead()+"Service provider "+svcProvider+" provided for service "+serviceClass.getName());
+					return new ServiceRealization<Service>(svcImpl, svcProvider, module);
+				}
+			}, module, serviceProvidingType(), httpMessage.originalMessage());
+		} catch (Throwable t) {
+			throw (ServiceUnavailableException)t;
 		}
-		if (svcProvider == null)
-			throw new ServiceUnavailableException(serviceClass, "Module returned no service provider", null);
-		RealService<Service> svcImpl = createRealService(svcProvider, serviceClass);
-		if (log.isTraceEnabled())
-			log.trace(getLogTextHead()+"Service provider "+svcProvider+" provided for service "+serviceClass.getName());
-		return new ServiceRealization<Service>(svcImpl, svcProvider, module);
 	}
 	
 	abstract <Service extends ProxyService> ServiceProvider<Service> callProvideService(ModuleType module, Class<Service> serviceClass);
 	
 	abstract <Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider);
+	
+	abstract ProcessType serviceProvidingType();
 	
 	@Override
 	public <Service extends ProxyService> Service getService(Class<Service> serviceClass)

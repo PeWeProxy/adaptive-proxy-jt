@@ -28,7 +28,7 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Response
 			public void run() {
 				plugin.desiredResponseServices(desiredServices,httpMessage.getHeader());
 			}
-		}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES);
+		}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES, httpMessage);
 	}
 	
 	@Override
@@ -50,5 +50,10 @@ public final class ResponseServiceHandleImpl extends ServicesHandleBase<Response
 	<Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider) {
 		// doChanges can be called only on modifiable message, so it's OK to crash if the cast fails
 		((ResponseServiceProvider<Service>) svcProvider).doChanges((ModifiableHttpResponseImpl)httpMessage);
+	}
+	
+	@Override
+	ProcessType serviceProvidingType() {
+		return ProcessType.RESPONSE_PROVIDE_SERVICE;
 	}
 }

@@ -69,6 +69,8 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return header;
 	}
 	
+	public abstract HttpMessageImpl<HandleType> originalMessage();
+	
 	public void setAllowedThread() {
 		checkThread = true;
 		Thread lastThread = allowedThread;

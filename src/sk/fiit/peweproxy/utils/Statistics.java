@@ -1,15 +1,20 @@
 package sk.fiit.peweproxy.utils;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
+import org.apache.log4j.Logger;
+
+import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
 import sk.fiit.peweproxy.plugins.PluginHandler;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 
 public class Statistics {
+	static final Logger log = Logger.getLogger(Statistics.class);
 	
 	public enum ProcessType {
 		// generic
@@ -142,20 +147,45 @@ public class Statistics {
 		}
 	}
 	
-	public void executeProcess(final Runnable task, ProxyPlugin plugin, ProcessType type) throws Throwable {
+	public void executeProcess(final Runnable task, ProxyPlugin plugin, ProcessType type, HttpMessageImpl<?> initMessage) throws Throwable {
 		executeProcess(new Callable<Object>() {
 			@Override
 			public Object call() throws Exception {
 				task.run();
 				return null;
 			}
-		},plugin, type);
+		}, plugin, type, initMessage);
 	}
 	
-	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type) throws Throwable {
+	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type, InetSocketAddress sockAddr) throws Throwable {
+		String text = "";
+		if (sockAddr != null) {
+			text = " related to message incoming from "+sockAddr;
+		}
+		return executeProcess(task, plugin, type, text);
+	}
+	
+	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type, HttpMessageImpl<?> initMessage) throws Throwable {
+		String text = "";
+		if (initMessage != null) {
+			text = " on "+initMessage.getHeader().getFullRequestLine()+" (userId: "+initMessage.userIdentification()+")";
+		}
+		return executeProcess(task, plugin, type, text);
+	}
+	
+	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type, String dgbString) throws Throwable {
 		long time = System.currentTimeMillis();
-		Type retVal = task.call();
-		time = System.currentTimeMillis() - time;
+		Type retVal = null;
+		try {
+			 retVal = task.call();
+			 time = System.currentTimeMillis() - time;
+		} catch (Throwable t) {
+			log.trace("Plugin "+plugin+" executing "+type+" process"+dgbString+" failed after "+time+" ms");
+			throw t;
+		}
+		if (log.isTraceEnabled()) {
+			log.trace("Plugin "+plugin+" executed "+type+" process"+dgbString+" in "+time+" ms");
+		}
 		PluginStats plgStats = statsForPlugins.get(plugin);
 		if (plgStats == null) {
 			plgStats = new PluginStats();

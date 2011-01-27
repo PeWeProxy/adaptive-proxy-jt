@@ -34,7 +34,6 @@ import rabbit.httpio.request.DirectContentSource;
 import rabbit.httpio.request.PrefetchedContentSource;
 import rabbit.io.BufferHandle;
 import org.khelekore.rnio.impl.DefaultTaskIdentifier;
-import org.xbill.DNS.RPRecord;
 
 import rabbit.proxy.Connection;
 import rabbit.proxy.HttpProxy;
@@ -246,7 +245,7 @@ public class AdaptiveEngine  {
 						public void run() {
 							plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
 						}
-					}, plugin, ProcessType.REQUEST_DESIRED_SERVICES);
+					}, plugin, ProcessType.REQUEST_DESIRED_SERVICES, conHandle.request.originalMessage());
 					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 						if (log.isDebugEnabled())
 							log.debug("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request");
@@ -330,7 +329,7 @@ public class AdaptiveEngine  {
 			tmpHandle = prevRequestHandles.remove(con);
 		}
 		final ConnectionHandle conHandle = tmpHandle;
-		conHandle.request.originalRequest().setData(requestContent);
+		conHandle.request.originalMessage().setData(requestContent);
 		if (!conHandle.rqLateProcessing)
 			conHandle.request.setData(requestContent);
 		if (log.isTraceEnabled()) {
@@ -420,21 +419,21 @@ public class AdaptiveEngine  {
 							public void run() {
 								plugin.processTransferedRequest(conHandle.request);
 							}
-						}, plugin, ProcessType.REQUEST_LATE_PROCESSING);
+						}, plugin, ProcessType.REQUEST_LATE_PROCESSING, conHandle.request.originalMessage());
 					} else {
 						RequestProcessingActions action = stats.executeProcess(new Callable<RequestProcessingActions>() {
 							@Override
 							public RequestProcessingActions call() throws Exception {
 								return plugin.processRequest(conHandle.request);
 							}
-						}, plugin, ProcessType.REQUEST_PROCESSING); 
+						}, plugin, ProcessType.REQUEST_PROCESSING, conHandle.request.originalMessage()); 
 						if (action == RequestProcessingActions.NEW_REQUEST || action == RequestProcessingActions.FINAL_REQUEST) {
 							HttpRequest newRequest = stats.executeProcess(new Callable<HttpRequest>() {
 								@Override
 								public HttpRequest call() throws Exception {
 									return plugin.getNewRequest(conHandle.request, conHandle.messageFactory);
 								}
-							}, plugin, ProcessType.REQUEST_CONSTRUCTION); 
+							}, plugin, ProcessType.REQUEST_CONSTRUCTION, conHandle.request.originalMessage()); 
 							if (newRequest == null)
 								log.warn("RQ: "+conHandle+" | Null HttpRequest was provided by "+rqPlgInstance+" after calling getNewRequest()," +
 											" substitution is being ignored.");
@@ -460,7 +459,7 @@ public class AdaptiveEngine  {
 								public HttpResponse call() throws Exception {
 									return plugin.getResponse(conHandle.request, conHandle.messageFactory);
 								}
-							}, plugin, ProcessType.REQUEST_CONSTRUCTION_REPONSE); 
+							}, plugin, ProcessType.REQUEST_CONSTRUCTION_REPONSE, conHandle.request.originalMessage()); 
 							if (newResponse == null)
 								log.warn("RQ: "+conHandle+" | Null HttpResponse was provided by "+rqPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
@@ -555,7 +554,7 @@ public class AdaptiveEngine  {
 					public void run() {
 						plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
 					}
-				}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES);
+				}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES, conHandle.response.originalMessage());
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
 						log.debug("RP: "+conHandle+" | Plugin "+rpPlgInstance+" wants content modifying service for response");
@@ -610,7 +609,7 @@ public class AdaptiveEngine  {
 	public void responseContentCached(Connection con, final byte[] responseContent, final AdaptiveHandler handler) {
 		final ConnectionHandle conHandle = requestHandles.get(con);
 		conHandle.response.setData(responseContent);
-		conHandle.response.originalResponse().setData(responseContent);
+		conHandle.response.originalMessage().setData(responseContent);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for real-time processing");
 		proxy.getNioHandler().runThreadTask(new Runnable() {
@@ -635,7 +634,7 @@ public class AdaptiveEngine  {
 			tmpHandle = prevRequestHandles.remove(con);
 		}
 		final ConnectionHandle conHandle = tmpHandle;
-		conHandle.response.originalResponse().setData(responseContent);
+		conHandle.response.originalMessage().setData(responseContent);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | "+responseContent.length+" bytes of response cached for late processing");
 		doResponseLateProcessing(conHandle);
@@ -685,7 +684,7 @@ public class AdaptiveEngine  {
 							public void run() {
 								plugin.processTransferedResponse(conHandle.response);
 							}
-						}, plugin, ProcessType.RESPONSE_LATE_PROCESSING);
+						}, plugin, ProcessType.RESPONSE_LATE_PROCESSING, conHandle.response.originalMessage());
 					} else {
 						ResponseProcessingActions action = stats.executeProcess(new Callable<ResponseProcessingActions>() {
 							@Override
@@ -693,14 +692,14 @@ public class AdaptiveEngine  {
 									throws Exception {
 								return plugin.processResponse(conHandle.response);
 							}
-						}, plugin, ProcessType.RESPONSE_PROCESSING);
+						}, plugin, ProcessType.RESPONSE_PROCESSING, conHandle.response.originalMessage());
 						if (action == ResponseProcessingActions.NEW_RESPONSE || action == ResponseProcessingActions.FINAL_RESPONSE) {
 							HttpResponse newResponse = stats.executeProcess(new Callable<HttpResponse>() {
 								@Override
 								public HttpResponse call() throws Exception {
 									return plugin.getNewResponse(conHandle.response, conHandle.messageFactory);
 								}
-							}, plugin, ProcessType.RESPONSE_CONSTRUCTION); 
+							}, plugin, ProcessType.RESPONSE_CONSTRUCTION, conHandle.response.originalMessage()); 
 							if (newResponse == null)
 								log.warn("RP: "+conHandle+" | Null HttpResponse was provided by "+rpPlgInstance+" after calling getNewResponse()," +
 											" substitution is being ignored.");
@@ -784,13 +783,13 @@ public class AdaptiveEngine  {
 	
 	private String requestProcessingTaskInfo(ConnectionHandle conHandle) {
 		return "Running plugins processing on request \""
-			+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getBackedHeader().getRequestLine()
+			+ ((HttpRequestImpl)conHandle.request.originalMessage()).getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseProcessingTaskInfo (ConnectionHandle conHandle) {
 		return "Running plugins processing on response \""
-			+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getBackedHeader().getStatusLine()
+			+ ((HttpResponseImpl)conHandle.response.originalMessage()).getHeader().getBackedHeader().getStatusLine()
 			+ "\" for request \"" + conHandle.request.getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}
@@ -798,14 +797,14 @@ public class AdaptiveEngine  {
 	private String requestSendingTaskInfo(ConnectionHandle conHandle) {
 		return "Proceeding in handling request \""
 			+ conHandle.request.getHeader().getBackedHeader().getRequestLine()
-			+ "\" (orig: \""+ ((HttpRequestImpl)conHandle.request.originalRequest()).getHeader().getBackedHeader().getRequestLine()
+			+ "\" (orig: \""+ ((HttpRequestImpl)conHandle.request.originalMessage()).getHeader().getBackedHeader().getRequestLine()
 			+ "\") from " + conHandle.request.clientSocketAddress();
 	}
 
 	private String responseSendingTaskInfo (ConnectionHandle conHandle) {
 		return "Proceeding in handling response \""
 			+ conHandle.response.getHeader().getBackedHeader().getStatusLine()
-			+ "\" (orig: \""+ ((HttpResponseImpl)conHandle.response.originalResponse()).getHeader().getBackedHeader().getStatusLine()
+			+ "\" (orig: \""+ ((HttpResponseImpl)conHandle.response.originalMessage()).getHeader().getBackedHeader().getStatusLine()
 			+ "\") for request \"" + conHandle.request.getHeader().getBackedHeader().getRequestLine()
 			+ "\" from " + conHandle.request.clientSocketAddress();
 	}

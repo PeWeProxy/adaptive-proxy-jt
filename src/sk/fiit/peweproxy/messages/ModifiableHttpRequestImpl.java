@@ -25,10 +25,10 @@ public final class ModifiableHttpRequestImpl extends HttpRequestImpl
 
 	@Override
 	public HttpRequest getOriginalRequest() {
-		return originalRequest;
+		return originalMessage();
 	}
 	
-	public HttpRequestImpl originalRequest() {
+	public HttpRequestImpl originalMessage() {
 		return originalRequest;
 	}
 	

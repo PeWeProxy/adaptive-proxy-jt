@@ -27,6 +27,11 @@ public class HttpRequestImpl extends HttpMessageImpl<RequestServiceHandleImpl>
 	
 	@Override
 	public HttpRequest getOriginalRequest() {
+		return originalMessage();
+	}
+	
+	@Override
+	public HttpRequestImpl originalMessage() {
 		// this class is for representations of original requests, let them
 		// point to self when asked for original message 
 		return this;

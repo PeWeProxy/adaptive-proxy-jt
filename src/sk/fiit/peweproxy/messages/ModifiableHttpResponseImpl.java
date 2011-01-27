@@ -30,10 +30,10 @@ public final class ModifiableHttpResponseImpl extends HttpResponseImpl
 	
 	@Override
 	public HttpResponse getOriginalResponse() {
-		return originalResponse;
+		return originalMessage();
 	}
 	
-	public HttpResponseImpl originalResponse() {
+	public HttpResponseImpl originalMessage() {
 		return originalResponse;
 	}
 	
