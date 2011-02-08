@@ -3,7 +3,6 @@ package rabbit.handler;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import rabbit.filter.HtmlFilterFactory;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ResourceSource;
@@ -11,7 +10,6 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import sk.fiit.peweproxy.utils.BytesChunker;
 import sk.fiit.peweproxy.utils.HeaderUtils;
 import sk.fiit.peweproxy.utils.InMemBytesStore;
 
@@ -23,7 +21,6 @@ public class AdaptiveHandler extends FilterHandler {
 	private boolean sendingPhase = false;
 	private InMemBytesStore memStore = null;
 	private ByteBuffer buffer = null;
-	private Queue<Integer> increments = null;
 	private boolean askForCaching = true;
 	private boolean doHTMLparsing = false;
 	
@@ -138,7 +135,6 @@ public class AdaptiveHandler extends FilterHandler {
 					response.setExistingValue("Content-Length",Long.toString(size, 10));
 				}
 			}*/
-			increments = BytesChunker.adjustBytesIncrements(memStore.getIncrements(), content.length);
 			buffer = ByteBuffer.wrap(content);
 			if (con.getChunking()) {
 				String contentEncoding = response.getHeader("Transfer-Encoding");
@@ -202,12 +198,9 @@ public class AdaptiveHandler extends FilterHandler {
 			if (buffer == null)
 				finishData();
 			else {
-				Integer increment = increments.poll();
-				if (increment != null) {
-					byte[] arr = new byte[increment.intValue()];
-					buffer.get(arr);
-					BufferHandle bufHandle = new SimpleBufferHandle(ByteBuffer.wrap(arr));
-					super.bufferRead(bufHandle);
+				int toRead = buffer.remaining();
+				if (buffer.hasRemaining()) {
+					super.bufferRead(new SimpleBufferHandle(InMemBytesStore.chunkBufferForSend(buffer)));
 				} else {
 					super.finishedRead();
 				}

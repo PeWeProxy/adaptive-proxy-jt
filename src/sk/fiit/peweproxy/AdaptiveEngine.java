@@ -10,7 +10,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -130,8 +129,8 @@ public class AdaptiveEngine  {
 		}
 		
 		@Override
-		public void dataCached(byte[] contentData, Queue<Integer> dataIncrements) {
-			requestContentCached(con, contentData, dataIncrements);
+		public void dataCached(byte[] contentData) {
+			requestContentCached(con, contentData);
 		}
 
 		@Override
@@ -323,7 +322,7 @@ public class AdaptiveEngine  {
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
 	}
 	
-	public void requestContentCached(final Connection con, final byte[] requestContent, final Queue<Integer> dataIncrements) {
+	public void requestContentCached(final Connection con, final byte[] requestContent) {
 		ConnectionHandle tmpHandle = requestHandles.get(con);
 		if (tmpHandle == null || tmpHandle.request == null) {
 			tmpHandle = prevRequestHandles.remove(con);
@@ -360,7 +359,7 @@ public class AdaptiveEngine  {
 						byte[] requestContent = conHandle.request.getData();
 						if (requestContent != null) {
 							boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
-							PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent,dataIncrements);
+							PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
 							resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 						}
 						proceedWithRequest(conHandle, resourceHandler);

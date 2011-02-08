@@ -2,21 +2,17 @@ package sk.fiit.peweproxy.utils;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
-import java.util.Queue;
 
 public class InMemBytesStore {
-	private static final int DEF_ARRAYSIZE = 4096;
+	public static final int DEF_ARRAYSIZE = 4096;
 	
 	private final ByteArrayOutputStream stream;
-	private final Queue<Integer> dataIncrements;
 	
 	public InMemBytesStore(long initSize) {
 		if (initSize < 1) {
 			initSize = DEF_ARRAYSIZE;
 		}
 		stream = new ByteArrayOutputStream((int)initSize);
-		dataIncrements = new LinkedList<Integer>();
 	}
 	
 	public void writeBuffer(ByteBuffer buffer) {
@@ -47,7 +43,6 @@ public class InMemBytesStore {
 	
 	public void writeArray(byte[] bytes, int offset, int len) {
 		stream.write(bytes,offset,len);
-		dataIncrements.add(new Integer(len));
 	}
 	
 	public byte[] getBytes() {
@@ -58,11 +53,20 @@ public class InMemBytesStore {
 		return stream.size();
 	}
 	
-	public Queue<Integer> getIncrements() {
-		Queue<Integer> retValue = new LinkedList<Integer>();
-		for (Integer integer : dataIncrements) {
-			retValue.add(integer);
-		}
-		return retValue;
+	public static ByteBuffer chunkBufferForSend(ByteBuffer buffer) {
+		int toRead = buffer.remaining();
+		if (toRead > 0) {
+			if (DEF_ARRAYSIZE < toRead) {
+				toRead = DEF_ARRAYSIZE;
+				int limit = buffer.limit();
+				buffer.limit(buffer.position()+toRead);
+				ByteBuffer retVal = buffer.slice();
+				buffer.position(buffer.limit());
+				buffer.limit(limit);
+				return retVal;
+			} else
+				return buffer;
+		} else
+			return null;
 	}
 }

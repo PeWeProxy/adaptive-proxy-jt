@@ -163,7 +163,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	
 	private ServiceProvider<ByteContentService> getByteService() {
 		readingAttempt(null);
-		if (httpMessage.hasBody())
+		if (httpMessage.bodyAccessible())
 			return new ByteServiceImpl(httpMessage);
 		else
 			throw new ServiceUnavailableException(ByteContentService.class, "The massage carries no data", null);
@@ -171,7 +171,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	
 	private ServiceProvider<ModifiableBytesService> getModByteServie()  {
 		readingAttempt(null);
-		if (httpMessage.hasBody())
+		if (httpMessage.bodyAccessible())
 			return new ModifiableByteServiceImpl(httpMessage);
 		else
 			throw new ServiceUnavailableException(ModifiableBytesService.class, "The massage carries no data", null);
@@ -179,7 +179,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	
 	private boolean hasTextutalContent () {
 		readingAttempt(null);
-		if (!httpMessage.hasBody())
+		if (!httpMessage.bodyAccessible())
 			return false;
 		return manager.matchesStringServicePattern(httpMessage.getHeader());
 	}
