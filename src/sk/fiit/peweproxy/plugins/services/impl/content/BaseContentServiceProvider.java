@@ -9,8 +9,8 @@ public abstract class BaseContentServiceProvider<Type, Service extends ProxyServ
 	protected final ServicesContentSource content;
 	
 	public BaseContentServiceProvider(ServicesContentSource content) {
-		if (content.getData() == null)
-			throw new IllegalStateException("No data in content");
+		/*if (content.getData() == null)
+			throw new IllegalStateException("No data in content");*/
 		this.content = content;
 	}
 }

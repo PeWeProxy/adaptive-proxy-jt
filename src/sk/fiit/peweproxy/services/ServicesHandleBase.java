@@ -151,7 +151,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 			throw new ServiceUnavailableException(ModifiableBytesService.class, "The massage carries no data", null);
 	}
 	
-	protected final boolean hasTextutalContent () {
+	protected boolean hasTextutalContent () {
 		readingAttempt(null);
 		if (!dataAccessible())
 			return false;
@@ -165,7 +165,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new StringServiceImpl(httpMessage.getHeader(), false, this);
+				return new StringServiceImpl(this);
 			} catch (CharacterCodingException e) {
 				excMessage = "Data of this message don't match it's charset";
 				cause = e;
@@ -187,7 +187,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new ModifiableStringServiceImpl(httpMessage.getHeader(), false, this);
+				return new ModifiableStringServiceImpl(this);
 			}  catch (UnsupportedCharsetException e) {
 				log.warn(getLogTextHead()+getLogTextCapital()
 						+" header denotes unsupported charset "+e.getCharsetName());
@@ -747,7 +747,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 			manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
 				@Override
 				public void run() {
-					callDoChanges(changedModelBinding.realization.provider);
+					callDoChanges(bindingDoingChanges.realization.provider);
 				}
 			}, changedModelBinding.realization.module, serviceCommitingType(), httpMessage);
 		} catch (Throwable t) {

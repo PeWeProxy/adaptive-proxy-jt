@@ -37,7 +37,7 @@ public class RequestChunkServiceHandleImpl extends ChunkServicesHandleImpl<Reque
 	@Override
 	<Service extends ProxyService> ServiceProvider<Service> callProvideService(RequestChunksServiceModule module,
 			Class<Service> serviceClass) {
-		return module.provideRequestChunkService((HttpRequest)httpMessage, this, remainsStore, serviceClass);
+		return module.provideRequestChunkService((HttpRequest)httpMessage, this, serviceClass, finalization);
 	}
 	
 	@Override

@@ -156,6 +156,7 @@ public class AdaptiveEngine  {
 		}
 		
 		void finishReadTask(byte[] data, AsyncChunkDataModifiedListener listener) {
+			conHandle.request.setChunkProcessed();
 			requestContentCached(conHandle);
 			listener.dataModified(data);
 		}
@@ -202,12 +203,12 @@ public class AdaptiveEngine  {
 					}
 				}, new DefaultTaskIdentifier(getClass().getSimpleName()+".responseChunkProcessingEnd", responseChunkProcessingTaskInfo(conHandle, 0)));
 				return; // don't call listener now
-				
 			}
 			finishReadTask(null, listener);
 		}
 		
 		void finishReadTask(byte[] data, AsyncChunkDataModifiedListener listener) {
+			conHandle.response.setChunkProcessed();
 			responseContentCached(conHandle,handler);
 			if (listener != null)
 				// we are finished caching for LT processing, send remaining chunk
@@ -461,10 +462,10 @@ public class AdaptiveEngine  {
 	}
 	
 	private byte[] doRequestChunkProcessing(final ConnectionHandle conHandle, byte[] data) {
-		if (data == null)
-			conHandle.request.setChunkProcessed();
+		conHandle.request.setAllowedThread();
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,RequestChunksProcessingPlugin.class);
 		final RequestChunkServiceHandleImpl svcHandle = new RequestChunkServiceHandleImpl(conHandle.request, modulesManager, data);
+		final boolean finalization = data == null;
 		for (ProcessingPluginInstance<RequestChunksProcessingPlugin> rqPlgInstance : requestChunksPlugins) {
 			if (blacklistedPlugins.contains(rqPlgInstance.plgInstance.getName())) {
 				if (log.isTraceEnabled())
@@ -476,14 +477,17 @@ public class AdaptiveEngine  {
 				stats.executeProcess(new Runnable() {
 					@Override
 					public void run() {
-						plugin.processRequestChunk(conHandle.request, svcHandle);
+						if (finalization)
+							plugin.finalizeProcessing(conHandle.request, svcHandle);
+						else
+							plugin.processRequestChunk(conHandle.request, svcHandle);
 					}
 				}, plugin, ProcessType.REQUEST_CHUNK_PROCESSING, conHandle.request);
 			} catch (Throwable t) {
 				log.info("RQ: "+conHandle+" | Throwable raised while processing request chunk by "+rqPlgInstance,t);
 			}
 			svcHandle.commitChanges();
-			if (svcHandle.getData() == null)
+			if (!finalization && svcHandle.getData() == null)
 				break;
 		}
 		svcHandle.finalize();
@@ -760,10 +764,10 @@ public class AdaptiveEngine  {
 	}
 	
 	private byte[] doResponseChunkProcessing(final ConnectionHandle conHandle, byte[] data) {
-		if (data == null)
-			conHandle.response.setChunkProcessed();
+		conHandle.response.setAllowedThread();
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,ResponseChunksProcessingPlugin.class);
 		final ResponseChunkServiceHandleImpl svcHandle = new ResponseChunkServiceHandleImpl(conHandle.response, modulesManager, data);
+		final boolean finalization = data == null;
 		for (ProcessingPluginInstance<ResponseChunksProcessingPlugin> rpPlgInstance : responseChunksPlugins) {
 			if (blacklistedPlugins.contains(rpPlgInstance.plgInstance.getName())) {
 				if (log.isTraceEnabled())
@@ -775,14 +779,17 @@ public class AdaptiveEngine  {
 				stats.executeProcess(new Runnable() {
 					@Override
 					public void run() {
-						plugin.processResponseChunk(conHandle.response, svcHandle);
+						if (finalization)
+							plugin.finalizeProcessing(conHandle.response, svcHandle);
+						else
+							plugin.processResponseChunk(conHandle.response, svcHandle);
 					}
 				}, plugin, ProcessType.RESPONSE_CHUNK_PROCESSING, conHandle.response);
 			} catch (Throwable t) {
 				log.info("RP: "+conHandle+" | Throwable raised while processing response chunk by "+rpPlgInstance,t);
 			}
 			svcHandle.commitChanges();
-			if (svcHandle.getData() == null)
+			if (!finalization && svcHandle.getData() == null)
 				break;
 		}
 		svcHandle.finalize();

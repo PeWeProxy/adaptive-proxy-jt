@@ -1,5 +1,6 @@
 package sk.fiit.peweproxy.messages;
 
+import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
@@ -26,6 +27,24 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	private boolean chunkProcessed = false;
 	private ChunksRemainsImpl chunkRemains = new ChunksRemainsImpl();
 	protected String userId = VOID_USERID;
+	private CharsetWrapper contentCharset;
+	
+	
+	public class CharsetWrapper {
+		private final Charset contentCharset;
+		
+		public CharsetWrapper(Charset charset) {
+			this.contentCharset = charset;
+		}
+		
+		/**
+		 * Do not use outside of chunks reading / processing phase !
+		 * @return
+		 */
+		public Charset getCharset() {
+			return contentCharset;
+		}
+	}
 	
 	public HttpMessageImpl(HeaderWrapper header) {
 		this.header = header;
@@ -57,6 +76,8 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		this.data = data;
 		this.dataStore = null;
 		isComlpete = true;
+		if (data == null)
+			contentCharset = null;
 	}
 	
 	public byte[] getData() {
@@ -166,6 +187,14 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	
 	public ChunksRemainsImpl getChunkRemains() {
 		return chunkRemains;
+	}
+	
+	public CharsetWrapper getCharsetWrapper() {
+		return contentCharset;
+	}
+	
+	public void setContentCharset(Charset contentCharset) {
+		this.contentCharset = new CharsetWrapper(contentCharset);
 	}
 	
 	@Override

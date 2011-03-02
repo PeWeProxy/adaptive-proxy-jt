@@ -91,6 +91,8 @@ public abstract class CharsetUtils {
 	}
 	
 	public static CharBuffer decodeBytes(byte[] data, Charset charset, boolean report) throws CharacterCodingException, IOException {
+		if (data == null || data.length == 0)
+			return CharBuffer.wrap("");
 		CodingErrorAction action = (report)? CodingErrorAction.REPORT : CodingErrorAction.REPLACE;
 		CharsetDecoder decoder = charset.newDecoder();
 		decoder.onMalformedInput(action);

@@ -1,13 +1,17 @@
 package sk.fiit.peweproxy.services;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.List;
 
+import rabbit.util.CharsetUtils;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.services.ChunkServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
-import sk.fiit.peweproxy.services.content.StringContentService;
+import sk.fiit.peweproxy.services.content.ModifiableStringService;
 
 public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> extends
 		ServicesHandleBase<ModuleType> implements ChunkServicesHandle {
@@ -15,22 +19,45 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 	protected byte[] data = null;
 	boolean sent = false;
 	protected final ChunksRemainsImpl remainsStore;
+	protected final boolean finalization;
 
 	public ChunkServicesHandleImpl(HttpMessageImpl<?> httpMessage, List<ModuleType> modules,
 			ModulesManager manager, byte[] data) {
 		super(httpMessage, modules, manager);
+		this.finalization = data == null;
 		this.remainsStore = httpMessage.getChunkRemains();
 		this.data = remainsStore.joinCeasedData(data);
+		HttpMessageImpl<?>.CharsetWrapper charsetWrp = httpMessage.getCharsetWrapper();
+		if (charsetWrp == null) {
+			// first time detecting textual content / charset
+			httpMessage.setContentCharset(null);
+			if (super.hasTextutalContent()) {
+				Charset charset = null;
+				try {
+					charset = CharsetUtils.detectCharset(httpMessage.originalMessage().getHeader(), data, false);
+					httpMessage.setContentCharset(charset);
+				} catch (IOException ignored) {
+					// CharsetWrapper is set (to reference null) already
+				}
+			}
+		}
 		if (hasTextutalContent()) {
 			// needed for ceasing undecoded bytes to avoid having chunk started with bytes
 			// remaining for character split between two chunks
-			getService(StringContentService.class);
+			getService(ModifiableStringService.class);
 		}
 	}
 	
 	@Override
+	protected boolean hasTextutalContent() {
+		if (httpMessage.getCharsetWrapper().getCharset() != null)
+			return true;
+		return false;
+	}
+	
+	@Override
 	boolean dataAccessible() {
-		return data != null;
+		return true;
 	}
 
 	@Override
@@ -49,7 +76,10 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 	
 	@Override
 	public void setData(byte[] data) {
+		HttpMessageImpl<?>.CharsetWrapper charsetWrp = httpMessage.getCharsetWrapper(); 
 		this.data = data;
+		if (charsetWrp != null)
+			httpMessage.setContentCharset(charsetWrp.getCharset()); // if data == null
 	}
 	
 	public void commitChanges() {
@@ -93,6 +123,13 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 	@Override
 	public <T> T getRemains(Object key) {
 		return remainsStore.getRemains(key);
+	}
+	
+	@Override
+	public Charset getCharset() throws UnsupportedCharsetException, IOException {
+		return httpMessage.getCharsetWrapper().getCharset();
+		// it's OK to throw NPE when returned CharsetWrapper is null since calling
+		// this method in that case is illegal
 	}
 	
 	abstract <Service extends ProxyService> void callDoChanges(ChunkServiceProvider<?, Service> svcProvider);

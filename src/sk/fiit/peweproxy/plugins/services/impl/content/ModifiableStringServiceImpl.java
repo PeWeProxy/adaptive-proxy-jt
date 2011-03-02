@@ -6,7 +6,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 
 import rabbit.util.CharsetUtils;
-import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.headers.ReadableHeader;
 import sk.fiit.peweproxy.headers.WritableHeader;
 import sk.fiit.peweproxy.messages.HttpRequest;
@@ -19,9 +18,9 @@ import sk.fiit.peweproxy.services.content.ModifiableStringService;
 public class ModifiableStringServiceImpl extends BaseStringServicesProvider<ModifiableStringService>
  implements ModifiableStringService{
 	
-	public ModifiableStringServiceImpl(HeaderWrapper actualHeader, boolean useJChardet, ServicesContentSource content)
+	public ModifiableStringServiceImpl(ServicesContentSource content)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
-		super(actualHeader, content, useJChardet);
+		super(content);
 	}
 
 	@Override

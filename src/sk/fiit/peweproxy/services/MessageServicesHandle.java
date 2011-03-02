@@ -1,10 +1,14 @@
 package sk.fiit.peweproxy.services;
 
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
+import rabbit.util.CharsetUtils;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
@@ -91,5 +95,10 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 	@Override
 	HeaderWrapper getHeaderForPatternMatch() {
 		return httpMessage.getHeader();
+	}
+	
+	@Override
+	public Charset getCharset() throws UnsupportedCharsetException, IOException {
+		return CharsetUtils.detectCharset(httpMessage.getHeader(), httpMessage.getData(), false);
 	}
 }

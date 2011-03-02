@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
 
-import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.messages.HttpRequest;
 import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
@@ -15,9 +14,9 @@ import sk.fiit.peweproxy.services.content.StringContentService;
 public class StringServiceImpl extends BaseStringServicesProvider<StringContentService>
 	implements StringContentService {
 	
-	public StringServiceImpl(HeaderWrapper actualHeader, boolean useJChardet, ServicesContentSource content)
+	public StringServiceImpl(ServicesContentSource content)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
-		super(actualHeader, content, useJChardet);
+		super(content);
 	}
 
 	@Override

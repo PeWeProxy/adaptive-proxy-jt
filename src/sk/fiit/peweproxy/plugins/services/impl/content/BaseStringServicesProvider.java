@@ -8,7 +8,6 @@ import java.nio.charset.UnsupportedCharsetException;
 import org.apache.log4j.Logger;
 
 import rabbit.util.CharsetUtils;
-import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.services.ChunkServicesHandle;
 import sk.fiit.peweproxy.services.ProxyService;
 
@@ -20,12 +19,11 @@ public abstract class BaseStringServicesProvider<Service extends ProxyService>
 	protected Charset charset;
 	private final boolean fullyDecoded;
 	
-	public BaseStringServicesProvider(HeaderWrapper actualHeader, ServicesContentSource content, boolean useJChardet)
+	public BaseStringServicesProvider(ServicesContentSource content)
 	 throws CharacterCodingException, UnsupportedCharsetException, IOException {
 		super(content);
-		byte[] data = this.content.getData();
-		charset = CharsetUtils.detectCharset(actualHeader, data, useJChardet);
-		sb = new StringBuilder(CharsetUtils.decodeBytes(data, charset, true));
+		this.charset = content.getCharset();
+		sb = new StringBuilder(CharsetUtils.decodeBytes(content.getData(), charset, true));
 		byte[] undecodedTrailing = null; // TODO fill undecodedTrailing
 		content.ceaseData(undecodedTrailing);
 		fullyDecoded = undecodedTrailing == null;
