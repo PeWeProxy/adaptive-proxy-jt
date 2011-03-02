@@ -6,25 +6,22 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 
 import rabbit.util.CharsetUtils;
+import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.headers.ReadableHeader;
 import sk.fiit.peweproxy.headers.WritableHeader;
-import sk.fiit.peweproxy.messages.HttpMessageImpl;
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
+import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.content.ModifiableStringService;
 
-public class ModifiableStringServiceImpl extends BaseMessageServiceProvider<ModifiableStringService>
-	implements ModifiableStringService{
-
-	private final StringBuilder sb;
-	private Charset charset = null;
+public class ModifiableStringServiceImpl extends BaseStringServicesProvider<ModifiableStringService>
+ implements ModifiableStringService{
 	
-	public ModifiableStringServiceImpl(HttpMessageImpl<?> httpMessage, boolean useJChardet)
+	public ModifiableStringServiceImpl(HeaderWrapper actualHeader, boolean useJChardet, ServicesContentSource content)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
-		super(httpMessage);
-		byte[] data = httpMessage.getData();
-		charset = CharsetUtils.detectCharset(httpMessage.getHeader(), data, useJChardet);
-		sb = new StringBuilder(CharsetUtils.decodeBytes(data, charset, true));
+		super(actualHeader, content, useJChardet);
 	}
 
 	@Override
@@ -44,20 +41,29 @@ public class ModifiableStringServiceImpl extends BaseMessageServiceProvider<Modi
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
+		if (charset == null)
+			throw new IllegalArgumentException("charset can not be null");
+		// no check whether changing charset is valid ( = header not already sent)
+		// to allow receiving chunk in original charset and sending it in new one
+		// (changing already sent header appropriately before it is sent is the
+		// responsibility of the plugin itself)
 	}
 
 	@Override
 	public void setContent(String content) {
 		sb.setLength(0);
-		sb.append(content);
+		if (content != null)
+			sb.append(content);
 	}
 	
 	void doChanges(ReadableHeader origHeader, WritableHeader targetHeader) {
 		String s = sb.toString();
-		httpMessage.setData(s.getBytes(charset));
+		content.setData(s.getBytes(charset));
+		if (origHeader == null)
+			// service over chunk, can't modify header
+			return;
 		if (origHeader.getField("Content-Length") != null) {
-			targetHeader.setField("Content-Length", Integer.toString(httpMessage.getData().length, 10));
+			targetHeader.setField("Content-Length", Integer.toString(content.getData().length, 10));
 		}
 		String cType = targetHeader.getField("Content-Type");
 		if (cType == null)
@@ -97,5 +103,17 @@ public class ModifiableStringServiceImpl extends BaseMessageServiceProvider<Modi
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {
 		doChanges(response.getOriginalResponse().getResponseHeader(), response.getResponseHeader());
+	}
+
+	@Override
+	public void doChanges(HttpRequest request,
+			ServicesHandle chunkServicesHandle) {
+		doChanges((ReadableHeader)null, (WritableHeader)null);
+	}
+
+	@Override
+	public void doChanges(HttpResponse response,
+			ServicesHandle chunkServicesHandle) {
+		doChanges((ReadableHeader)null, (WritableHeader)null);
 	}
 }

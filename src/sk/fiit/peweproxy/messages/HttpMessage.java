@@ -23,7 +23,11 @@ public interface HttpMessage {
 	 * proxy server has not body data prefetched.
 	 * @return whether body data of this message is accessible
 	 */
-	boolean hasBody();
+	boolean bodyAccessible();
+	
+	boolean isComplete();
+	
+	boolean wasChunkProcessed();
 	
 	/**
 	 * Returns the unique textual identifier of the user that initiated this message. This

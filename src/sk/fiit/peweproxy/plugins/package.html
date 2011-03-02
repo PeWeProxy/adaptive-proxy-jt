@@ -33,8 +33,8 @@ namely {@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)}
 method.
 <p>
 Besides this base plugin interface, this package also contains common interfaces for all
-request (see {@link sk.fiit.peweproxy.plugins.RequestPlugin}) and response plugins (see
-{@link sk.fiit.peweproxy.plugins.ResponsePlugin}), that define the way a request / response
+request (see {@link sk.fiit.peweproxy.plugins.FullRequestPlugin}) and response plugins (see
+{@link sk.fiit.peweproxy.plugins.FullResponsePlugin}), that define the way a request / response
 plugins (processing plugins or modules) are asked for services they want to be available
 over the HTTP message later in the real-time processing phase. This querying is done by
 Adaptive Proxy platform to find out whether some plugin wants to be able to modify the body

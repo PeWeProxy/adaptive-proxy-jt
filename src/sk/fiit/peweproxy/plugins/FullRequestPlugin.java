@@ -13,7 +13,7 @@ import sk.fiit.peweproxy.services.ProxyService;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestPlugin extends ProxyPlugin {
+public interface FullRequestPlugin extends ProxyPlugin {
 	/**
 	 * Called by platform to get services (their classes) over request message that this plugin
 	 * wishes to be able to get and use later when it will be involved in the request handling
@@ -23,7 +23,8 @@ public interface RequestPlugin extends ProxyPlugin {
 	 * interfaces).
 	 * @param desiredServices set to be filled with classes of desired services
 	 * @param clientRQHeader read-only request header
+	 * @param chunkProcessingAvailable whether chunk processing can be run during message data transfer
 	 */
 	void desiredRequestServices(Set<Class<? extends ProxyService>> desiredServices,
-			RequestHeader clientRQHeader);
+			RequestHeader clientRQHeader, boolean chunkProcessingAvailable);
 }

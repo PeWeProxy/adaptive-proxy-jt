@@ -4,7 +4,7 @@ import sk.fiit.peweproxy.messages.HttpMessageFactory;
 import sk.fiit.peweproxy.messages.HttpRequest;
 import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
-import sk.fiit.peweproxy.plugins.RequestPlugin;
+import sk.fiit.peweproxy.plugins.FullRequestPlugin;
 
 /**
  * Interface for proxy plugins involved in processing of HTTP requests.
@@ -15,7 +15,7 @@ import sk.fiit.peweproxy.plugins.RequestPlugin;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestProcessingPlugin extends RequestPlugin {
+public interface RequestProcessingPlugin extends FullRequestPlugin {
 	/**
 	 * Values of this enum are used to signal proxy server what actions should it take
 	 * in further processing of a HTTP request message.

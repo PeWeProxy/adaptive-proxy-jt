@@ -8,10 +8,8 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -19,21 +17,23 @@ import java.util.concurrent.Callable;
 
 import org.apache.log4j.Logger;
 
+import sk.fiit.peweproxy.headers.HeaderWrapper;
 import sk.fiit.peweproxy.headers.RequestHeader;
 import sk.fiit.peweproxy.headers.ResponseHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.HttpRequest;
 import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.plugins.PluginProperties;
+import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
 import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceProvider;
-import sk.fiit.peweproxy.plugins.services.ServiceModule;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
 import sk.fiit.peweproxy.plugins.services.impl.content.ByteServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableByteServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.content.ModifiableStringServiceImpl;
+import sk.fiit.peweproxy.plugins.services.impl.content.ServicesContentSource;
 import sk.fiit.peweproxy.plugins.services.impl.content.StringServiceImpl;
 import sk.fiit.peweproxy.plugins.services.impl.platform.PlatformContextImpl;
 import sk.fiit.peweproxy.services.ProxyService.readonly;
@@ -46,9 +46,11 @@ import sk.fiit.peweproxy.services.user.UserIdentificationService;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
-public abstract class ServicesHandleBase<ModuleType extends ServiceModule> implements ServicesHandle {
+public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> implements ServicesHandle,
+	ServicesContentSource {
+	
 	static final Logger log = Logger.getLogger(ServicesHandleBase.class);
-	private static ServiceModule baseModule = new BaseModule();
+	private static ProxyPlugin baseModule = new BaseModule();
 	
 	static class BaseModule implements RequestServiceModule, ResponseServiceModule {
 		@Override
@@ -63,10 +65,10 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		public void getProvidedResponseServices(Set<Class<? extends ProxyService>> providedServices) {}
 		@Override
 		public void desiredRequestServices(Set<Class<? extends ProxyService>> desiredServices,
-				RequestHeader clientRQHeaders) {}
+				RequestHeader clientRQHeaders, boolean chunkProcessingAvailable) {}
 		@Override
 		public void desiredResponseServices(Set<Class<? extends ProxyService>> desiredServices,
-				ResponseHeader webRPHeaders) {}
+				ResponseHeader webRPHeaders, boolean chunkProcessingAvailable) {}
 		@Override
 		public <Service extends ProxyService> RequestServiceProvider<Service> provideRequestService(
 				HttpRequest request, Class<Service> serviceClass)
@@ -81,13 +83,13 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	final ModulesManager manager;
 	final HttpMessageImpl<?> httpMessage;
 	private final ClassLoader servicesCLoader;
-	private final List<ModuleType> modules;
+	protected final List<ModuleType> modules;
 	private final Map<ProxyService, ServiceBinding<?>> serviceBindings;
 	private final Queue<ServiceBinding<?>> inCodeOfStack;
 	private final List<ServiceBinding<?>> actualServicesBindings;
 	private ServiceBinding<?> changedModelBinding;
 	private ServiceBinding<?> bindingDoingChanges;
-	private ModuleType moduleExecutingProvide;
+	protected ModuleType moduleExecutingProvide;
 	
 	public ServicesHandleBase(HttpMessageImpl<?> httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		this.httpMessage = httpMessage;
@@ -100,39 +102,6 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		this.servicesCLoader = manager.getAdaptiveEngine().getPluginHandler().getServicesCLoader();
 	}
 	
-	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices) {
-		/*if (contentNeeded(desiredServices))
-			return true;*/
-		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
-			ModuleType module = iterator.previous();
-			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
-				Set<Class<? extends ProxyService>> plgDesiredSvcs = new HashSet<Class<? extends ProxyService>>();
-				try {
-					discoverDesiredServices(module,plgDesiredSvcs);
-				} catch (Throwable t) {
-					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "
-								+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
-				}
-				desiredServices.addAll(plgDesiredSvcs);
-				if (contentNeeded(desiredServices)) {
-					if (log.isDebugEnabled())
-						log.debug(getLogTextHead()+"Service module "+module+" wants "
-								+"content modifying service for "+getLogTextNormal());
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-	
-	private <E> boolean overlapSets(Set<E> set1, Set<E> set2) {
-		for (E element : set1) {
-			if (set2.contains(element))
-				return true;
-		}
-		return false;
-	}
-	
 	public static boolean contentNeeded(Set<Class<? extends ProxyService>> desiredServices) {
 		return (desiredServices.contains(ModifiableStringService.class)
 				/*|| desiredServices.contains(StringContentService.class)*/
@@ -142,54 +111,61 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	
 	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
 	
-	abstract void discoverDesiredServices(ModuleType plugin,
-			Set<Class<? extends ProxyService>> desiredServices) throws Throwable;
+	protected enum LogText {TYPE, NORMAL,CAPITAL,SHORT};
 	
-	protected enum LogText {NORMAL,CAPITAL,SHORT};
+	protected String getLogTextType() {
+		return getText4Logging(LogText.TYPE);
+	}
 	
-	private String getLogTextHead() {
+	protected String getLogTextHead() {
 		return getText4Logging(LogText.SHORT)+": "+toString()+" | ";
 	}
 	
-	private String getLogTextCapital() {
+	protected String getLogTextCapital() {
 		return getText4Logging(LogText.CAPITAL);
 	}
 	
-	private String getLogTextNormal() {
+	protected String getLogTextNormal() {
 		return getText4Logging(LogText.NORMAL);
 	}
 	
 	abstract String getText4Logging(LogText type);
 	
+	protected ServiceBinding<?> getChangedModelBinding() {
+		return changedModelBinding;
+	}
+	
 	private ServiceProvider<ByteContentService> getByteService() {
 		readingAttempt(null);
-		if (httpMessage.bodyAccessible())
-			return new ByteServiceImpl(httpMessage);
+		if (dataAccessible())
+			return new ByteServiceImpl(this);
 		else
 			throw new ServiceUnavailableException(ByteContentService.class, "The massage carries no data", null);
 	}
 	
 	private ServiceProvider<ModifiableBytesService> getModByteServie()  {
 		readingAttempt(null);
-		if (httpMessage.bodyAccessible())
-			return new ModifiableByteServiceImpl(httpMessage);
+		if (dataAccessible())
+			return new ModifiableByteServiceImpl(this);
 		else
 			throw new ServiceUnavailableException(ModifiableBytesService.class, "The massage carries no data", null);
 	}
 	
-	private boolean hasTextutalContent () {
+	protected final boolean hasTextutalContent () {
 		readingAttempt(null);
-		if (!httpMessage.bodyAccessible())
+		if (!dataAccessible())
 			return false;
-		return manager.matchesStringServicePattern(httpMessage.getHeader());
+		return manager.matchesStringServicePattern(getHeaderForPatternMatch());
 	}
+	
+	abstract HeaderWrapper getHeaderForPatternMatch();
 	
 	private ServiceProvider<StringContentService> getStringService() {
 		Throwable cause = null;
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new StringServiceImpl(httpMessage,false);
+				return new StringServiceImpl(httpMessage.getHeader(), false, this);
 			} catch (CharacterCodingException e) {
 				excMessage = "Data of this message don't match it's charset";
 				cause = e;
@@ -211,7 +187,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		String excMessage = "The message does not carry textual content";
 		if (hasTextutalContent())
 			try {
-				return new ModifiableStringServiceImpl(httpMessage, false);
+				return new ModifiableStringServiceImpl(httpMessage.getHeader(), false, this);
 			}  catch (UnsupportedCharsetException e) {
 				log.warn(getLogTextHead()+getLogTextCapital()
 						+" header denotes unsupported charset "+e.getCharsetName());
@@ -251,6 +227,14 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		return new PlatformContextImpl(httpMessage, manager.getAdaptiveEngine());
 	}
 	
+	private <Service extends ProxyService> boolean isBasicService(Class<Service> serviceClass) {
+		return (serviceClass == ModifiableStringService.class) ||
+				(serviceClass == StringContentService.class) ||
+				(serviceClass == ModifiableBytesService.class) ||
+				(serviceClass == ByteContentService.class) ||
+				(serviceClass == PlatformContextService.class);
+	}
+	
 	@SuppressWarnings("unchecked")
 	private <Service extends ProxyService> ServiceProvider<Service> getBasicProvider(Class<Service> serviceClass) {
 		if (serviceClass == ModifiableStringService.class)
@@ -275,7 +259,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 				serviceClass == PluginsTogglingService.class);
 	}*/
 	
-	private class ServiceInfo<Service extends ProxyService> {
+	protected class ServiceInfo<Service extends ProxyService> {
 		final Class<Service> serviceClass;
 		final ModuleType ignoredModule;
 		
@@ -306,7 +290,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		}
 	}
 	
-	private class ServiceRealization<Service extends ProxyService> extends RealService<Service> {
+	protected class ServiceRealization<Service extends ProxyService> extends RealService<Service> {
 		final ServiceProvider<Service> provider;
 		final ModuleType module;
 		final Map<Method, Boolean> readonlyFlags = new HashMap<Method, Boolean>();;
@@ -331,7 +315,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		}
 	}
 	
-	private class ServiceBinding<Service extends ProxyService> {
+	protected class ServiceBinding<Service extends ProxyService> {
 		final ServiceInfo<Service> svcInfo;
 		Service proxiedService;
 		ServiceRealization<Service> realization;
@@ -460,7 +444,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		if (binding.realization != newRealization)
 			throw new IllegalStateException("Passed binding does not reference passed service realization");
 		if (newRealization.initChangedModel) {
-			if (!httpMessage.isReadOnly())
+			if (!isReadOnly())
 				changedModelBinding = binding;
 			actualServicesBindings.clear();
 		}
@@ -504,7 +488,7 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	public void headerBeingModified() {
 		if (log.isTraceEnabled())
 			log.trace(getLogTextHead()+"An attempt to modify message header");
-		if (httpMessage.isReadOnly()) {
+		if (isReadOnly()) {
 			UnsupportedOperationException e =  new UnsupportedOperationException("Modifying message header is not allowed for" +
 					" read-only messages");
 			log.info("Attempt to modify message header when discovering services",e);
@@ -599,11 +583,19 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		}
 	}
 	
+	abstract boolean dataAccessible();
+	
+	abstract boolean isReadOnly();
+	
+	abstract void setReadOnly();
+	
 	abstract <Service extends ProxyService> ServiceProvider<Service> callProvideService(ModuleType module, Class<Service> serviceClass);
 	
 	abstract <Service extends ProxyService> void callDoChanges(ServiceProvider<Service> svcProvider);
 	
 	abstract ProcessType serviceProvidingType();
+	
+	abstract ProcessType serviceCommitingType();
 	
 	@Override
 	public <Service extends ProxyService> Service getService(Class<Service> serviceClass)
@@ -614,15 +606,19 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		return getNextService(svcInfo);
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <Service extends ProxyService> Service getNextService(Service previousService) throws ServiceUnavailableException {
 		if (previousService == null)
 			throw new IllegalArgumentException("Previous service can not be null");
-		ServiceBinding<Service> svcContainer = (ServiceBinding<Service>)serviceBindings.get(previousService);
+		ServiceBinding<Service> svcContainer = getBindingForService(previousService);
 		if (log.isDebugEnabled())
 			log.debug(getLogTextHead()+"Asking for next service "+svcContainer.svcInfo.serviceClass.getName()+"(previous: "+previousService+")");
 		ServiceInfo<Service> svcInfo = new ServiceInfo<Service>(svcContainer.svcInfo.serviceClass, svcContainer.realization.module);
 		return getNextService(svcInfo);
+	}
+	
+	@SuppressWarnings("unchecked")
+	protected <Service extends ProxyService> ServiceBinding<Service> getBindingForService(Service proxiedService) {
+		return (ServiceBinding<Service>)serviceBindings.get(proxiedService);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -652,18 +648,18 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	private <Service extends ProxyService> void checkForbiddenServices(ServiceInfo<Service> svcInfo) {
 		if ((svcInfo.serviceClass == ModifiableStringService.class
 				|| svcInfo.serviceClass == ModifiableBytesService.class)) {
-			if (httpMessage.isReadOnly()) {
+			if (isReadOnly()) {
 				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
-						" unavilable for read-only messages", null);
+						" unavilable for read-only "+getLogTextType(), null);
 				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
-						+" service for "+getText4Logging(LogText.NORMAL)+" because the message is read-only");
+						+" service for "+getLogTextNormal()+" because the "+getLogTextType()+" is read-only");
 				throw e;
 			}
 			if (inReadOnlyState()) {
 				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
 						"unavilable when discovering services", null);
 				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
-						+" service for "+getText4Logging(LogText.NORMAL)+" because we are discovering services now");
+						+" service for "+getLogTextNormal()+" because we are discovering services now");
 				throw e;
 			}
 		}
@@ -674,12 +670,17 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 		checkForbiddenServices(svcInfo);
 		boolean skip = (svcInfo.ignoredModule != null);
 		ServiceUnavailableException cause = null;
-		// if one of base services, provide realizations
-		ServiceProvider<Service> baseSvcProvider = getBasicProvider(svcInfo.serviceClass);
-		if (baseSvcProvider != null) {
-			if (log.isTraceEnabled())
-				log.trace(getLogTextHead()+"Base service provider "+baseSvcProvider+" created");
-			return new ServiceRealization<Service>(baseSvcProvider.getService(), baseSvcProvider, (ModuleType)baseModule, false);
+		if (isBasicService(svcInfo.serviceClass)) {
+			if (svcInfo.ignoredModule == baseModule)
+				throw new ServiceUnavailableException(svcInfo.serviceClass, "Only one realization of basic service"
+						+svcInfo.serviceClass.getSimpleName()+" is available", null);
+			// if one of base services, provide realizations
+			ServiceProvider<Service> baseSvcProvider = getBasicProvider(svcInfo.serviceClass);
+			if (baseSvcProvider != null) {
+				if (log.isTraceEnabled())
+					log.trace(getLogTextHead()+"Base service provider "+baseSvcProvider+" created");
+				return new ServiceRealization<Service>(baseSvcProvider.getService(), baseSvcProvider, (ModuleType)baseModule, false);
+			}
 		}
 		for (ModuleType module : modules) {
 			try {
@@ -732,28 +733,40 @@ public abstract class ServicesHandleBase<ModuleType extends ServiceModule> imple
 	private void applyLastChanges() {
 		if (log.isDebugEnabled())
 			log.debug(getLogTextHead()+"Aplying changes made in inner model of "+changedModelBinding.realization.realService);
-		ServiceProvider<?> svcProvider = changedModelBinding.realization.provider;
 		inCodeOfStack.add(changedModelBinding);
 		bindingDoingChanges = changedModelBinding;
 		changedModelBinding = null;
-		if (httpMessage.isReadOnly()) {
+		if (isReadOnly()) {
 			String msg = "Attempt to introduce changes on read-only message. Fix it !\n"+StackTraceUtils.getStackTraceText(); 
 			log.warn(msg);
 			System.err.println(msg);
 		}
 		ModuleType moduleProvidingSvc = moduleExecutingProvide;
 		moduleExecutingProvide = null;	// we can be executing service providing atm so make the message writable temporally
-		callDoChanges(svcProvider);
+		try {
+			manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
+				@Override
+				public void run() {
+					callDoChanges(changedModelBinding.realization.provider);
+				}
+			}, changedModelBinding.realization.module, serviceCommitingType(), httpMessage);
+		} catch (Throwable t) {
+			log.warn("Throwable raised when trying to commit changes of "+changedModelBinding.realization.provider, t);
+		}
 		moduleExecutingProvide = moduleProvidingSvc;
 		inCodeOfStack.poll();
 		bindingDoingChanges = null;
 	}
 	
 	public void finalize() {
+		commitChanges();
+		setReadOnly();
+	}
+	
+	protected void commitChanges() {
 		if (changedModelBinding != null) {
 			readingAttempt(null);
 		}
-		httpMessage.setReadOnly();
 	}
 	
 	public ModulesManager getManager() {

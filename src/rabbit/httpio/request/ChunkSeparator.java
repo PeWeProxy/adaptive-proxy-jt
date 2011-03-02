@@ -32,10 +32,10 @@ public class ChunkSeparator implements ContentSeparator, ChunkDataFeeder {
 		return retVal;
 	}
 	
-	@Override
+	/*@Override
 	public void finishedRead() {
 		//empty, not called by ChunkHandler
-	}
+	}*/
 
 	@Override
 	public void readMore() {

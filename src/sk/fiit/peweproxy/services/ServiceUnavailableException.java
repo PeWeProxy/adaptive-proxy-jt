@@ -14,6 +14,8 @@ public final class ServiceUnavailableException extends RuntimeException {
 	 * Constructs new <code>ServiceUnavailableException</code> with unavailable service
 	 * class set to <code>serviceClass</code>.
 	 * @param serviceClass class of the unavailable service
+	 * @param message error message
+	 * @param cause causing exception
 	 */
 	public ServiceUnavailableException(Class<? extends ProxyService> serviceClass, String message, Throwable cause) {
 		super(message,cause);

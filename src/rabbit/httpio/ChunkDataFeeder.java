@@ -16,5 +16,5 @@ public interface ChunkDataFeeder {
 
     /** Chunk reading has been completed. 
      */
-    void finishedRead ();
+    //void finishedRead ();
 }

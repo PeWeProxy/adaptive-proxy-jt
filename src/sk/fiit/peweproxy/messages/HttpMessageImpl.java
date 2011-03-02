@@ -5,8 +5,10 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
+import sk.fiit.peweproxy.services.ChunksRemainsImpl;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
+import sk.fiit.peweproxy.utils.InMemBytesStore;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 
 public abstract class HttpMessageImpl<HandleType extends ServicesHandle> implements HttpMessage {
@@ -14,11 +16,15 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	private static final String VOID_USERID = HttpMessageImpl.class.getSimpleName()+"_VOID_USERID";
 	
 	protected final HeaderWrapper header;
+	private InMemBytesStore dataStore = null;
 	byte[] data = null;
 	private HandleType serviceHandle;
 	private boolean checkThread = false;
 	private Thread allowedThread;
 	private boolean isReadonly = false;
+	private boolean isComlpete = false;
+	private boolean chunkProcessed = false;
+	private ChunksRemainsImpl chunkRemains = new ChunksRemainsImpl();
 	protected String userId = VOID_USERID;
 	
 	public HttpMessageImpl(HeaderWrapper header) {
@@ -32,11 +38,30 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 			log.debug(toString()+" uses "+serviceHandle.toString());
 	}
 	
+	public void addData(byte[] data) {
+		if (data == null || data.length == 0)
+			return;
+		if (dataStore == null) {
+			int size = data.length;
+			if (this.data != null)
+				size += this.data.length;
+			dataStore = new InMemBytesStore(size);
+			if (this.data != null)
+				dataStore.writeArray(this.data, 0, this.data.length);
+		}
+		dataStore.writeArray(data, 0, data.length);
+		this.data = null;
+	}
+	
 	public void setData(byte[] data) {
 		this.data = data;
+		this.dataStore = null;
+		isComlpete = true;
 	}
 	
 	public byte[] getData() {
+		if (data == null && dataStore != null)
+			data = dataStore.getBytes();
 		return data;
 	}
 	
@@ -50,8 +75,30 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	}
 	
 	@Override
-	public boolean hasBody() {
-		return data != null;
+	public boolean bodyAccessible() {
+		return data != null || dataStore != null;
+	}
+	
+	public void setComlpete() {
+		if (dataStore != null) {
+			data = dataStore.getBytes();
+			dataStore = null;
+		}
+		isComlpete = true;
+	}
+	
+	@Override
+	public boolean isComplete() {
+		return isComlpete;
+	}
+	
+	@Override
+	public boolean wasChunkProcessed() {
+		return chunkProcessed;
+	}
+	
+	public void setChunkProcessed() {
+		this.chunkProcessed = true;
 	}
 	
 	@Override
@@ -117,6 +164,10 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return isReadonly;
 	}
 	
+	public ChunksRemainsImpl getChunkRemains() {
+		return chunkRemains;
+	}
+	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
@@ -130,9 +181,13 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	protected <MessageType extends HttpMessageImpl<HandleType>> MessageType clone(MessageType message) {
 		if (data != null)
 			message.data = Arrays.copyOf(data, data.length);
+		else if (dataStore != null)
+			message.data = dataStore.getBytes();
 		message.disableThreadCheck();
 		message.isReadonly = isReadonly;
 		message.userId = userId;
+		message.isComlpete = isComlpete;
+		message.chunkProcessed = chunkProcessed;
 		return message;
 	}
 }

@@ -274,7 +274,7 @@ public class GZipHandler extends BaseHandler {
     }
 
     protected void send (BufferHandle bufHandle) {
-	if (isCompressing) {
+	if (isCompressing && !bufHandle.isEmpty()) {
 	    ByteBuffer buf = bufHandle.getBuffer ();
 	    byte[] arr = buf.array ();
 	    int pos = buf.position ();

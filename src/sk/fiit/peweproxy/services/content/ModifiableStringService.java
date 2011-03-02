@@ -25,7 +25,7 @@ public interface ModifiableStringService extends StringContentService {
 
 	/**
 	 * Sets the text content of textual HTTP message body to passed <code>content</code>.
-	 * @param content new textual HTTP message body content
+	 * @param content new textual HTTP message body content, may be <code>null</code>
 	 */
 	void setContent(String content);
 	
@@ -33,7 +33,7 @@ public interface ModifiableStringService extends StringContentService {
 	 * Sets the charset of the textual HTTP message body content. Charset determines
 	 * conversion of textual body content to sequence of bytes and modification
 	 * of "Content-Type" HTTP message header field.
-	 * @param charset new charset of textual HTTP message body content
+	 * @param charset new charset of textual HTTP message body content, can not be <code>null</code>
 	 */
 	void setCharset(Charset charset);
 }

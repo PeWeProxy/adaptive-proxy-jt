@@ -3,7 +3,7 @@ package sk.fiit.peweproxy.plugins.services;
 import java.util.Set;
 
 import sk.fiit.peweproxy.messages.HttpResponse;
-import sk.fiit.peweproxy.plugins.ResponsePlugin;
+import sk.fiit.peweproxy.plugins.FullResponsePlugin;
 import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.ServiceUnavailableException;
 
@@ -17,7 +17,7 @@ import sk.fiit.peweproxy.services.ServiceUnavailableException;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface ResponseServiceModule extends ServiceModule, ResponsePlugin {
+public interface ResponseServiceModule extends FullResponsePlugin {
 	/**
 	 * Called by platform to get services (their classes) which this response service module is
 	 * able to provide implementation for, depending on particular response messages context. For

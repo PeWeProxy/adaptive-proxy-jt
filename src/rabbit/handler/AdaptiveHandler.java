@@ -3,9 +3,13 @@ package rabbit.handler;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
+
 import rabbit.filter.HtmlFilterFactory;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ResourceSource;
+import rabbit.httpio.request.ContentChunksModifier;
+import rabbit.httpio.request.ContentChunksModifier.AsyncChunkDataModifiedListener;
+import rabbit.httpio.request.ContentChunksModifier.AsyncChunkModifierListener;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
@@ -17,12 +21,19 @@ public class AdaptiveHandler extends FilterHandler {
 	private static final org.apache.log4j.Logger log
 		= org.apache.log4j.Logger.getLogger(AdaptiveHandler.class);
 	
+	/**
+	 * whether are we sending data that are read 
+	 */
 	private boolean transfering = true;
+	/**
+	 * whether are we sending passed response
+	 */
 	private boolean sendingPhase = false;
-	private InMemBytesStore memStore = null;
 	private ByteBuffer buffer = null;
 	private boolean askForCaching = true;
 	private boolean doHTMLparsing = false;
+	private ContentChunksModifier chunksModifier = null;
+	private boolean finishAfterSend = false;
 	
 	public AdaptiveHandler() {}
 	
@@ -33,14 +44,6 @@ public class AdaptiveHandler extends FilterHandler {
 			  List<HtmlFilterFactory> filterClasses) {
 		super(con, tlh, header, webHeader, content, mayCache,
 				mayFilter, size, compress, repack, filterClasses);
-		long dataSize = size;
-		if (dataSize > 0) {
-			if (dataSize > Integer.MAX_VALUE)
-				dataSize = Integer.MAX_VALUE;
-		} else {
-			dataSize = 4096;
-		}
-		memStore = new InMemBytesStore((int)dataSize);
 	}
 	
 	@Override
@@ -85,37 +88,66 @@ public class AdaptiveHandler extends FilterHandler {
 			if (doHTMLparsing)
 				super.handleArray(arr, off, len);
 			else {
-				if (!sendingPhase)
-					memStore.writeArray(arr, off, len); // for read-only processing
-				List<ByteBuffer> buffers = new LinkedList<ByteBuffer>();
-				buffers.add(ByteBuffer.wrap(arr, off, len));
-				sendBlocks = buffers.iterator();
-				if (sendBlocks.hasNext())
-					sendBlockBuffers();
-				else
-					blockSent();
+				if (!sendingPhase) {
+					//  modify if needed and cache for late processing
+					chunksModifier.modifyArray(arr, off, len, new AsyncChunkDataModifiedListener() {
+						@Override
+						public void dataModified(byte[] newData) {
+							if (newData == null)
+								sendArray(null, 0, 0);
+							else
+								sendArray(newData, 0, newData.length);
+						}
+					});
+				} else {
+					sendArray(arr, off, len);
+				}
 			}
 		} else {
-			memStore.writeArray(arr, off, len); // for full access processing
+			// modify if needed and cache for full access real-time processing 
+			chunksModifier.modifyArray(arr, off, len, new AsyncChunkDataModifiedListener() {
+				@Override
+				public void dataModified(byte[] newData) {
+					blockSent();
+				}
+			});
+		}
+	}
+	
+	private void sendArray(byte[] arr, int off, int len) {
+		if (len == 0)
 			blockSent();
+		else {
+			List<ByteBuffer> buffers = new LinkedList<ByteBuffer>();
+			buffers.add(ByteBuffer.wrap(arr, off, len));
+			sendBlocks = buffers.iterator();
+			sendBlockBuffers();
 		}
 	}
 
 	@Override
 	protected void finishData() {
 		if (transfering || sendingPhase) {
-			Connection con = this.con;
-			log.warn(this+" finishData() with con = "+con);
-			super.finishData();
-			if (!sendingPhase) {
-				if (log.isDebugEnabled())
-					log.debug(this+" cached data of length "+memStore.getBytes().length + " for read-only processing");
-				con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes());
+			if (!sendingPhase && con.getChunking()) {
+				// data cached for late processing, if we can, send remaining chunks
+				chunksModifier.finishedRead(new AsyncChunkDataModifiedListener() {
+					@Override
+					public void dataModified(byte[] newData) {
+						if (newData != null && newData.length > 0) {
+							finishAfterSend = true;
+							sendArray(newData, 0, newData.length);
+						} else
+							AdaptiveHandler.super.finishData();
+					}
+				});
+			} else {
+				// sending provided response, or we can't modify response (non-chunked transfer)
+				super.finishData();
 			}
 		} else {
-			if (log.isDebugEnabled())
-				log.debug(this+" cached data of length "+memStore.getBytes().length + " for full acccess processing");
-			con.getProxy().getAdaptiveEngine().responseContentCached(con, memStore.getBytes(), this);
+			// data cached for full access real-time processing, it will initiate sending
+			// so we must ignore con.getChunking() 
+			chunksModifier.finishedRead(null);
 		}
 	}
 	
@@ -158,7 +190,6 @@ public class AdaptiveHandler extends FilterHandler {
 			emptyChunkSent = true;
 		}
 		gzu = null;
-		memStore = null;
 		sendingPhase = true;
 		writeBytes = true;
 		setHTMLparsing();
@@ -171,14 +202,22 @@ public class AdaptiveHandler extends FilterHandler {
 			// FilterHandler's methods are messing with HTML blocks
 			// 		&& we are not caching for full access processing
 			//		&& we are not sending something already cached
-			memStore.writeBufferKeepPosition(bufHandle.getBuffer());
+			chunksModifier.modifyBuffer(bufHandle, new AsyncChunkModifierListener() {
+				@Override
+				public void chunkModified(BufferHandle bufHandle) {
+					AdaptiveHandler.super.send(bufHandle);
+				}
+			});
+			return;
 		}
 		super.send(bufHandle);
 	}
 	
 	@Override
 	protected void requestMoreData() {
-		if (!sendingPhase)
+		if (finishAfterSend)
+			super.finishData();
+		else if (!sendingPhase)
 			super.requestMoreData();
 		else
 			waitForData();
@@ -198,7 +237,6 @@ public class AdaptiveHandler extends FilterHandler {
 			if (buffer == null)
 				finishData();
 			else {
-				int toRead = buffer.remaining();
 				if (buffer.hasRemaining()) {
 					super.bufferRead(new SimpleBufferHandle(InMemBytesStore.chunkBufferForSend(buffer)));
 				} else {
@@ -222,6 +260,10 @@ public class AdaptiveHandler extends FilterHandler {
 					log.debug(this+" caching response data: "+!transfering);
 			}
 		}
+	}
+	
+	public void setChunksListener(ContentChunksModifier chunksModifier) {
+		this.chunksModifier = chunksModifier;
 	}
 	
 	@Override

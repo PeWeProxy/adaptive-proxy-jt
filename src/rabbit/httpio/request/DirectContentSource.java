@@ -7,7 +7,8 @@ import rabbit.io.SimpleBufferHandle;
 import org.khelekore.rnio.ReadHandler;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import sk.fiit.peweproxy.utils.InMemBytesStore;
+
+import rabbit.httpio.request.ContentChunksModifier.AsyncChunkDataModifiedListener;
 
 public class DirectContentSource extends ContentSource {
 	private final Connection con;
@@ -15,29 +16,40 @@ public class DirectContentSource extends ContentSource {
     private final TrafficLoggerHandler tlh;
     private final ContentSeparator separator;
     private boolean allDataPassed = false;
-    private final ContentCachingListener cachedListener;
-    private final InMemBytesStore memStore;
+    private boolean chunkModifierNotified = false;
+    private final ContentChunksModifier chunksModifier;
     
 	public DirectContentSource(Connection con, BufferHandle bufHandle, 
-			TrafficLoggerHandler tlh, ContentSeparator separator, ContentCachingListener cachedListener) {
+			TrafficLoggerHandler tlh, ContentSeparator separator, ContentChunksModifier chunksModifier) {
 		this.con = con;
 		this.bufHandle = bufHandle;
 		this.tlh = tlh;
 		this.separator = separator;
-		this.cachedListener = cachedListener;
-		if (cachedListener == null)
-			memStore = null;
-		else
-			memStore = new InMemBytesStore(0);
-			
+		this.chunksModifier = chunksModifier;
 	}
 
 	@Override
 	public void readNextBytes() {
 		if (allDataPassed) {
-			if (cachedListener != null)
-				cachedListener.dataCached(memStore.getBytes());
-			listener.finishedRead();
+			if (chunkModifierNotified)
+				listener.finishedRead();
+			else {
+				chunkModifierNotified = true;
+				if (con.getChunking()) {
+					// request chunk modifier does not initiate advance in request handling
+					// (listener does), so we don't need to call him
+					chunksModifier.finishedRead(new AsyncChunkDataModifiedListener() {
+						@Override
+						public void dataModified(byte[] newData) {
+							if (newData != null && newData.length > 0) {
+								listener.bufferRead(new SimpleBufferHandle(ByteBuffer.wrap(newData)));
+							} else
+								listener.finishedRead();
+						}
+					});
+				} else
+					listener.finishedRead();
+			}
 		} else if (!bufHandle.isEmpty())
 			separateData();
 		else
@@ -111,17 +123,28 @@ public class DirectContentSource extends ContentSource {
 	    	waitForRead();
 		} else if (indicator == ContentSeparator.VAL_SEPARATED_UNFINISHED
 				|| indicator == ContentSeparator.VAL_SEPARATED_FINISHED) {
-			BufferHandle providedBuffer = new SimpleBufferHandle(buffer.slice());
-			buffer.position(buffer.limit());
-			buffer.limit(limit);
+			
+			BufferHandle providedBuffer = bufHandle;
+			if (buffer.limit() != limit) {
+				// separation moved buffer's limit back, we need to pass only a slice
+				providedBuffer = new SimpleBufferHandle(buffer.slice());
+				buffer.position(buffer.limit());
+				buffer.limit(limit);
+			}
 			allDataPassed = (indicator == ContentSeparator.VAL_SEPARATED_FINISHED);
-			if (memStore != null)
-				memStore.writeBufferKeepPosition(providedBuffer.getBuffer());
-			listener.bufferRead(providedBuffer);
+			if (con.getChunking()) {
+				chunksModifier.modifyBuffer(providedBuffer, new ContentChunksModifier.AsyncChunkModifierListener() {
+					@Override
+					public void chunkModified(BufferHandle bufHandle) {
+						listener.bufferRead(bufHandle);
+					}
+				});
+			} else
+				listener.bufferRead(providedBuffer);
 		} else
 			throw new IllegalStateException("Content separator returned unspecified value");
 	}
-
+	
 	private void failed (Exception e) {
 		bufHandle.possiblyFlush ();
 		listener.failed(e);

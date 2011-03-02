@@ -10,29 +10,34 @@ import sk.fiit.peweproxy.plugins.services.RequestServiceProvider;
 import sk.fiit.peweproxy.plugins.services.ServiceProvider;
 import sk.fiit.peweproxy.utils.Statistics.ProcessType;
 
-public class RequestServiceHandleImpl extends ServicesHandleBase<RequestServiceModule> {
+public class RequestServiceHandleImpl extends MessageServicesHandle<RequestServiceModule> {
 	
 	public RequestServiceHandleImpl(HttpRequestImpl request, ModulesManager modulesManager) {
 		super(request, modulesManager.getLoadedRequestModules(), modulesManager);
 	}
 	
+	@Override
 	Set<Class<? extends ProxyService>> getProvidedSvcs(RequestServiceModule module) {
 		return manager.getProvidedRequestServices(module);
 	}
 	
 	@Override
 	void discoverDesiredServices(final RequestServiceModule plugin,
-			final Set<Class<? extends ProxyService>> desiredServices) throws Throwable {
+			final Set<Class<? extends ProxyService>> desiredServices,
+			final boolean conChunking) throws Throwable {
 		manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
 			@Override
 			public void run() {
-				plugin.desiredRequestServices(desiredServices,httpMessage.getHeader());
+				plugin.desiredRequestServices(desiredServices,httpMessage.getHeader(),conChunking);
 			}
 		}, plugin, ProcessType.REQUEST_DESIRED_SERVICES, httpMessage);
 	}
 	
 	@Override
 	String getText4Logging(LogText type) {
+		String superStr = super.getText4Logging(type);
+		if (superStr != null)
+			return superStr;
 		if (type == LogText.CAPITAL)
 			return "Request";
 		if (type == LogText.SHORT)
@@ -55,5 +60,10 @@ public class RequestServiceHandleImpl extends ServicesHandleBase<RequestServiceM
 	@Override
 	ProcessType serviceProvidingType() {
 		return ProcessType.REQUEST_PROVIDE_SERVICE;
+	}
+	
+	@Override
+	ProcessType serviceCommitingType() {
+		return ProcessType.REQUEST_SERVICE_COMMIT;
 	}
 }

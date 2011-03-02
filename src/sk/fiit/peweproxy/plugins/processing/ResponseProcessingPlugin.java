@@ -3,7 +3,7 @@ package sk.fiit.peweproxy.plugins.processing;
 import sk.fiit.peweproxy.messages.HttpMessageFactory;
 import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
-import sk.fiit.peweproxy.plugins.ResponsePlugin;
+import sk.fiit.peweproxy.plugins.FullResponsePlugin;
 
 /**
  * Interface for proxy plugins involved in processing of HTTP responses.
@@ -14,7 +14,7 @@ import sk.fiit.peweproxy.plugins.ResponsePlugin;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface ResponseProcessingPlugin extends ResponsePlugin {
+public interface ResponseProcessingPlugin extends FullResponsePlugin {
 	/**
 	 * Values of this enum are used to signal proxy server what actions should it take
 	 * in further processing of a HTTP response message.

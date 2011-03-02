@@ -4,28 +4,25 @@ import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
 
-import rabbit.util.CharsetUtils;
-import sk.fiit.peweproxy.messages.HttpMessageImpl;
+import sk.fiit.peweproxy.headers.HeaderWrapper;
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
+import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.content.StringContentService;
 
-public class StringServiceImpl extends BaseMessageServiceProvider<StringContentService>
+public class StringServiceImpl extends BaseStringServicesProvider<StringContentService>
 	implements StringContentService {
 	
-	final String content;
-	
-	public StringServiceImpl(HttpMessageImpl<?> httpMessage, boolean useJChardet)
+	public StringServiceImpl(HeaderWrapper actualHeader, boolean useJChardet, ServicesContentSource content)
 		throws CharacterCodingException, UnsupportedCharsetException, IOException {
-		super(httpMessage);
-		byte[] data = httpMessage.getData();
-		content = CharsetUtils.decodeBytes(data, CharsetUtils.detectCharset(httpMessage.getHeader(), data, useJChardet), true).toString();
-		//MemoryUsageInspector.printMemoryUsage(log, "Before StringBuilder creation");
+		super(actualHeader, content, useJChardet);
 	}
 
 	@Override
 	public String getContent() {
-		return content;
+		return sb.toString();
 	}
 	
 	@Override
@@ -38,4 +35,10 @@ public class StringServiceImpl extends BaseMessageServiceProvider<StringContentS
 
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {}
+
+	@Override
+	public void doChanges(HttpRequest request, ServicesHandle chunkServicesHandle) {}
+
+	@Override
+	public void doChanges(HttpResponse response, ServicesHandle chunkServicesHandle) {}
 }

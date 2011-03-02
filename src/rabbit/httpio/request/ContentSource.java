@@ -22,8 +22,8 @@ public abstract class ContentSource {
 	
 	/**
 	 * Tells this content source to gather some more content data. When
-	 * it obtains some more data, {@link ContentBytesReadyListener#bytesReady()}
-	 * of associated  listener will be called.
+	 * it obtains some more data, {@link BlockListener#bufferRead()}
+	 * of associated listener will be called.
 	 */
 	abstract void readNextBytes();
 }

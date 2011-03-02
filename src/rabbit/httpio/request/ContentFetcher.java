@@ -7,37 +7,36 @@ import rabbit.proxy.TrafficLoggerHandler;
 
 public class ContentFetcher implements BlockListener {
 	private final Connection con;
-	private final ContentCachingListener listener;
 	private final DirectContentSource directSource;
 	
 	public ContentFetcher(Connection con, BufferHandle bufHandle, 
 			TrafficLoggerHandler tlh, ContentSeparator separator,
-			ContentCachingListener listener) {
+			ContentChunksModifier chunksModifier) {
 		this.con = con;
-		this.listener = listener;
-		directSource = new DirectContentSource(con,bufHandle,tlh,separator,listener);
+		directSource = new DirectContentSource(con,bufHandle,tlh,separator,chunksModifier);
 		directSource.readFirstBytes(this);
 	}
 	
 	@Override
 	public void bufferRead(BufferHandle bufHandle) {
 		con.fireResouceDataRead (bufHandle);
+		// no need to call listener.bufferRead(bufHandle) since DirectContentSource
+		// is passing read chunks to chunksModifier
 		directSource.readNextBytes();
 	}
 	
 	@Override
 	public void finishedRead() {
-		// empty since DirectContentSource notifies listener with dataCached()
+		// do nothing since chunkModifier already initiated advance in request handling
 	}
 	
 	@Override
 	public void failed(Exception e) {
-		listener.failed(e);
+		con.readFailed(e);
 	}
 
 	@Override
 	public void timeout() {
-		// TODO do we need to try 5 times ?
-		listener.timeout();
+		con.readTimeout();
 	}
 }

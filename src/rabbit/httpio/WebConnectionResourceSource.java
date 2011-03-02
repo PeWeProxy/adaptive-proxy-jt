@@ -98,9 +98,9 @@ public class WebConnectionResourceSource
 	}
     }
 
-    public void finishedRead () {
+    /*public void finishedRead () {
 	cleanupAndFinish ();
-    }
+    }*/
 
     private void cleanupAndFinish () {
 	listener.finishedRead ();

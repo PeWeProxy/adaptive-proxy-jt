@@ -2,7 +2,7 @@ package rabbit.httpio;
 
 import rabbit.io.BufferHandle;
 
-/** A listener for resource data.
+/** A listener for resource data chunks.
  *
  * @author <a href="mailto:robo@khelekore.org">Robert Olofsson</a>
  */
@@ -13,8 +13,8 @@ public interface BlockListener extends AsyncListener {
      * @param bufHandle the data that was read
      */
     void bufferRead (BufferHandle bufHandle);
-
+    
     /** The resource have been fully transferred 
      */
-    void finishedRead ();    
+    void finishedRead ();
 }

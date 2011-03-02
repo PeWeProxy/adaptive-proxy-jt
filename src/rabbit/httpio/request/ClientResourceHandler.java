@@ -60,10 +60,13 @@ public class ClientResourceHandler implements BlockListener {
     @Override
     public void bufferRead(BufferHandle bufHandle) {
     	con.fireResouceDataRead (bufHandle);
-    	BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
-			     con.getTrafficLoggerHandler().getNetwork (),
-			     bufHandle, chunking, sendingListener);
-		bs.write();
+    	if (bufHandle.getBuffer().hasRemaining()) {
+	    	BlockSender bs = new BlockSender (wc.getChannel (), con.getNioHandler(), 
+				     con.getTrafficLoggerHandler().getNetwork (),
+				     bufHandle, chunking, sendingListener);
+			bs.write();
+		} else
+			sendingListener.blockSent(); // modification of the chunk resulted in no data to send
     }
     
     @Override

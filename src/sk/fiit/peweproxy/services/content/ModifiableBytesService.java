@@ -18,7 +18,7 @@ package sk.fiit.peweproxy.services.content;
 public interface ModifiableBytesService extends ByteContentService {
 	/**
 	 * Sets the HTTP message body data to passed <code>data</code>.
-	 * @param data new HTTP message body data
+	 * @param data new HTTP message body data, may be <code>null</code>
 	 */
 	void setData(byte[] data);
 }

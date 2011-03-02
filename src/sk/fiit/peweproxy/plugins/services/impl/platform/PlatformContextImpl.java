@@ -7,14 +7,18 @@ import java.util.Map;
 
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
 import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
+import sk.fiit.peweproxy.services.ChunkServicesHandle;
+import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.platform.PlatformContextService;
 
-public class PlatformContextImpl extends BaseServiceProvider<PlatformContextService>
+public class PlatformContextImpl extends BaseServiceProvider<Object, PlatformContextService>
 	implements PlatformContextService {
 		
 	private class PluginStatusImpl implements PluginStatus {
@@ -65,10 +69,11 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 	final AdaptiveEngine adaptiveEngine;
 	final  Map<Class<? extends ProxyPlugin>, List<PluginStatus>> createdInstances = 
 		new HashMap<Class<? extends ProxyPlugin>, List<PluginStatus>>();
+	final HttpMessageImpl<?> httpMessage;
 	final String userId;
 	
 	public PlatformContextImpl(HttpMessageImpl<?> httpMessage, AdaptiveEngine adaptiveEngine) {
-		super(httpMessage);
+		this.httpMessage = httpMessage;
 		this.userId = httpMessage.userIdentification();
 		this.adaptiveEngine = adaptiveEngine;
 	}
@@ -112,4 +117,15 @@ public class PlatformContextImpl extends BaseServiceProvider<PlatformContextServ
 	protected Class<PlatformContextService> getServiceClass() {
 		return PlatformContextService.class;
 	}
+
+
+	@Override
+	public void doChanges(HttpRequest request, ServicesHandle chunkServicesHandle) {}
+
+
+	@Override
+	public void doChanges(HttpResponse response, ServicesHandle chunkServicesHandle) {}
+	
+	@Override
+	public void ceaseContent(Object chunkPart, ChunkServicesHandle chunkServiceshandle) {};
 }

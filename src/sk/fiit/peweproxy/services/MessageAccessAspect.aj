@@ -64,7 +64,7 @@ public aspect MessageAccessAspect {
 	
 	@SuppressWarnings("unchecked")
 	pointcut servicesHandleMethod(ServicesHandleBase svcHandle)
-		: execution(* ServicesHandle.*(..)) && this(svcHandle);
+		: execution(* (ServicesHandle || ChunkServicesHandle).*(..)) && this(svcHandle);
 	
 	@SuppressWarnings("unchecked")
 	pointcut messageMethod(HttpMessageImpl message)

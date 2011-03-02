@@ -15,9 +15,11 @@ import org.apache.log4j.Logger;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.headers.ReadableHeader;
 import sk.fiit.peweproxy.plugins.PluginHandler;
+import sk.fiit.peweproxy.plugins.ProxyPlugin;
+import sk.fiit.peweproxy.plugins.services.RequestChunksServiceModule;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;
+import sk.fiit.peweproxy.plugins.services.ResponseChunksServiceModule;
 import sk.fiit.peweproxy.plugins.services.ResponseServiceModule;
-import sk.fiit.peweproxy.plugins.services.ServiceModule;
 
 public class ModulesManager {
 	private static final Logger log = Logger.getLogger(ModulesManager.class);
@@ -26,24 +28,36 @@ public class ModulesManager {
 	private final AdaptiveEngine adaptiveEngine;
 	private final List<RequestServiceModule> rqModules;
 	private final List<ResponseServiceModule> rpModules;
-	private final Map<RequestServiceModule, Set<Class<? extends ProxyService>>> providedRqServices;
-	private final Map<ResponseServiceModule, Set<Class<? extends ProxyService>>> providedRpServices;
+	private final List<RequestChunksServiceModule> rqChunkModules;
+	private final List<ResponseChunksServiceModule> rpChunkModules;
+	private final Map<ProxyPlugin, Set<Class<? extends ProxyService>>> providedRqServices;
+	private final Map<ProxyPlugin, Set<Class<? extends ProxyService>>> providedRpServices;
 	private Pattern stringServicesPattern = Pattern.compile(DEF_PATTERN_TEXTMSGS);
 	
 	public ModulesManager(AdaptiveEngine adaptiveEngine) {
 		this.adaptiveEngine = adaptiveEngine;
 		rqModules = new LinkedList<RequestServiceModule>();
 		rpModules = new LinkedList<ResponseServiceModule>();
-		providedRqServices = new HashMap<RequestServiceModule, Set<Class<? extends ProxyService>>>();
-		providedRpServices = new HashMap<ResponseServiceModule, Set<Class<? extends ProxyService>>>();
+		rqChunkModules = new LinkedList<RequestChunksServiceModule>();
+		rpChunkModules = new LinkedList<ResponseChunksServiceModule>();
+		providedRqServices = new HashMap<ProxyPlugin, Set<Class<? extends ProxyService>>>();
+		providedRpServices = new HashMap<ProxyPlugin, Set<Class<? extends ProxyService>>>();
 	}
 	
 	List<RequestServiceModule> getLoadedRequestModules() {
 		return rqModules;
 	}
 	
+	List<RequestChunksServiceModule> getLoadedRequestChunksModules() {
+		return rqChunkModules;
+	}
+	
 	List<ResponseServiceModule> getLoadedResponseModules() {
 		return rpModules;
+	}
+	
+	List<ResponseChunksServiceModule> getLoadedResponseChunksModules() {
+		return rpChunkModules;
 	}
 	
 	public void initPlugins(PluginHandler pluginHandler) {
@@ -56,6 +70,15 @@ public class ModulesManager {
 				return providedServices;
 			}
 		});
+		log.info("Loading request chunks service modules");
+		initPlugins(RequestChunksServiceModule.class, rqChunkModules, providedRqServices, new ProvidedServicesGetter<RequestChunksServiceModule>() {
+			@Override
+			public Set<Class<? extends ProxyService>> getProvidedServices(RequestChunksServiceModule module) {
+				Set<Class<? extends ProxyService>> providedServices = new HashSet<Class<? extends ProxyService>>();
+				module.getProvidedRequestChunkServices(providedServices);
+				return providedServices;
+			}
+		});
 		log.info("Loading response service modules");
 		initPlugins(ResponseServiceModule.class, rpModules, providedRpServices, new ProvidedServicesGetter<ResponseServiceModule>() {
 			@Override
@@ -65,33 +88,36 @@ public class ModulesManager {
 				return providedServices;
 			}
 		});
+		log.info("Loading response chunks service modules");
+		initPlugins(ResponseChunksServiceModule.class, rpChunkModules, providedRpServices, new ProvidedServicesGetter<ResponseChunksServiceModule>() {
+			@Override
+			public Set<Class<? extends ProxyService>> getProvidedServices(ResponseChunksServiceModule module) {
+				Set<Class<? extends ProxyService>> providedServices = new HashSet<Class<? extends ProxyService>>();
+				module.getProvidedResponseChunkServices(providedServices);
+				return providedServices;
+			}
+		});
 	}
 	
-	private interface ProvidedServicesGetter<ModuleType extends ServiceModule> {
+	private interface ProvidedServicesGetter<ModuleType extends ProxyPlugin> {
 		Set<Class<? extends ProxyService>> getProvidedServices(ModuleType module);
 	}
 	
-	private <ModuleType extends ServiceModule> void initPlugins(Class<ModuleType> modulesClass, List<ModuleType> modulesList
-			, Map<ModuleType, Set<Class<? extends ProxyService>>> providedServicesMap
+	private <ModuleType extends ProxyPlugin> void initPlugins(Class<ModuleType> modulesClass, List<ModuleType> modulesList
+			, Map<ProxyPlugin, Set<Class<? extends ProxyService>>> providedServicesMap
 			, ProvidedServicesGetter<ModuleType> providedSvcsGetter) {
 		modulesList.clear();
 		providedServicesMap.clear();
 		modulesList.addAll(adaptiveEngine.getPluginHandler().getPlugins(modulesClass));
-		/*Map<ServiceModule, Set<Class<? extends ProxyService>>> dependencies
-			= new HashMap<ServiceModule, Set<Class<? extends ProxyService>>>();*/
 		for (ModuleType module : modulesList) {
+			Set<Class<? extends ProxyService>> providedServices = null;
 			try {
-				/*Set<Class<? extends ProxyService>> pluginDependencies = module.getDependencies();
-				if (pluginDependencies == null)
-					pluginDependencies = Collections.emptySet();
-				dependencies.put(module, pluginDependencies);*/
-				Set<Class<? extends ProxyService>> providedServices = providedSvcsGetter.getProvidedServices(module);
-				if (providedServices == null)
-					providedServices = Collections.emptySet();
-				providedServicesMap.put(module, providedServices);
+				providedServices = providedSvcsGetter.getProvidedServices(module);
 			} catch (Throwable e) {
-				// TODO: handle exception
+				log.warn("Unable to obtain set of provided services from "+modulesClass.getSimpleName()+" "+module, e);
+				providedServices =  Collections.emptySet();
 			}
+			providedServicesMap.put(module, providedServices);
 		}
 	}
 	
@@ -99,8 +125,16 @@ public class ModulesManager {
 		return providedRqServices.get(module);
 	}
 	
+	public Set<Class<? extends ProxyService>> getProvidedRequestChunksServices(RequestChunksServiceModule module) {
+		return null;
+	}
+	
 	public Set<Class<? extends ProxyService>> getProvidedResponseServices(ResponseServiceModule module) {
 		return providedRpServices.get(module);
+	}
+	
+	public Set<Class<? extends ProxyService>> getProvidedResponseChunksServices(ResponseChunksServiceModule module) {
+		return null;
 	}
 
 	public AdaptiveEngine getAdaptiveEngine() {

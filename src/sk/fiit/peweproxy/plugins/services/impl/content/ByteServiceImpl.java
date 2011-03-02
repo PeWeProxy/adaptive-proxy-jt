@@ -2,20 +2,22 @@ package sk.fiit.peweproxy.plugins.services.impl.content;
 
 import java.util.Arrays;
 
-import sk.fiit.peweproxy.messages.HttpMessageImpl;
+import sk.fiit.peweproxy.messages.HttpRequest;
+import sk.fiit.peweproxy.messages.HttpResponse;
 import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
 import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
+import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.content.ByteContentService;
 
-public class ByteServiceImpl extends BaseMessageServiceProvider<ByteContentService>
+public class ByteServiceImpl extends BaseByteServicesProvider<ByteContentService>
 	implements ByteContentService {	
-	public ByteServiceImpl(HttpMessageImpl<?> httpMessage) {
-		super(httpMessage);
+	public ByteServiceImpl(ServicesContentSource content) {
+		super(content);
 	}
 	
 	@Override
 	public byte[] getData() {
-		byte[] data = httpMessage.getData();
+		byte[] data = content.getData();
 		return Arrays.copyOf(data, data.length);
 	}
 	
@@ -29,4 +31,10 @@ public class ByteServiceImpl extends BaseMessageServiceProvider<ByteContentServi
 
 	@Override
 	public void doChanges(ModifiableHttpResponse response) {}
+
+	@Override
+	public void doChanges(HttpRequest request, ServicesHandle chunkServicesHandle) {}
+
+	@Override
+	public void doChanges(HttpResponse response, ServicesHandle chunkServicesHandle) {}
 }
