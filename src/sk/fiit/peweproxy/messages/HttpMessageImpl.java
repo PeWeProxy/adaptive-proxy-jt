@@ -6,7 +6,8 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
-import sk.fiit.peweproxy.services.ChunksRemainsImpl;
+import sk.fiit.peweproxy.services.ProcessingStorage;
+import sk.fiit.peweproxy.services.ProcessingStoreImpl;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
 import sk.fiit.peweproxy.utils.InMemBytesStore;
@@ -25,7 +26,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	private boolean isReadonly = false;
 	private boolean isComlpete = false;
 	private boolean chunkProcessed = false;
-	private ChunksRemainsImpl chunkRemains = new ChunksRemainsImpl();
+	private ProcessingStoreImpl processingStore = new ProcessingStoreImpl();
 	protected String userId = VOID_USERID;
 	private CharsetWrapper contentCharset;
 	
@@ -185,8 +186,8 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return isReadonly;
 	}
 	
-	public ChunksRemainsImpl getChunkRemains() {
-		return chunkRemains;
+	public ProcessingStoreImpl getProcessingStore() {
+		return processingStore;
 	}
 	
 	public CharsetWrapper getCharsetWrapper() {
@@ -195,6 +196,11 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	
 	public void setContentCharset(Charset contentCharset) {
 		this.contentCharset = new CharsetWrapper(contentCharset);
+	}
+	
+	@Override
+	public ProcessingStorage getStorage() {
+		return processingStore;
 	}
 	
 	@Override
@@ -217,6 +223,7 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		message.userId = userId;
 		message.isComlpete = isComlpete;
 		message.chunkProcessed = chunkProcessed;
+		message.processingStore.copyValues(processingStore);
 		return message;
 	}
 }

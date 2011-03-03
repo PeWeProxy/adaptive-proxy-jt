@@ -1,5 +1,6 @@
 package sk.fiit.peweproxy.messages;
 
+import sk.fiit.peweproxy.services.ProcessingStorage;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
 
@@ -28,6 +29,8 @@ public interface HttpMessage {
 	boolean isComplete();
 	
 	boolean wasChunkProcessed();
+	
+	ProcessingStorage getStorage();
 	
 	/**
 	 * Returns the unique textual identifier of the user that initiated this message. This

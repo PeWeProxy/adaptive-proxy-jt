@@ -18,15 +18,13 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 	
 	protected byte[] data = null;
 	boolean sent = false;
-	protected final ChunksRemainsImpl remainsStore;
 	protected final boolean finalization;
 
 	public ChunkServicesHandleImpl(HttpMessageImpl<?> httpMessage, List<ModuleType> modules,
 			ModulesManager manager, byte[] data) {
 		super(httpMessage, modules, manager);
 		this.finalization = data == null;
-		this.remainsStore = httpMessage.getChunkRemains();
-		this.data = remainsStore.joinCeasedData(data);
+		this.data = processingStore.joinCeasedData(data);
 		HttpMessageImpl<?>.CharsetWrapper charsetWrp = httpMessage.getCharsetWrapper();
 		if (charsetWrp == null) {
 			// first time detecting textual content / charset
@@ -69,6 +67,11 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 		sent = true;
 	}
 	
+	public byte[] getActualData() {
+		commitChanges();
+		return getData();
+	}
+	
 	@Override
 	public byte[] getData() {
 		return data;
@@ -82,15 +85,17 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 			httpMessage.setContentCharset(charsetWrp.getCharset()); // if data == null
 	}
 	
-	public byte[] getActualData() {
-		commitChanges();
-		return getData();
-	}
-	
 	@Override
 	public void ceaseData(byte[] data) {
 		// called by base services implementations
-		remainsStore.ceaseData(data);
+		processingStore.ceaseData(data);
+	}
+	
+	@Override
+	public Charset getCharset() throws UnsupportedCharsetException, IOException {
+		return httpMessage.getCharsetWrapper().getCharset();
+		// it's OK to throw NPE when returned CharsetWrapper is null since calling
+		// this method in that case is illegal
 	}
 	
 	public <T, Service extends ProxyService> void ceaseContent(Service byService, T chunkPart) {
@@ -116,22 +121,6 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 			svcProvider.ceaseContent(chunkPart, this);
 		}
 	};
-	
-	public <T> void setRemains(Object key, T remains) {
-		remainsStore.setRemains(key, remains);
-	};
-	
-	@Override
-	public <T> T getRemains(Object key) {
-		return remainsStore.getRemains(key);
-	}
-	
-	@Override
-	public Charset getCharset() throws UnsupportedCharsetException, IOException {
-		return httpMessage.getCharsetWrapper().getCharset();
-		// it's OK to throw NPE when returned CharsetWrapper is null since calling
-		// this method in that case is illegal
-	}
 	
 	abstract <Service extends ProxyService> void callDoChanges(ChunkServiceProvider<?, Service> svcProvider);
 	

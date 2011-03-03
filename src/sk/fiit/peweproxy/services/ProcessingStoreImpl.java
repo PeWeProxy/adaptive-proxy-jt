@@ -4,19 +4,29 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ChunksRemainsImpl implements ChunkRemains {
-	final Map<Object, Object> remains = new HashMap<Object, Object>();
+public class ProcessingStoreImpl implements ProcessingStorage {
+	Map<Object, Object> values = new HashMap<Object, Object>();
 	byte[] ceasedData = null;
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T> T getRemains(Object key) {
-		return (T)remains.get(key);
+	public <T> T getValue(Object key) {
+		return (T)values.get(key);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T> T removeValue(Object key) {
+		return (T)values.remove(key);
 	}
 
 	@Override
-	public <T> void setRemains(Object key, T remains) {
-		this.remains.put(key, remains);
+	public <T> void setValue(Object key, T value) {
+		this.values.put(key, value);
+	}
+	
+	public void copyValues(ProcessingStoreImpl otherStore) {
+		this.values = otherStore.values;
 	}
 	
 	public void ceaseData(byte[] data) {

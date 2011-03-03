@@ -90,6 +90,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 	private ServiceBinding<?> changedModelBinding;
 	private ServiceBinding<?> bindingDoingChanges;
 	protected ModuleType moduleExecutingProvide;
+	protected final ProcessingStoreImpl processingStore;
 	
 	public ServicesHandleBase(HttpMessageImpl<?> httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		this.httpMessage = httpMessage;
@@ -100,6 +101,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		this.changedModelBinding = null;
 		this.manager = manager;
 		this.servicesCLoader = manager.getAdaptiveEngine().getPluginHandler().getServicesCLoader();
+		this.processingStore = httpMessage.getProcessingStore();
 	}
 	
 	public static boolean contentNeeded(Set<Class<? extends ProxyService>> desiredServices) {

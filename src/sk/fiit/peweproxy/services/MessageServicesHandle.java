@@ -45,6 +45,16 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 	}
 	
 	@Override
+	public void ceaseData(byte[] data) {
+		throw new IllegalStateException("Calling ceaseContent() is illegal for full-message services handle");
+	}
+	
+	@Override
+	public Charset getCharset() throws UnsupportedCharsetException, IOException {
+		return CharsetUtils.detectCharset(httpMessage.getHeader(), httpMessage.getData(), false);
+	}
+	
+	@Override
 	String getText4Logging(LogText type) {
 		if (type == LogText.TYPE)
 			return "message";
@@ -88,17 +98,7 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 			Set<Class<? extends ProxyService>> desiredServices, boolean conChunking) throws Throwable;
 	
 	@Override
-	public void ceaseData(byte[] data) {
-		throw new IllegalStateException("Calling ceaseContent() is illegal for full-message services handle");
-	}
-	
-	@Override
 	HeaderWrapper getHeaderForPatternMatch() {
 		return httpMessage.getHeader();
-	}
-	
-	@Override
-	public Charset getCharset() throws UnsupportedCharsetException, IOException {
-		return CharsetUtils.detectCharset(httpMessage.getHeader(), httpMessage.getData(), false);
 	}
 }
