@@ -34,6 +34,7 @@ public class AdaptiveHandler extends FilterHandler {
 	private boolean doHTMLparsing = false;
 	private ContentChunksModifier chunksModifier = null;
 	private boolean finishAfterSend = false;
+	private byte[] chunkProcessedData = null;
 	
 	public AdaptiveHandler() {}
 	
@@ -95,8 +96,9 @@ public class AdaptiveHandler extends FilterHandler {
 						public void dataModified(byte[] newData) {
 							if (newData == null)
 								sendArray(null, 0, 0);
-							else
+							else {
 								sendArray(newData, 0, newData.length);
+							}
 						}
 					});
 				} else {
@@ -135,6 +137,7 @@ public class AdaptiveHandler extends FilterHandler {
 					public void dataModified(byte[] newData) {
 						if (newData != null && newData.length > 0) {
 							finishAfterSend = true;
+							chunkProcessedData = newData;
 							sendArray(newData, 0, newData.length);
 						} else
 							AdaptiveHandler.super.finishData();
@@ -198,7 +201,12 @@ public class AdaptiveHandler extends FilterHandler {
 	
 	@Override
 	protected void send(BufferHandle bufHandle) {
-		if (doHTMLparsing && transfering && !sendingPhase) {
+		boolean modify = true;
+		if (bufHandle.getBuffer().array() == chunkProcessedData) {
+			modify = false;
+			chunkProcessedData = null;
+		}
+		if (modify && doHTMLparsing && transfering && !sendingPhase) {
 			// FilterHandler's methods are messing with HTML blocks
 			// 		&& we are not caching for full access processing
 			//		&& we are not sending something already cached
