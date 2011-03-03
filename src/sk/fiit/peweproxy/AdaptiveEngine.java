@@ -486,8 +486,7 @@ public class AdaptiveEngine  {
 			} catch (Throwable t) {
 				log.info("RQ: "+conHandle+" | Throwable raised while processing request chunk by "+rqPlgInstance,t);
 			}
-			svcHandle.commitChanges();
-			if (!finalization && svcHandle.getData() == null)
+			if (!finalization && svcHandle.getActualData() == null)
 				break;
 		}
 		svcHandle.finalize();
@@ -788,8 +787,7 @@ public class AdaptiveEngine  {
 			} catch (Throwable t) {
 				log.info("RP: "+conHandle+" | Throwable raised while processing response chunk by "+rpPlgInstance,t);
 			}
-			svcHandle.commitChanges();
-			if (!finalization && svcHandle.getData() == null)
+			if (!finalization && svcHandle.getActualData() == null)
 				break;
 		}
 		svcHandle.finalize();

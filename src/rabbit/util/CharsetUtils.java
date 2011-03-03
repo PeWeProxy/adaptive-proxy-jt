@@ -15,6 +15,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.HashMap;
@@ -90,13 +91,71 @@ public abstract class CharsetUtils {
 		return charset;
 	}
 	
-	public static CharBuffer decodeBytes(byte[] data, Charset charset, boolean report) throws CharacterCodingException, IOException {
-		if (data == null || data.length == 0)
+	/**
+	 * Includes only slightly modified {@link CharsetDecoder#decode(ByteBuffer)} code.
+	 */
+	public static CharBuffer decodeBytes(ByteBuffer buffer, Charset charset) throws CharacterCodingException, IOException {
+		if (buffer == null || !buffer.hasRemaining())
 			return CharBuffer.wrap("");
-		CodingErrorAction action = (report)? CodingErrorAction.REPORT : CodingErrorAction.REPLACE;
 		CharsetDecoder decoder = charset.newDecoder();
-		decoder.onMalformedInput(action);
-		decoder.onUnmappableCharacter(action);
-		return decoder.decode(ByteBuffer.wrap(data));
+		decoder.onMalformedInput(CodingErrorAction.REPORT);
+		decoder.onUnmappableCharacter(CodingErrorAction.REPLACE);
+		
+		/*boolean debug = false;
+		ByteBuffer origIn = buffer;
+		if (debug) {
+			buffer = ByteBuffer.allocate(origIn.remaining()+2);
+			buffer.put((byte)0xE2);
+			buffer.put((byte)0x82);
+			buffer.put(origIn);
+			buffer.rewind();
+			debug = false;
+		}
+		if (debug) {
+			buffer = ByteBuffer.allocate(origIn.remaining()+1);
+			buffer.put(origIn);
+			buffer.put((byte)0xAC);
+			buffer.rewind();
+		}*/
+		
+		// START of copy-paste of CharsetDecoder.decode(ByteBuffer) method code
+		// with little modifications
+		
+		int n = (int)(buffer.remaining() * decoder.averageCharsPerByte());
+		CharBuffer out = CharBuffer.allocate(n);
+
+		if ((n == 0) && (buffer.remaining() == 0))
+		    return out;
+		decoder.reset();
+		for (;;) {
+		    CoderResult cr = buffer.hasRemaining() ?
+			decoder.decode(buffer, out, true) : CoderResult.UNDERFLOW;
+		    if (cr.isUnderflow())
+			cr = decoder.flush(out);
+
+		    if (cr.isUnderflow())
+			break;
+		    if (cr.isOverflow()) {
+			n = 2*n + 1;	// Ensure progress; n might be 0!
+			CharBuffer o = CharBuffer.allocate(n);
+			out.flip();
+			o.put(out);
+			out = o;
+			continue;
+		    }
+		    if (cr.isMalformed())
+		    	break; // return what is decoded, leaving some bytes remaining in input buffer
+		    else
+		    	cr.throwException(); // should not happen since we're REPLACEing unmappable characters
+		}
+		out.flip();
+		
+		/*if (buffer != origIn) {
+			int newPos = origIn.position()-buffer.remaining();
+			origIn.position(newPos);
+			origIn.put(buffer);
+			origIn.position(newPos);
+		}*/
+		return out;
 	}
 }

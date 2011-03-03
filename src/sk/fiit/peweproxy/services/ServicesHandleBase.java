@@ -749,9 +749,9 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 				public void run() {
 					callDoChanges(bindingDoingChanges.realization.provider);
 				}
-			}, changedModelBinding.realization.module, serviceCommitingType(), httpMessage);
+			}, bindingDoingChanges.realization.module, serviceCommitingType(), httpMessage);
 		} catch (Throwable t) {
-			log.warn("Throwable raised when trying to commit changes of "+changedModelBinding.realization.provider, t);
+			log.warn("Throwable raised when trying to commit changes of "+bindingDoingChanges.realization.provider, t);
 		}
 		moduleExecutingProvide = moduleProvidingSvc;
 		inCodeOfStack.poll();

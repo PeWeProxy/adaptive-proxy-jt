@@ -33,7 +33,9 @@ public interface RequestChunksProcessingPlugin extends ProxyPlugin {
 	 * Finalizes request's chunks processing by adding whatever this plugin needs to append
 	 * (after the request) to the content accessible through passed <code>chunkServicesHandle
 	 * </code>. This method is always run after processing of last body data chunk received
-	 * from the client.
+	 * from the client. Setting chunk data to <code>null</code> does not break the process
+	 * of finalizing of chunk processing by all plugins, thus this method is always called
+	 * on every request chunks processing plugin.
 	 * @param request read-only request message containing already sent data
 	 * @param chunkServiceshandle chunk services handle for full access to the remaining content
 	 */

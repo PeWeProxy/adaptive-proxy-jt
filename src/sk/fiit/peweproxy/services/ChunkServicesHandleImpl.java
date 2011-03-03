@@ -82,8 +82,9 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 			httpMessage.setContentCharset(charsetWrp.getCharset()); // if data == null
 	}
 	
-	public void commitChanges() {
-		super.commitChanges();
+	public byte[] getActualData() {
+		commitChanges();
+		return getData();
 	}
 	
 	@Override

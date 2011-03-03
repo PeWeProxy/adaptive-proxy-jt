@@ -1,6 +1,7 @@
 package sk.fiit.peweproxy.plugins.services.impl.content;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
@@ -23,9 +24,19 @@ public abstract class BaseStringServicesProvider<Service extends ProxyService>
 	 throws CharacterCodingException, UnsupportedCharsetException, IOException {
 		super(content);
 		this.charset = content.getCharset();
-		sb = new StringBuilder(CharsetUtils.decodeBytes(content.getData(), charset, true));
-		byte[] undecodedTrailing = null; // TODO fill undecodedTrailing
-		content.ceaseData(undecodedTrailing);
+		byte[] undecodedTrailing = null;
+		if (content.getData() == null)
+			sb = new StringBuilder("");
+		else {
+			ByteBuffer buf = ByteBuffer.wrap(content.getData());
+			sb = new StringBuilder(CharsetUtils.decodeBytes(buf, charset));
+			
+			if (buf.hasRemaining()) {
+				undecodedTrailing = new byte[buf.remaining()];
+				buf.get(undecodedTrailing);
+				content.ceaseData(undecodedTrailing);
+			}
+		}
 		fullyDecoded = undecodedTrailing == null;
 	}
 	
@@ -38,7 +49,7 @@ public abstract class BaseStringServicesProvider<Service extends ProxyService>
 		if (chunkPart == null || chunkPart.isEmpty())
 			return;
 		if (!sb.toString().endsWith(chunkPart)) {
-			log.debug("Ceasing text that is not at the end of current chunk");
+			log.debug("Text being ceased is not at the end of current chunk");
 		}
 		content.ceaseData(chunkPart.getBytes(charset));
 	};

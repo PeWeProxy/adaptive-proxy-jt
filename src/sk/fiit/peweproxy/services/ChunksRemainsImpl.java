@@ -22,21 +22,29 @@ public class ChunksRemainsImpl implements ChunkRemains {
 	public void ceaseData(byte[] data) {
 		if (ceasedData == null)
 			ceasedData = data;
+		if (data == null || data.length == 0)
+			return;
 		else {
-			byte[] tmp = ceasedData;
-			// make large array and copy data to the beginning
-			ceasedData = Arrays.copyOf(data, data.length+ceasedData.length);
-			// copy original ceasedData to the end of new array
-			System.arraycopy(tmp, 0, ceasedData, data.length, tmp.length);
+			joinArrays(data, ceasedData);
 		}
+	}
+	
+	private byte[] joinArrays(byte[] header, byte[] trailer) {
+		byte[] tmp = trailer;
+		// make large array and copy header to the beginning
+		trailer = Arrays.copyOf(header, header.length+trailer.length);
+		// append original trailer to the end of new array
+		System.arraycopy(tmp, 0, trailer, header.length, tmp.length);
+		return trailer;
 	}
 	
 	public byte[] joinCeasedData(byte[] chunkData) {
 		if (ceasedData == null || ceasedData.length == 0)
 			return chunkData;
-		byte[] tmp = chunkData;
-		chunkData = Arrays.copyOf(ceasedData, ceasedData.length+chunkData.length);
-		System.arraycopy(tmp, 0, chunkData, ceasedData.length, tmp.length);
-		return chunkData;
+		if (chunkData == null || chunkData.length == 0)
+			return ceasedData;
+		byte[] ceasedData = this.ceasedData;
+		this.ceasedData = null;
+		return joinArrays(ceasedData, chunkData);
 	}
 }
