@@ -305,7 +305,7 @@ public class AdaptiveEngine  {
 		con.setProxyRHeader(conHandle.request.getHeader().getBackedHeader());
 		if (log.isTraceEnabled())
 			log.trace("RQ: "+conHandle+" | New request received ("
-					+origRequest.getHeader().getBackedHeader().getRequestLine()+") - "+conHandle.request);
+					+origRequest.getHeader().getFullLine()+") - "+conHandle.request);
 	}
 	
 	public void cacheRequestIfNeeded(final Connection con, final ContentSeparator separator, boolean isChunked) {
@@ -645,8 +645,8 @@ public class AdaptiveEngine  {
 		conHandle.messageFactory.setResponse(conHandle.response);
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | New response received ( "
-					+response.getStatusLine()+" | requested "
-					+conHandle.request.getHeader().getBackedHeader().getRequestLine()+") - "+conHandle.response);
+					+origResponse.getHeader().getFullLine()+" | requested "
+					+conHandle.request.getHeader().getFullLine()+") - "+conHandle.response);
 	}
 	
 	public void newResponse(Connection con, HttpHeader header, final Runnable proceedTask) {

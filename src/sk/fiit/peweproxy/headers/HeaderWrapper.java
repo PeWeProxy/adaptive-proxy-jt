@@ -278,12 +278,17 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 		return backedHeader.size();
 	}
 	
-	public String getFullRequestLine() {
-		StringBuilder sb = new StringBuilder(getMethod());
-		sb.append(' ');
-		sb.append(getDestionationInternal());
-		sb.append(' ');
-		sb.append(getHTTPVersionInternal());
+	public String getFullLine() {
+		StringBuilder sb = new StringBuilder();
+		if (backedHeader.isResponse()) {
+			sb.append(getStatusLine());
+		} else {
+			sb.append(getMethod());
+			sb.append(' ');
+			sb.append(getDestionationInternal());
+			sb.append(' ');
+			sb.append(getHTTPVersionInternal());;
+		}
 		return sb.toString();
 	}
 	

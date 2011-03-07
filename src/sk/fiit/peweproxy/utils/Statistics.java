@@ -170,7 +170,7 @@ public class Statistics {
 	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type, HttpMessageImpl<?> initMessage) throws Throwable {
 		String text = "";
 		if (initMessage != null) {
-			text = " on "+initMessage.getHeader().getFullRequestLine()+" (userId: "+initMessage.userIdentification()+")";
+			text = " on "+initMessage.getHeader().getFullLine()+" (userId: "+initMessage.userIdentification()+")";
 		}
 		return executeProcess(task, plugin, type, text);
 	}
