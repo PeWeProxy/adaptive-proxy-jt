@@ -213,7 +213,10 @@ public class AdaptiveHandler extends FilterHandler {
 			chunksModifier.modifyBuffer(bufHandle, new AsyncChunkModifierListener() {
 				@Override
 				public void chunkModified(BufferHandle bufHandle) {
-					AdaptiveHandler.super.send(bufHandle);
+					if (bufHandle.isEmpty())
+						blockSent();
+					else
+						AdaptiveHandler.super.send(bufHandle);
 				}
 			});
 			return;
