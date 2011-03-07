@@ -9,7 +9,7 @@ import java.nio.charset.UnsupportedCharsetException;
 import org.apache.log4j.Logger;
 
 import rabbit.util.CharsetUtils;
-import sk.fiit.peweproxy.services.ChunkServicesHandle;
+import sk.fiit.peweproxy.services.DataHolder;
 import sk.fiit.peweproxy.services.ProxyService;
 
 public abstract class BaseStringServicesProvider<Service extends ProxyService>
@@ -45,7 +45,7 @@ public abstract class BaseStringServicesProvider<Service extends ProxyService>
 		return !fullyDecoded;
 	}
 	
-	public final void ceaseContent(String chunkPart, ChunkServicesHandle chunkServiceshandle) {
+	public final void ceaseContent(String chunkPart, DataHolder dataHolder) {
 		if (chunkPart == null || chunkPart.isEmpty())
 			return;
 		if (!sb.toString().endsWith(chunkPart)) {

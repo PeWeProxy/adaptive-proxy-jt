@@ -1,6 +1,6 @@
 package sk.fiit.peweproxy.plugins.services.impl.content;
 
-import sk.fiit.peweproxy.services.ChunkServicesHandle;
+import sk.fiit.peweproxy.services.DataHolder;
 import sk.fiit.peweproxy.services.ProxyService;
 
 public abstract class BaseByteServicesProvider<Service extends ProxyService> extends
@@ -11,7 +11,7 @@ public abstract class BaseByteServicesProvider<Service extends ProxyService> ext
 	}
 	
 	@Override
-	public void ceaseContent(byte[] chunkPart, ChunkServicesHandle chunkServiceshandle) {
+	public void ceaseContent(byte[] chunkPart, DataHolder dataHolder) {
 		if (chunkPart != null && chunkPart.length > 0)
 			content.ceaseData(chunkPart);
 	}

@@ -14,7 +14,7 @@ import sk.fiit.peweproxy.messages.ModifiableHttpResponse;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.PluginHandler.PluginInstance;
 import sk.fiit.peweproxy.plugins.services.impl.BaseServiceProvider;
-import sk.fiit.peweproxy.services.ChunkServicesHandle;
+import sk.fiit.peweproxy.services.DataHolder;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.platform.PlatformContextService;
 
@@ -127,5 +127,5 @@ public class PlatformContextImpl extends BaseServiceProvider<Object, PlatformCon
 	public void doChanges(HttpResponse response, ServicesHandle chunkServicesHandle) {}
 	
 	@Override
-	public void ceaseContent(Object chunkPart, ChunkServicesHandle chunkServiceshandle) {};
+	public void ceaseContent(Object chunkPart, DataHolder dataHolder) {};
 }
