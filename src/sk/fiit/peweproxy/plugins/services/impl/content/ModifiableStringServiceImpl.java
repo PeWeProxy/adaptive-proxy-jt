@@ -46,6 +46,7 @@ public class ModifiableStringServiceImpl extends BaseStringServicesProvider<Modi
 		// to allow receiving chunk in original charset and sending it in new one
 		// (changing already sent header appropriately before it is sent is the
 		// responsibility of the plugin itself)
+		this.charset = charset;
 	}
 
 	@Override
