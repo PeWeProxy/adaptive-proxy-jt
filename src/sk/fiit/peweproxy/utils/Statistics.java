@@ -176,17 +176,19 @@ public class Statistics {
 	}
 	
 	public <Type> Type executeProcess(Callable<Type> task, ProxyPlugin plugin, ProcessType type, String dgbString) throws Throwable {
+		if (log.isTraceEnabled())
+			log.trace("Plugin "+plugin+" starting execution of "+type+" process"+dgbString);
 		long time = System.currentTimeMillis();
 		Type retVal = null;
 		try {
 			 retVal = task.call();
 			 time = System.currentTimeMillis() - time;
 		} catch (Throwable t) {
-			log.trace("Plugin "+plugin+" executing "+type+" process"+dgbString+" failed after "+time+" ms");
+			log.debug("Plugin "+plugin+" executing "+type+" process"+dgbString+" failed after "+time+" ms");
 			throw t;
 		}
-		if (log.isTraceEnabled()) {
-			log.trace("Plugin "+plugin+" executed "+type+" process"+dgbString+" in "+time+" ms");
+		if (log.isDebugEnabled()) {
+			log.debug("Plugin "+plugin+" executed "+type+" process"+dgbString+" in "+time+" ms");
 		}
 		PluginStats plgStats = statsForPlugins.get(plugin);
 		if (plgStats == null) {
