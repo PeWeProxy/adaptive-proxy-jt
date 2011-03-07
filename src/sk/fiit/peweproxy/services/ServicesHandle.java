@@ -1,7 +1,7 @@
 package sk.fiit.peweproxy.services;
 
 /**
- * Service handle is an entity that provides implementations of services available for
+ * Services handle is an entity that provides implementations of services available for
  * particular HTTP message, which are obtained from service modules.
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *

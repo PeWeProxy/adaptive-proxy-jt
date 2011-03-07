@@ -1,6 +1,5 @@
 package sk.fiit.peweproxy.messages;
 
-import sk.fiit.peweproxy.services.ProcessingStorage;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.user.UserIdentificationService;
 
@@ -26,10 +25,24 @@ public interface HttpMessage {
 	 */
 	boolean bodyAccessible();
 	
+	/**
+	 * Returns <code>true</code> if all data of this HTTP message was already transfered through
+	 * AdaptiveProxy, <code>false</code> otherwise.  
+	 * @return whether all data of this HTTP message was already transfered via proxy
+	 */
 	boolean isComplete();
 	
+	/**
+	 * Returns whether body data of this HTTP message was processed by chunk processing plugins.
+	 * @return whether this message was chunk-processed
+	 */
 	boolean wasChunkProcessed();
 	
+	/**
+	 * Returns processing storage that plugins may use to store message-specific data. Every HTTP message
+	 * instance has it's own processing storage instance.
+	 * @return processing storage for this message
+	 */
 	ProcessingStorage getStorage();
 	
 	/**

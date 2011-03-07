@@ -23,6 +23,7 @@ import sk.fiit.peweproxy.headers.ResponseHeader;
 import sk.fiit.peweproxy.messages.HttpMessageImpl;
 import sk.fiit.peweproxy.messages.HttpRequest;
 import sk.fiit.peweproxy.messages.HttpResponse;
+import sk.fiit.peweproxy.messages.ProcessingStoreImpl;
 import sk.fiit.peweproxy.plugins.PluginProperties;
 import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.plugins.services.RequestServiceModule;

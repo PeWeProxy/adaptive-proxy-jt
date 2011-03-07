@@ -6,8 +6,6 @@ import java.util.Arrays;
 import org.apache.log4j.Logger;
 
 import sk.fiit.peweproxy.headers.HeaderWrapper;
-import sk.fiit.peweproxy.services.ProcessingStorage;
-import sk.fiit.peweproxy.services.ProcessingStoreImpl;
 import sk.fiit.peweproxy.services.ServicesHandle;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
 import sk.fiit.peweproxy.utils.InMemBytesStore;

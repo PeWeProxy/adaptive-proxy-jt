@@ -1,8 +1,9 @@
-package sk.fiit.peweproxy.services;
+package sk.fiit.peweproxy.messages;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+
 
 public class ProcessingStoreImpl implements ProcessingStorage {
 	Map<Object, Object> values = new HashMap<Object, Object>();
