@@ -142,7 +142,8 @@ public class AdaptiveEngine  {
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (conHandle.con.getChunking() && !requestChunksPlugins.isEmpty()) {
+			if ((!conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED)
+					&& (conHandle.con.getChunking() && !requestChunksPlugins.isEmpty())) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -194,7 +195,8 @@ public class AdaptiveEngine  {
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (conHandle.con.getChunking() && !responseChunksPlugins.isEmpty()) {
+			if ((!conHandle.rpLateProcessing || conHandle.transferRpBody) &&
+					(conHandle.con.getChunking() && !responseChunksPlugins.isEmpty())) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -345,9 +347,13 @@ public class AdaptiveEngine  {
 					log.info("RQ: Throwable raised while obtaining set of desired services from "+rqPlgInstance,t);
 				}
 			}
+			if (!isChunked) {
+				isChunked = true; // TODO ak je isChunked = false, treba zistit u chunk pluginov ci bude chciet niekto menit data (= dlzku)
+				conHandle.request.getHeader().getBackedHeader().removeHeader("Content-Length");
+			}
 			if (!prefetch)
-				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices,con.getChunking());
-			RequestContentListener rqContentModifier = new RequestContentListener(conHandle);
+				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices,isChunked);
+			RequestContentListener rqContentModifier = (isChunked || prefetch) ? new RequestContentListener(conHandle) : null;
 			if (prefetch) {
 				new ContentFetcher(con,bufHandle,tlh,separator,rqContentModifier);
 				// cache request body data first, then run full message real-time processing (see requestContentCached())
@@ -357,9 +363,10 @@ public class AdaptiveEngine  {
 					log.debug("RQ: "+conHandle+" | No plugin wants content modifying service for request");
 				conHandle.rqLateProcessing = true;
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator,rqContentModifier);
-				resourceHandler = new ClientResourceHandler(con,directSource,isChunked);
+				resourceHandler = new ClientResourceHandler(con,directSource,true);
 				// will run header-only real-time processing, then proceeds in handling request what will
-				// transfer request body data while caching it for late processing
+				// transfer request body data while caching it for late processing and processing incoming chunks
+				// if real-time processing ended with PROCEED result
 			}
 		} else {
 			if (log.isTraceEnabled())
