@@ -80,8 +80,10 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	}
 	
 	public byte[] getData() {
-		if (data == null && dataStore != null)
+		if (data == null && dataStore != null) {
 			data = dataStore.getBytes();
+			dataStore = null;
+		}
 		return data;
 	}
 	

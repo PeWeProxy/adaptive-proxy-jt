@@ -257,8 +257,8 @@ public class GZipHandler extends BaseHandler {
      *  the modifyBuffer(ByteBuffer) as well.
      * @param arr the data to write to the gzip stream.
      */
-    protected void writeDataToGZipper (byte[] arr) {
-	packer.setInput (arr, 0, arr.length);
+    protected void writeDataToGZipper (byte[] arr, int offset, int length) {
+	packer.setInput (arr, offset, length);
 	if (packer.needsInput ())
 	    waitForData ();
 	else
@@ -300,16 +300,19 @@ public class GZipHandler extends BaseHandler {
 	    // array() on them. Create a new byte[] and copy data into it.
 	    byte[] arr;
 	    ByteBuffer buf = bufHandle.getBuffer ();
-	    totalRead += buf.remaining ();
+	    int length = buf.remaining();
+	    totalRead += length;
+	    int offset = 0;
 	    if (buf.isDirect ()) {
 		arr = new byte[buf.remaining ()];
 		buf.get (arr);
 	    } else {
-		arr = buf.array ();
+	    arr = buf.array ();
+	    offset = buf.arrayOffset();
 		buf.position (buf.limit ());
 	    }
 	    bufHandle.possiblyFlush ();
-	    writeDataToGZipper (arr);
+	    writeDataToGZipper (arr, offset, length);
 	} else {
 	    modifyBuffer (bufHandle);
 	}

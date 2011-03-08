@@ -195,6 +195,7 @@ public class AdaptiveHandler extends FilterHandler {
 		gzu = null;
 		sendingPhase = true;
 		writeBytes = true;
+		totalRead = 0;
 		setHTMLparsing();
 		sendHeader();
 	}

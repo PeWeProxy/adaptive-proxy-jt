@@ -191,8 +191,8 @@ public class FilterHandler extends GZipHandler {
     }
 
     @Override
-    protected void writeDataToGZipper (byte[] arr) {
-	forwardArrayToHandler (arr, 0, arr.length);
+    protected void writeDataToGZipper (byte[] arr, int offset, int length) {
+	forwardArrayToHandler (arr, offset, length);
     }
 
     @Override
