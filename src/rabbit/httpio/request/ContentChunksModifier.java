@@ -41,6 +41,7 @@ public abstract class ContentChunksModifier {
 						buffer.position(pos);
 					} else {
 						bufferHandle = new SimpleBufferHandle(ByteBuffer.wrap(data));
+						buffer.position(buffer.limit());
 					}
 				}
 				modifiedListener.chunkModified(bufferHandle);
