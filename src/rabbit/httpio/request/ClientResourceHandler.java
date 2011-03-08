@@ -105,8 +105,4 @@ public class ClientResourceHandler implements BlockListener {
 			listener.sendingTimeout();
 		}
     }
-    
-    public void setChunking(boolean shouldUseChunking) {
-    	chunking = shouldUseChunking;
-    }
 }

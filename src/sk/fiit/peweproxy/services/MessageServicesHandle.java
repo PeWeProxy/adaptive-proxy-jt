@@ -69,7 +69,7 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 		return false;
 	}
 	
-	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices, boolean conChunking) {
+	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices, boolean msgChunked) {
 		/*if (contentNeeded(desiredServices))
 			return true;*/
 		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
@@ -77,7 +77,7 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
 				Set<Class<? extends ProxyService>> plgDesiredSvcs = new HashSet<Class<? extends ProxyService>>();
 				try {
-					discoverDesiredServices(module,plgDesiredSvcs,conChunking);
+					discoverDesiredServices(module,plgDesiredSvcs,msgChunked);
 				} catch (Throwable t) {
 					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "
 								+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
@@ -95,7 +95,7 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 	}
 	
 	abstract void discoverDesiredServices(ModuleType plugin,
-			Set<Class<? extends ProxyService>> desiredServices, boolean conChunking) throws Throwable;
+			Set<Class<? extends ProxyService>> desiredServices, boolean msgChunked) throws Throwable;
 	
 	@Override
 	HeaderWrapper getHeaderForPatternMatch() {

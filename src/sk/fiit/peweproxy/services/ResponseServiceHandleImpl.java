@@ -24,11 +24,11 @@ public final class ResponseServiceHandleImpl extends MessageServicesHandle<Respo
 	@Override
 	void discoverDesiredServices(final ResponseServiceModule plugin,
 			final Set<Class<? extends ProxyService>> desiredServices,
-			final boolean conChunking) throws Throwable {
+			final boolean msgChunked) throws Throwable {
 		manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
 			@Override
 			public void run() {
-				plugin.desiredResponseServices(desiredServices,httpMessage.getHeader(),conChunking);
+				plugin.desiredResponseServices(desiredServices,httpMessage.getHeader(),msgChunked);
 			}
 		}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES, httpMessage);
 	}

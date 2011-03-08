@@ -19,8 +19,8 @@ public class DirectContentSource extends ContentSource {
     private boolean chunkModifierNotified = false;
     private final ContentChunksModifier chunksModifier;
     
-	public DirectContentSource(Connection con, BufferHandle bufHandle, 
-			TrafficLoggerHandler tlh, ContentSeparator separator, ContentChunksModifier chunksModifier) {
+	public DirectContentSource(Connection con, BufferHandle bufHandle, TrafficLoggerHandler tlh,
+			ContentSeparator separator, ContentChunksModifier chunksModifier) {
 		this.con = con;
 		this.bufHandle = bufHandle;
 		this.tlh = tlh;
@@ -35,7 +35,7 @@ public class DirectContentSource extends ContentSource {
 				listener.finishedRead();
 			else {
 				chunkModifierNotified = true;
-				if (con.getChunking()) {
+				if (chunksModifier != null) {
 					// request chunk modifier does not initiate advance in request handling
 					// (listener does), so we don't need to call him
 					chunksModifier.finishedRead(new AsyncChunkDataModifiedListener() {
@@ -132,7 +132,7 @@ public class DirectContentSource extends ContentSource {
 				buffer.limit(limit);
 			}
 			allDataPassed = (indicator == ContentSeparator.VAL_SEPARATED_FINISHED);
-			if (con.getChunking()) {
+			if (chunksModifier != null) {
 				chunksModifier.modifyBuffer(providedBuffer, new ContentChunksModifier.AsyncChunkModifierListener() {
 					@Override
 					public void chunkModified(BufferHandle bufHandle) {
