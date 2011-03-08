@@ -803,18 +803,23 @@ public class PluginHandler {
 			}
 		}
 		nodeList = docRoot.getElementsByTagName(ELEMENT_TYPES);
-		if (nodeList.getLength() == 0)
-			throw new PluginConfigurationException("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"'");
-		Element typesElement = (Element)nodeList.item(0);
-		NodeList types = typesElement.getElementsByTagName(ELEMENT_TYPE);
-		List<String> pluginTypes = new ArrayList<String>(types.getLength());
-		if (types.getLength() == 0)
-			log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"', this plugin won't be used");
-		for (int i = 0; i < types.getLength(); i++) {
-			Element type = (Element)types.item(i);
-			pluginTypes.add(type.getTextContent());
+		List<String> pluginTypes = null;
+		if (nodeList.getLength() == 0) {
+			pluginTypes = Collections.emptyList();
+			log.debug("Plugin '"+pluginName+"' - Missing element '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"', dynamic type discovery will be used");
+		} else {
+			Element typesElement = (Element)nodeList.item(0);
+			NodeList types = typesElement.getElementsByTagName(ELEMENT_TYPE);
+			if (types.getLength() == 0) {
+				pluginTypes = Collections.emptyList();
+				log.debug("Plugin '"+pluginName+"' - Missing elements '"+ELEMENT_TYPE+"' in '"+ELEMENT_PLUGIN+"/"+ELEMENT_TYPES+"', dynamic type discovery will be used");
+			} else
+				pluginTypes = new ArrayList<String>(types.getLength());
+			for (int i = 0; i < types.getLength(); i++) {
+				Element type = (Element)types.item(i);
+				pluginTypes.add(type.getTextContent());
+			}
 		}
-		
 		nodeList = docRoot.getElementsByTagName(ELEMENT_PARAMS);
 		Map<String, String> properties = new  HashMap<String, String>();
 		if (nodeList.getLength() == 0)
