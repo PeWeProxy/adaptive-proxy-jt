@@ -32,8 +32,10 @@ public class ClientResourceHandler implements BlockListener {
      * @param header the HttpHeader to be modified by this client request. 
      */
     public void modifyRequest (HttpHeader header) {
-    	if (chunking)
+    	if (chunking) {
     		header.setHeader ("Transfer-Encoding", "chunked");
+    		header.removeHeader("Content-Length");
+    	}
     }
     
     /** Transfer the resouce data
