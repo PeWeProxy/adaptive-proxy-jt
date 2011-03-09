@@ -1,5 +1,7 @@
 package rabbit.httpio.request;
 
+import java.nio.ByteBuffer;
+
 import rabbit.httpio.BlockListener;
 import rabbit.io.BufferHandle;
 import rabbit.proxy.Connection;
@@ -20,8 +22,10 @@ public class ContentFetcher implements BlockListener {
 	@Override
 	public void bufferRead(BufferHandle bufHandle) {
 		con.fireResouceDataRead (bufHandle);
-		// no need to call listener.bufferRead(bufHandle) since DirectContentSource
-		// is passing read chunks to chunksModifier
+		ByteBuffer buf = bufHandle.getBuffer();
+		// if buf is bufHandle that DirectContentSource uses for reading, we have to
+		// exhaust the buffer so that DirectContentSource won'try to separate it's content 
+		buf.position(buf.limit());
 		directSource.readNextBytes();
 	}
 	
