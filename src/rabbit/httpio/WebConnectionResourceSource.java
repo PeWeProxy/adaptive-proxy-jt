@@ -23,6 +23,7 @@ public class WebConnectionResourceSource
     private final BufferHandle bufHandle;
     private final TrafficLogger tl;
     private BlockListener listener;
+    private BlockListener keptListener;
     private final boolean isChunked;
     private final long dataSize;
     private long totalRead = 0;
@@ -86,6 +87,7 @@ public class WebConnectionResourceSource
 	    throw new RuntimeException ("Trying to overwrite block listener: " +
 					this.listener + " with: " + listener);
 	this.listener = listener;
+	keptListener = listener;
 	if (isChunked)
 	    chunkHandler.setBlockListener (listener);
 
@@ -163,7 +165,7 @@ public class WebConnectionResourceSource
 		handleBlock ();
 	    }
 	} catch (IOException e) {
-	    listener.failed (e);
+	    keptListener.failed (e);
 	}
     }
 
@@ -172,8 +174,8 @@ public class WebConnectionResourceSource
     }
 
     public void closed () {
-	if (listener != null) {
-	    listener.failed (new IOException ("channel closed"));
+	if (keptListener != null) {
+		keptListener.failed (new IOException ("channel closed"));
 	    listener = null;
 	} else {
 	    Logger logger = Logger.getLogger (getClass ().getName ());
@@ -182,8 +184,8 @@ public class WebConnectionResourceSource
     }
 
     public void timeout () {
-	if (listener != null) {
-	    listener.timeout ();
+	if (keptListener != null) {
+		keptListener.timeout ();
 	    listener = null;
 	} else {
 	    Logger logger = Logger.getLogger (getClass ().getName ());
