@@ -135,17 +135,18 @@ public class AdaptiveEngine  {
 	
 	class RequestContentListener extends ContentChunksModifier {
 		final ConnectionHandle conHandle;
-		final boolean chunking; 
+		final boolean caheChunk;
+		boolean mayProcess; 
 		
-		private RequestContentListener(ConnectionHandle conHandle, boolean chunking) {
+		private RequestContentListener(ConnectionHandle conHandle, boolean mayProcess) {
 			this.conHandle = conHandle;
-			this.chunking = chunking;
+			caheChunk = !conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED;
+			this.mayProcess = mayProcess;
 		}
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (chunking && !requestChunksPlugins.isEmpty()
-				&& (!conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED)) {
+			if (mayProcess && caheChunk && !requestChunksPlugins.isEmpty()) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -166,9 +167,9 @@ public class AdaptiveEngine  {
 		@Override
 		protected void modifyData(final byte[] data, final AsyncChunkDataModifiedListener listener) {
 			conHandle.request.originalMessage().addData(data);
-			if (!conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED) {
+			if (caheChunk) {
 				// we're caching chunks before RT processing or we are allowed to modify chunks cached for LT processing
-				if (chunking && !requestChunksPlugins.isEmpty()) {
+				if (mayProcess && !requestChunksPlugins.isEmpty()) {
 					proxy.getNioHandler().runThreadTask(new Runnable() {
 						@Override
 						public void run() {
@@ -188,16 +189,19 @@ public class AdaptiveEngine  {
 	class ResponseContentListener extends ContentChunksModifier {
 		final ConnectionHandle conHandle;
 		final AdaptiveHandler handler;
+		final boolean caheChunk;
+		final boolean mayProcess; 
 		
 		private ResponseContentListener(ConnectionHandle conHandle, AdaptiveHandler handler) {
 			this.conHandle = conHandle;
 			this.handler = handler;
+			caheChunk = !conHandle.rpLateProcessing || conHandle.transferRpBody;
+			mayProcess = conHandle.con.getChunking();
 		}
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (conHandle.con.getChunking() && !responseChunksPlugins.isEmpty() &&
-					(!conHandle.rpLateProcessing || conHandle.transferRpBody)) {
+			if (mayProcess && caheChunk && !responseChunksPlugins.isEmpty()) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -220,8 +224,8 @@ public class AdaptiveEngine  {
 		@Override
 		protected void modifyData(final byte[] data, final AsyncChunkDataModifiedListener listener) {
 			conHandle.response.originalMessage().addData(data);
-			if (!conHandle.rpLateProcessing || conHandle.transferRpBody) {
-				if (conHandle.con.getChunking() && !responseChunksPlugins.isEmpty()) {
+			if (caheChunk) {
+				if (mayProcess && !responseChunksPlugins.isEmpty()) {
 					proxy.getNioHandler().runThreadTask(new Runnable() {
 						@Override
 						public void run() {
@@ -315,6 +319,7 @@ public class AdaptiveEngine  {
 		final BufferHandle bufHandle = con.getRequestBufferHandle();
 		final TrafficLoggerHandler tlh = con.getTrafficLoggerHandler();
 		ClientResourceHandler resourceHandler = null;
+		RequestContentListener rqContentModifier = null;
 		if (separator != null) {
 			// request has some content
 			if (log.isTraceEnabled())
@@ -350,12 +355,10 @@ public class AdaptiveEngine  {
 			boolean rqSendingChunked = isChunked;
 			if (!prefetch)
 				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices,isChunked);
-			if (prefetch)
-				rqSendingChunked = true;
 			if (!rqSendingChunked) {
 				rqSendingChunked = true; // TODO ak je isChunked = false, treba zistit u chunk pluginov ci bude chciet niekto menit data (= dlzku)
 			}
-			RequestContentListener rqContentModifier = new RequestContentListener(conHandle,rqSendingChunked);
+			rqContentModifier = new RequestContentListener(conHandle,(rqSendingChunked || prefetch) );
 			if (prefetch) {
 				new ContentFetcher(con,bufHandle,tlh,separator,rqContentModifier);
 				// cache request body data first, then run full message real-time processing (see requestContentCached())
@@ -374,6 +377,7 @@ public class AdaptiveEngine  {
 			if (log.isTraceEnabled())
 				log.trace("RQ: "+conHandle+" | Request has no body");
 		}
+		final RequestContentListener requestContentModifier = rqContentModifier;
 		final ClientResourceHandler handler = resourceHandler;
 		// no body or no need to modify it, run header-only real-time processing (request may have body)
 		proxy.getNioHandler().runThreadTask(new Runnable() {
@@ -400,6 +404,12 @@ public class AdaptiveEngine  {
 				} else if (toSendResponse) {
 					// set that we need to send response after all data was read from connection with client
 					handlerToUse = null;
+				} else {
+					// RT processing resulted in PROCEED, we need to check whether plugins did not change header in such way
+					// that we have to send request in chunks
+					boolean isChunked = ConnectionSetupResolver.isChunked(conHandle.request.getHeader().getBackedHeader());
+					handlerToUse.setChunking(isChunked);
+					requestContentModifier.mayProcess = requestContentModifier.mayProcess || isChunked;
 				}
 				boolean responseWillBeSent = false;
 				if (handler != null && handlerToUse != handler) {

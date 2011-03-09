@@ -118,8 +118,8 @@ public class DirectContentSource extends ContentSource {
 			return;
 		}
 		if (indicator == ContentSeparator.VAL_SEPARATED_NEEDMOREDATA) {
-	    	if (!bufHandle.isEmpty())
-	    	    bufHandle.getBuffer().compact();
+	    	if (buffer.hasRemaining())
+	    	    buffer.compact();
 	    	waitForRead();
 		} else if (indicator == ContentSeparator.VAL_SEPARATED_UNFINISHED
 				|| indicator == ContentSeparator.VAL_SEPARATED_FINISHED) {

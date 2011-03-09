@@ -27,6 +27,10 @@ public class ClientResourceHandler implements BlockListener {
 		sendingListener = new SendingListener();
     }
     
+    public void setChunking(boolean chunking) {
+    	this.chunking = this.chunking || chunking;
+    }
+    
     /** Modify the request sent to the server, used to add 
      *  "Expect: 100 Continue" and similar. 
      * @param header the HttpHeader to be modified by this client request. 
