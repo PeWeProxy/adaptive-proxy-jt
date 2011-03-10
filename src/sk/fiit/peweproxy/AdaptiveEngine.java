@@ -397,14 +397,13 @@ public class AdaptiveEngine  {
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
 						ClientResourceHandler newHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 						handlerToUse = newHandler; // transfer constructed request body instead
-						
 					} else
 						// no body to transfer
 						handlerToUse = null;
 				} else if (toSendResponse) {
 					// set that we need to send response after all data was read from connection with client
 					handlerToUse = null;
-				} else {
+				} else if (handlerToUse != null) {
 					// RT processing resulted in PROCEED, we need to check whether plugins did not change header in such way
 					// that we have to send request in chunks
 					boolean isChunked = ConnectionSetupResolver.isChunked(conHandle.request.getHeader().getBackedHeader());
