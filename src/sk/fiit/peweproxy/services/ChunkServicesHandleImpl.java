@@ -24,6 +24,9 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 			ModulesManager manager, byte[] data) {
 		super(httpMessage, modules, manager);
 		this.finalization = data == null;
+		if (httpMessage == null)
+			// this is dummy handle, just for modification need discovery
+			return;
 		this.data = processingStore.joinCeasedData(data);
 		HttpMessageImpl<?>.CharsetWrapper charsetWrp = httpMessage.getCharsetWrapper();
 		if (charsetWrp == null) {
@@ -138,8 +141,10 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 	
 	@Override
 	String getText4Logging(LogText type) {
-		if (type == LogText.TYPE)
+		if (type == LogText.CONTENT_TYPE)
 			return "chunk";
+		if (type == LogText.SVC_NORMAL)
+			return "chunk service";
 		return null;
 	}
 }

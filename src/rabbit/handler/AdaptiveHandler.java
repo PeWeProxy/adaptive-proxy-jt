@@ -267,7 +267,7 @@ public class AdaptiveHandler extends FilterHandler {
 		super.setupHandler();
 		if (askForCaching) {
 			if (isCompressing || super.seeUnpackedData()) {
-				transfering = !con.getProxy().getAdaptiveEngine().transferResponse(con, response);
+				transfering = con.getProxy().getAdaptiveEngine().transferResponse(con, response);
 				if (log.isDebugEnabled())
 					log.debug(this+" caching response data: "+!transfering);
 			}

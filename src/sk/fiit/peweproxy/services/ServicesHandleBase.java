@@ -8,8 +8,10 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -66,10 +68,10 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		public void getProvidedResponseServices(Set<Class<? extends ProxyService>> providedServices) {}
 		@Override
 		public void desiredRequestServices(Set<Class<? extends ProxyService>> desiredServices,
-				RequestHeader clientRQHeaders, boolean chunkProcessingAvailable) {}
+				RequestHeader clientRQHeaders) {}
 		@Override
 		public void desiredResponseServices(Set<Class<? extends ProxyService>> desiredServices,
-				ResponseHeader webRPHeaders, boolean chunkProcessingAvailable) {}
+				ResponseHeader webRPHeaders) {}
 		@Override
 		public <Service extends ProxyService> RequestServiceProvider<Service> provideRequestService(
 				HttpRequest request, Class<Service> serviceClass)
@@ -102,7 +104,7 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		this.changedModelBinding = null;
 		this.manager = manager;
 		this.servicesCLoader = manager.getAdaptiveEngine().getPluginHandler().getServicesCLoader();
-		this.processingStore = httpMessage.getProcessingStore();
+		this.processingStore = (httpMessage != null) ? httpMessage.getProcessingStore() : null;
 	}
 	
 	public static boolean contentNeeded(Set<Class<? extends ProxyService>> desiredServices) {
@@ -114,22 +116,30 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 	
 	abstract Set<Class<? extends ProxyService>> getProvidedSvcs(ModuleType plugin);
 	
-	protected enum LogText {TYPE, NORMAL,CAPITAL,SHORT};
+	protected enum LogText {CONTENT_TYPE, SVC_NORMAL, SVC_CAPITAL, MSG_NORMAL, MSG_CAPITAL, MSG_SHORT};
 	
 	protected String getLogTextType() {
-		return getText4Logging(LogText.TYPE);
+		return getText4Logging(LogText.CONTENT_TYPE);
+	}
+	
+	protected String getLogTextSvcCapital() {
+		return getText4Logging(LogText.SVC_CAPITAL);
+	}
+	
+	protected String getLogTextSvcNormal() {
+		return getText4Logging(LogText.SVC_NORMAL);
 	}
 	
 	protected String getLogTextHead() {
-		return getText4Logging(LogText.SHORT)+": "+toString()+" | ";
+		return getText4Logging(LogText.MSG_SHORT)+": "+toString()+" | ";
 	}
 	
 	protected String getLogTextCapital() {
-		return getText4Logging(LogText.CAPITAL);
+		return getText4Logging(LogText.MSG_CAPITAL);
 	}
 	
 	protected String getLogTextNormal() {
-		return getText4Logging(LogText.NORMAL);
+		return getText4Logging(LogText.MSG_NORMAL);
 	}
 	
 	abstract String getText4Logging(LogText type);
@@ -585,6 +595,42 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 			throw (ServiceUnavailableException)t;
 		}
 	}
+	
+	private <E> boolean overlapSets(Set<E> set1, Set<E> set2) {
+		for (E element : set1) {
+			if (set2.contains(element))
+				return true;
+		}
+		return false;
+	}
+	
+	public boolean isModificationNeeded(Set<Class<? extends ProxyService>> desiredServices) {
+		/*if (contentNeeded(desiredServices))
+			return true;*/
+		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
+			ModuleType module = iterator.previous();
+			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
+				Set<Class<? extends ProxyService>> plgDesiredSvcs = new HashSet<Class<? extends ProxyService>>();
+				try {
+					discoverDesiredServices(module,plgDesiredSvcs);
+				} catch (Throwable t) {
+					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired "+getLogTextSvcNormal()+"s from "
+								+getLogTextSvcCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
+				}
+				desiredServices.addAll(plgDesiredSvcs);
+				if (contentNeeded(desiredServices)) {
+					if (log.isDebugEnabled())
+						log.debug(getLogTextHead()+"Service module "+module+" wants "+getLogTextType()
+								+"'s content modifying "+getLogTextSvcNormal()+" for "+getLogTextNormal());
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	abstract void discoverDesiredServices(ModuleType plugin,
+			Set<Class<? extends ProxyService>> desiredServices) throws Throwable;
 	
 	abstract boolean dataAccessible();
 	

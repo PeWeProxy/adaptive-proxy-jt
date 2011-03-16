@@ -3,10 +3,7 @@ package sk.fiit.peweproxy.services;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.Set;
 
 import rabbit.util.CharsetUtils;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
@@ -15,6 +12,8 @@ import sk.fiit.peweproxy.plugins.ProxyPlugin;
 
 public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> extends
 		ServicesHandleBase<ModuleType> {
+	
+	private boolean tempReadOnly = false;
 	
 	public MessageServicesHandle(HttpMessageImpl<?> httpMessage, List<ModuleType> modules, ModulesManager manager) {
 		super(httpMessage, modules, manager);
@@ -27,11 +26,16 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 
 	@Override
 	public boolean isReadOnly() {
-		return httpMessage.isReadOnly();
+		return tempReadOnly || httpMessage.isReadOnly();
 	}
 	
 	void setReadOnly() {
-		httpMessage.setReadOnly();
+		if (!tempReadOnly) // if tempReadOnly = TRUE, we are in finalize() and don't want to lock the message 
+			httpMessage.setReadOnly();
+	}
+	
+	public void setReadOnlyTemp(boolean readOnly) {
+		tempReadOnly = readOnly;
 	}
 	
 	@Override
@@ -56,46 +60,12 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 	
 	@Override
 	String getText4Logging(LogText type) {
-		if (type == LogText.TYPE)
+		if (type == LogText.CONTENT_TYPE)
 			return "message";
+		if (type == LogText.SVC_NORMAL)
+			return "message service";
 		return null;
 	}
-	
-	private <E> boolean overlapSets(Set<E> set1, Set<E> set2) {
-		for (E element : set1) {
-			if (set2.contains(element))
-				return true;
-		}
-		return false;
-	}
-	
-	public boolean needContent(Set<Class<? extends ProxyService>> desiredServices, boolean msgChunked) {
-		/*if (contentNeeded(desiredServices))
-			return true;*/
-		for (ListIterator<ModuleType> iterator = modules.listIterator(modules.size()); iterator.hasPrevious();) {
-			ModuleType module = iterator.previous();
-			if (overlapSets(desiredServices, getProvidedSvcs(module))) {
-				Set<Class<? extends ProxyService>> plgDesiredSvcs = new HashSet<Class<? extends ProxyService>>();
-				try {
-					discoverDesiredServices(module,plgDesiredSvcs,msgChunked);
-				} catch (Throwable t) {
-					log.info(getLogTextHead()+"Throwable raised while obtaining set of desired services from "
-								+getLogTextCapital()+"ServiceModule of class '"+module.getClass()+"'",t);
-				}
-				desiredServices.addAll(plgDesiredSvcs);
-				if (contentNeeded(desiredServices)) {
-					if (log.isDebugEnabled())
-						log.debug(getLogTextHead()+"Service module "+module+" wants "
-								+"content modifying service for "+getLogTextNormal());
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-	
-	abstract void discoverDesiredServices(ModuleType plugin,
-			Set<Class<? extends ProxyService>> desiredServices, boolean msgChunked) throws Throwable;
 	
 	@Override
 	HeaderWrapper getHeaderForPatternMatch() {

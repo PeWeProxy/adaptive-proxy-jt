@@ -62,6 +62,7 @@ import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.RequestChunkServiceHandleImpl;
 import sk.fiit.peweproxy.services.ResponseChunkServiceHandleImpl;
 import sk.fiit.peweproxy.services.ServicesHandleBase;
+import sk.fiit.peweproxy.utils.HeaderUtils;
 import sk.fiit.peweproxy.utils.StackTraceUtils;
 import sk.fiit.peweproxy.utils.Statistics;
 import sk.fiit.peweproxy.utils.Statistics.ProcessType;
@@ -135,18 +136,18 @@ public class AdaptiveEngine  {
 	
 	class RequestContentListener extends ContentChunksModifier {
 		final ConnectionHandle conHandle;
-		final boolean caheChunk;
+		final boolean caheChunksToActualRq;
 		boolean mayProcess; 
 		
 		private RequestContentListener(ConnectionHandle conHandle, boolean mayProcess) {
 			this.conHandle = conHandle;
-			caheChunk = !conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED;
+			caheChunksToActualRq = !conHandle.rqLateProcessing || conHandle.rqResult == RequestProcessingActions.PROCEED;
 			this.mayProcess = mayProcess;
 		}
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (mayProcess && caheChunk && !requestChunksPlugins.isEmpty()) {
+			if (mayProcess && caheChunksToActualRq && !requestChunksPlugins.isEmpty()) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -167,7 +168,7 @@ public class AdaptiveEngine  {
 		@Override
 		protected void modifyData(final byte[] data, final AsyncChunkDataModifiedListener listener) {
 			conHandle.request.originalMessage().addData(data);
-			if (caheChunk) {
+			if (caheChunksToActualRq) {
 				// we're caching chunks before RT processing or we are allowed to modify chunks cached for LT processing
 				if (mayProcess && !requestChunksPlugins.isEmpty()) {
 					proxy.getNioHandler().runThreadTask(new Runnable() {
@@ -189,19 +190,19 @@ public class AdaptiveEngine  {
 	class ResponseContentListener extends ContentChunksModifier {
 		final ConnectionHandle conHandle;
 		final AdaptiveHandler handler;
-		final boolean caheChunk;
+		final boolean cacheChunksToActualRp;
 		final boolean mayProcess; 
 		
-		private ResponseContentListener(ConnectionHandle conHandle, AdaptiveHandler handler) {
+		private ResponseContentListener(ConnectionHandle conHandle, AdaptiveHandler handler, boolean mayProcess) {
 			this.conHandle = conHandle;
 			this.handler = handler;
-			caheChunk = !conHandle.rpLateProcessing || conHandle.transferRpBody;
-			mayProcess = conHandle.con.getChunking();
+			cacheChunksToActualRp = !conHandle.rpLateProcessing || conHandle.transferRpBody;
+			this.mayProcess = mayProcess;
 		}
 		
 		@Override
 		public void finishedRead(final AsyncChunkDataModifiedListener listener) {
-			if (mayProcess && caheChunk && !responseChunksPlugins.isEmpty()) {
+			if (mayProcess && cacheChunksToActualRp && !responseChunksPlugins.isEmpty()) {
 				proxy.getNioHandler().runThreadTask(new Runnable() {
 					@Override
 					public void run() {
@@ -224,7 +225,7 @@ public class AdaptiveEngine  {
 		@Override
 		protected void modifyData(final byte[] data, final AsyncChunkDataModifiedListener listener) {
 			conHandle.response.originalMessage().addData(data);
-			if (caheChunk) {
+			if (cacheChunksToActualRp) {
 				if (mayProcess && !responseChunksPlugins.isEmpty()) {
 					proxy.getNioHandler().runThreadTask(new Runnable() {
 						@Override
@@ -324,48 +325,42 @@ public class AdaptiveEngine  {
 			// request has some content
 			if (log.isTraceEnabled())
 				log.trace("RQ: "+conHandle+" | Request separator used: "+separator.toString());
-			boolean prefetch = false;
-			Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
-			for (ProcessingPluginInstance<RequestProcessingPlugin> rqPlgInstance : requestPlugins) {
-				if (!integrationManager.isPluginEnabled(conHandle.request, rqPlgInstance.plgInstance.getName(), RequestProcessingPlugin.class)) {
-					if (log.isTraceEnabled())
-						log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during services need discovery");
-					continue;
+			boolean prefetch = isModifyingNeed(conHandle, RequestProcessingPlugin.class, requestPlugins, new DesiredServicesGetter<RequestProcessingPlugin>() {
+				@Override
+				public void getDesiredServices(RequestProcessingPlugin plugin,
+						Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+					plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader());
 				}
-				try {
-					final Set<Class<? extends ProxyService>> pluginsDesiredSvcs	= new HashSet<Class<? extends ProxyService>>();
-					final RequestProcessingPlugin plugin = rqPlgInstance.plugin;
-					stats.executeProcess(new Runnable() {
-						@Override
-						public void run() {
-							plugin.desiredRequestServices(pluginsDesiredSvcs,conHandle.request.getHeader(),isChunked);
-						}
-					}, plugin, ProcessType.REQUEST_DESIRED_SERVICES, conHandle.request.originalMessage());
-					if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
-						if (log.isDebugEnabled())
-							log.debug("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request");
-						prefetch = true;
-						break;
-					} else
-						desiredServices.addAll(pluginsDesiredSvcs);
-				} catch (Throwable t) {
-					log.info("RQ: Throwable raised while obtaining set of desired services from "+rqPlgInstance,t);
+
+				@Override
+				public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+					return conHandle.request.getServicesHandleInternal().isModificationNeeded(pluginsDesiredSvcs);
 				}
-			}
-			boolean rqSendingChunked = isChunked;
-			if (!prefetch)
-				prefetch = conHandle.request.getServicesHandle().needContent(desiredServices,isChunked);
+			}, true, "");
+			boolean rqSendingChunked = isChunked || prefetch;
 			if (!rqSendingChunked) {
-				rqSendingChunked = true; // TODO ak je isChunked = false, treba zistit u chunk pluginov ci bude chciet niekto menit data (= dlzku)
+				// if prefetch = true, chunk processing will take place
+				rqSendingChunked = isModifyingNeed(conHandle, RequestChunksProcessingPlugin.class, requestChunksPlugins, new DesiredServicesGetter<RequestChunksProcessingPlugin>() {
+					@Override
+					public void getDesiredServices(RequestChunksProcessingPlugin plugin,
+							Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+						plugin.desiredRequestChunkServices(pluginsDesiredSvcs,conHandle.request.getHeader());
+					}
+
+					@Override
+					public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+						// temporary RequestChunkServiceHandleImpl just to resolve modification need
+						return new RequestChunkServiceHandleImpl(null, modulesManager, null).isModificationNeeded(pluginsDesiredSvcs);
+					}
+				}, true, " chunk");
 			}
-			rqContentModifier = new RequestContentListener(conHandle,(rqSendingChunked || prefetch) );
+			rqContentModifier = new RequestContentListener(conHandle,rqSendingChunked);
 			if (prefetch) {
+				doRequestChunkingStartProcessing(conHandle, null);
 				new ContentFetcher(con,bufHandle,tlh,separator,rqContentModifier);
 				// cache request body data first, then run full message real-time processing (see requestContentCached())
 				return;
 			} else {
-				if (log.isDebugEnabled())
-					log.debug("RQ: "+conHandle+" | No plugin wants content modifying service for request");
 				conHandle.rqLateProcessing = true;
 				ContentSource directSource = new DirectContentSource(con,bufHandle,tlh,separator,rqContentModifier);
 				resourceHandler = new ClientResourceHandler(con,directSource,rqSendingChunked);
@@ -386,17 +381,17 @@ public class AdaptiveEngine  {
 				ClientResourceHandler handlerToUse = handler;
 				conHandle.rqResult = doRequestProcessing(conHandle, false); //header-only real-time processing
 				boolean toSendResponse = (conHandle.rqResult == RequestProcessingActions.NEW_RESPONSE || conHandle.rqResult == RequestProcessingActions.FINAL_RESPONSE );
+				HttpHeader headerToBeSent = conHandle.request.getHeader().getBackedHeader();
 				if (conHandle.rqResult == RequestProcessingActions.NEW_REQUEST) {
 					// substitutive request was constructed
-					HttpHeader headerToBeSent = conHandle.request.getHeader().getBackedHeader();
 					con.setProxyRHeader(headerToBeSent);
 					byte[] requestContent = conHandle.request.getData();
 					if (requestContent != null) {
 						// substitutive request with body was constructed
 						boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
-						ClientResourceHandler newHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
-						handlerToUse = newHandler; // transfer constructed request body instead
+						// transfer constructed request body instead
+						handlerToUse = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 					} else
 						// no body to transfer
 						handlerToUse = null;
@@ -406,7 +401,7 @@ public class AdaptiveEngine  {
 				} else if (handlerToUse != null) {
 					// RT processing resulted in PROCEED, we need to check whether plugins did not change header in such way
 					// that we have to send request in chunks
-					boolean isChunked = ConnectionSetupResolver.isChunked(conHandle.request.getHeader().getBackedHeader());
+					boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent);
 					handlerToUse.setChunking(isChunked);
 					requestContentModifier.mayProcess = requestContentModifier.mayProcess || isChunked;
 				}
@@ -422,10 +417,61 @@ public class AdaptiveEngine  {
 						boolean processResponse = conHandle.rqResult == RequestProcessingActions.NEW_RESPONSE;
 						sendResponse(conHandle, processResponse, false);
 					}
-				} else
+				} else {
+					if (handlerToUse != null && requestContentModifier.mayProcess)
+						doRequestChunkingStartProcessing(conHandle, handlerToUse);
 					proceedWithRequest(conHandle, handlerToUse);
+				}
 			}
 		}, new DefaultTaskIdentifier(getClass().getSimpleName()+".requestProcessing", requestProcessingTaskInfo(conHandle)));
+	}
+	
+	interface DesiredServicesGetter<PluginType extends ProxyPlugin> {
+		void getDesiredServices(PluginType plugin, Set<Class<? extends ProxyService>> pluginsDesiredSvcs);
+		
+		boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs);
+	}
+	
+	<PluginType extends ProxyPlugin> boolean isModifyingNeed(final ConnectionHandle conHandle, Class<PluginType> pluginClass
+			, List<ProcessingPluginInstance<PluginType>> pluginList, final DesiredServicesGetter<PluginType> getter
+			, boolean request, String logText) {
+		String msgType = (request) ? "RQ: " : "RP: ";
+		ProcessType procType = (request) ? ProcessType.REQUEST_DESIRED_SERVICES : ProcessType.RESPONSE_DESIRED_SERVICES;
+		boolean modifyNeed = false;
+		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,pluginClass);
+		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
+		for (ProcessingPluginInstance<PluginType> rqPlgInstance : pluginList) {
+			if (blacklistedPlugins.contains(rqPlgInstance.plgInstance.getName())) {
+				if (log.isTraceEnabled())
+					log.trace(msgType+conHandle+" | Plugin "+rqPlgInstance+" skipped during"+logText+" services need discovery");
+				continue;
+			}
+			try {
+				final Set<Class<? extends ProxyService>> pluginsDesiredSvcs	= new HashSet<Class<? extends ProxyService>>();
+				final PluginType plugin = rqPlgInstance.plugin;
+				stats.executeProcess(new Runnable() {
+					@Override
+					public void run() {
+						getter.getDesiredServices(plugin, pluginsDesiredSvcs);
+					}
+				}, plugin, procType, conHandle.request.originalMessage());
+				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
+					if (log.isDebugEnabled())
+						log.debug(msgType+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request"+logText);
+					modifyNeed = true;
+					break;
+				} else
+					desiredServices.addAll(pluginsDesiredSvcs);
+			} catch (Throwable t) {
+				log.info(msgType+"Throwable raised while obtaining set of desired"+logText+" services from "+rqPlgInstance,t);
+			}
+		}
+		if (!modifyNeed)
+			modifyNeed = getter.resolveServices(desiredServices);
+		if (!modifyNeed && log.isDebugEnabled()) {
+			log.debug(msgType+conHandle+" | No plugin wants content modifying"+logText+" service for request"+logText);
+		}
+		return modifyNeed;
 	}
 	
 	private void requestContentCached(final ConnectionHandle conHandle) {
@@ -457,9 +503,13 @@ public class AdaptiveEngine  {
 						byte[] requestContent = conHandle.request.getData();
 						if (requestContent != null) {
 							boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
+							if (!isChunked) {
+								headerToBeSent.setHeader("Content-Length", Integer.toString(requestContent.length, 10));
+							}
 							PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
 							resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
-						}
+						} else
+							HeaderUtils.removeContentHeaders(headerToBeSent);
 						proceedWithRequest(conHandle, resourceHandler);
 					} else {
 						boolean processResponse = (conHandle.rqResult == RequestProcessingActions.NEW_RESPONSE) ? true : false;
@@ -479,6 +529,34 @@ public class AdaptiveEngine  {
 		});
 	}
 	
+	private void doRequestChunkingStartProcessing(final ConnectionHandle conHandle, ClientResourceHandler handler) {
+		conHandle.request.setAllowedThread();
+		conHandle.request.getServicesHandleInternal().setReadOnlyTemp(true);
+		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,RequestChunksProcessingPlugin.class);
+		for (ProcessingPluginInstance<RequestChunksProcessingPlugin> rqPlgInstance : requestChunksPlugins) {
+			if (blacklistedPlugins.contains(rqPlgInstance.plgInstance.getName())) {
+				if (log.isTraceEnabled())
+					log.trace("RQ: "+conHandle+" | Plugin "+rqPlgInstance+" skipped during chunk processing start");
+				continue;
+			}
+			try {
+				final RequestChunksProcessingPlugin plugin = rqPlgInstance.plugin;
+				stats.executeProcess(new Runnable() {
+					@Override
+					public void run() {
+						plugin.startRequestProcessing(conHandle.request);
+					}
+				}, plugin, ProcessType.REQUEST_CHUNK_PROCESSING, conHandle.request);
+			} catch (Throwable t) {
+				log.info("RQ: "+conHandle+" | Throwable raised while starting chunks processing on request by "+rqPlgInstance,t);
+			}
+		}
+		conHandle.request.getServicesHandleInternal().finalize();
+		conHandle.request.getServicesHandleInternal().setReadOnlyTemp(false);
+		if (handler != null)
+			handler.setChunking(ConnectionSetupResolver.isChunked(conHandle.request.getHeader().getBackedHeader()));
+	}
+	
 	private byte[] doRequestChunkProcessing(final ConnectionHandle conHandle, byte[] data) {
 		conHandle.request.setAllowedThread();
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,RequestChunksProcessingPlugin.class);
@@ -496,7 +574,7 @@ public class AdaptiveEngine  {
 					@Override
 					public void run() {
 						if (finalization)
-							plugin.finalizeProcessing(conHandle.request, svcHandle);
+							plugin.finalizeRequestProcessing(conHandle.request, svcHandle);
 						else
 							plugin.processRequestChunk(conHandle.request, svcHandle);
 					}
@@ -534,6 +612,7 @@ public class AdaptiveEngine  {
 				byte[] data = conHandle.request.getData();
 				if (data != null && data.length > 0) {
 					conHandle.request.setData(null);
+					doRequestChunkingStartProcessing(conHandle, null);
 					doRequestChunkProcessing(conHandle, data);
 					doRequestChunkProcessing(conHandle, null);
 				}
@@ -615,7 +694,7 @@ public class AdaptiveEngine  {
 					}
 				} catch (Throwable t) {
 					log.info("RQ: "+conHandle+" | Throwable raised while processing request by "+rqPlgInstance,t);
-					// TODO revert changes maybe ?
+					// revert changes maybe ?
 				}
 			}
 		} while (again);
@@ -678,38 +757,47 @@ public class AdaptiveEngine  {
 	public boolean transferResponse(Connection con, HttpHeader response) {
 		con.setMayCache(false);
 		final ConnectionHandle conHandle = requestHandles.get(con);
-		Set<Class<? extends ProxyService>> desiredServices = new HashSet<Class<? extends ProxyService>>();
-		for (ProcessingPluginInstance<ResponseProcessingPlugin> rpPlgInstance : responsePlugins) {
-			if (!integrationManager.isPluginEnabled(conHandle.response, rpPlgInstance.plgInstance.getName(), ResponseProcessingPlugin.class)) {
-				if (log.isTraceEnabled())
-					log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped during services need discovery");
-				continue;
+		boolean transfer = !isModifyingNeed(conHandle, ResponseProcessingPlugin.class, responsePlugins, new DesiredServicesGetter<ResponseProcessingPlugin>() {
+			@Override
+			public void getDesiredServices(ResponseProcessingPlugin plugin,
+					Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+				plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader());
 			}
-			try {
-				final Set<Class<? extends ProxyService>> pluginsDesiredSvcs	= new HashSet<Class<? extends ProxyService>>();
-				final ResponseProcessingPlugin plugin = rpPlgInstance.plugin;
-				stats.executeProcess(new Runnable() {
-					@Override
-					public void run() {
-						plugin.desiredResponseServices(pluginsDesiredSvcs,conHandle.response.getHeader(),conHandle.con.getChunking());
-					}
-				}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES, conHandle.response.originalMessage());
-				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
-					if (log.isDebugEnabled())
-						log.debug("RP: "+conHandle+" | Plugin "+rpPlgInstance+" wants content modifying service for response");
-					return true;
-				} else
-					desiredServices.addAll(pluginsDesiredSvcs);
-			} catch (Throwable t) {
-				log.info("RP: Throwable raised while obtaining set of desired services from "+rpPlgInstance,t);
+
+			@Override
+			public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+				return conHandle.response.getServicesHandleInternal().isModificationNeeded(pluginsDesiredSvcs);
+			}
+		}, false, "");
+		boolean mayProcess = !transfer;
+		if (transfer) {
+			mayProcess = ConnectionSetupResolver.isChunked(response);
+			if (!mayProcess) {
+				if (ConnectionSetupResolver.chunkingPossible(conHandle.request.originalMessage().getHeader().getBackedHeader())) {
+					mayProcess = isModifyingNeed(conHandle, ResponseChunksProcessingPlugin.class, responseChunksPlugins, new DesiredServicesGetter<ResponseChunksProcessingPlugin>() {
+						@Override
+						public void getDesiredServices(ResponseChunksProcessingPlugin plugin,
+								Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+							plugin.desiredResponseChunkServices(pluginsDesiredSvcs,conHandle.response.getHeader());
+						}
+
+						@Override
+						public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+							// temporary ResponseChunkServiceHandleImpl just to resolve modification need
+							return new ResponseChunkServiceHandleImpl(null,modulesManager,null).isModificationNeeded(pluginsDesiredSvcs);
+						}
+					}, false, " chunk");
+					// handler is set to chunk according to con.getChunking() which is always TRUE when using AdaptiveHandler
+				}
 			}
 		}
-		if (conHandle.response.getServicesHandle().needContent(desiredServices,con.getChunking()))
-			return true;
-		if (log.isDebugEnabled())
-			log.debug("RP: "+conHandle+" | No plugin wants content modifying service for response");
-		conHandle.rpLateProcessing = true;
-		return false;
+		AdaptiveHandler aHandler = ((AdaptiveHandler) conHandle.handler);
+		doResponseChunkingStartProcessing(conHandle);
+		ResponseContentListener rpModifier = new ResponseContentListener(conHandle, aHandler, mayProcess);
+		aHandler.setChunksListener(rpModifier);
+		if (transfer)
+			conHandle.rpLateProcessing = true;
+		return transfer;
 	}
 
 	public void processResponse(final Connection con, final Runnable proceedTask) {
@@ -780,6 +868,32 @@ public class AdaptiveEngine  {
 		});
 	}
 	
+	private void doResponseChunkingStartProcessing(final ConnectionHandle conHandle) {
+		conHandle.response.setAllowedThread();
+		conHandle.response.getServicesHandleInternal().setReadOnlyTemp(true);
+		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,ResponseChunksProcessingPlugin.class);
+		for (ProcessingPluginInstance<ResponseChunksProcessingPlugin> rpPlgInstance : responseChunksPlugins) {
+			if (blacklistedPlugins.contains(rpPlgInstance.plgInstance.getName())) {
+				if (log.isTraceEnabled())
+					log.trace("RP: "+conHandle+" | Plugin "+rpPlgInstance+" skipped during chunk processing start");
+				continue;
+			}
+			try {
+				final ResponseChunksProcessingPlugin plugin = rpPlgInstance.plugin;
+				stats.executeProcess(new Runnable() {
+					@Override
+					public void run() {
+						plugin.startResponseProcessing(conHandle.response);
+					}
+				}, plugin, ProcessType.RESPONSE_CHUNK_PROCESSING, conHandle.response);
+			} catch (Throwable t) {
+				log.info("RP: "+conHandle+" | Throwable raised while starting chunks processing on response by "+rpPlgInstance,t);
+			}
+		}
+		conHandle.response.getServicesHandleInternal().finalize();
+		conHandle.response.getServicesHandleInternal().setReadOnlyTemp(false);
+	}
+	
 	private byte[] doResponseChunkProcessing(final ConnectionHandle conHandle, byte[] data) {
 		conHandle.response.setAllowedThread();
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,ResponseChunksProcessingPlugin.class);
@@ -797,7 +911,7 @@ public class AdaptiveEngine  {
 					@Override
 					public void run() {
 						if (finalization)
-							plugin.finalizeProcessing(conHandle.response, svcHandle);
+							plugin.finalizeResponseProcessing(conHandle.response, svcHandle);
 						else
 							plugin.processResponseChunk(conHandle.response, svcHandle);
 					}
@@ -833,6 +947,7 @@ public class AdaptiveEngine  {
 				byte[] data = conHandle.response.getData();
 				if (data != null && data.length > 0) {
 					conHandle.response.setData(null);
+					doResponseChunkingStartProcessing(conHandle);
 					doResponseChunkProcessing(conHandle, data);
 					doResponseChunkProcessing(conHandle, null);
 				}
@@ -893,7 +1008,7 @@ public class AdaptiveEngine  {
 					}
 				} catch (Throwable t) {
 					log.info("RP: "+conHandle+" | Throwable raised while processing response by "+rpPlgInstance,t);
-					// TODO revert changes maybe ?
+					// revert changes maybe ?
 				}
 			}
 		} while (again);
@@ -1208,11 +1323,6 @@ public class AdaptiveEngine  {
 	public void responseHandlerUsed(Connection connection, Handler handler) {
 		ConnectionHandle conHandle = requestHandles.get(connection);
 		conHandle.handler = handler;
-		if (handler instanceof AdaptiveHandler) {
-			AdaptiveHandler aHandler = ((AdaptiveHandler) handler); 
-			ResponseContentListener rpModifier = new ResponseContentListener(conHandle, aHandler);
-			aHandler.setChunksListener(rpModifier);
-		}
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
 					+" on " +conHandle.request.getHeader().getBackedHeader().getRequestLine());

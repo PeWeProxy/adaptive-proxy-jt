@@ -24,36 +24,35 @@ public class ConnectionSetupResolver {
 		    setKeepAlive (false);
 		if (keepalive && pcon != null && pcon.equalsIgnoreCase ("close"))
 		    setKeepAlive (false);
-		
-		if (header.isResponse ()) {
-		    if (header.getResponseHTTPVersion ().equals ("HTTP/1.1")) {
-				String chunked = header.getHeader ("Transfer-Encoding");
-				setKeepAlive (true);
-				ischunked = false;
-				
-				if (chunked != null && chunked.equalsIgnoreCase ("chunked")) {
-				    /* If we handle chunked data we must read the whole page
-				     * before continuing, since the chunk footer must be 
-				     * appended to the header (read the RFC)...
-				     * 
-				     * As of RFC 2616 this is not true anymore...
-				     * this means that we throw away footers and it is legal.
-				     */
-				    ischunked = true;
-				    header.removeHeader ("Content-Length");
-				    dataSize = -1;
-				}
-		    } else {
-		    	setKeepAlive (false);
-		    }
-		    if (!(dataSize > -1 || ischunked))
-			setKeepAlive (false);
-		} else {
-		    String httpVersion = header.getHTTPVersion ();
-		    if (httpVersion != null) {
+		String httpVersion = header.getHTTPVersion ();
+		if (httpVersion != null) {
+			if (header.isResponse ()) {
+			    if (httpVersion.equals ("HTTP/1.1")) {
+					String chunked = header.getHeader ("Transfer-Encoding");
+					setKeepAlive (true);
+					ischunked = false;
+					
+					if (chunked != null && chunked.toLowerCase().endsWith ("chunked")) {
+					    /* If we handle chunked data we must read the whole page
+					     * before continuing, since the chunk footer must be 
+					     * appended to the header (read the RFC)...
+					     * 
+					     * As of RFC 2616 this is not true anymore...
+					     * this means that we throw away footers and it is legal.
+					     */
+					    ischunked = true;
+					    header.removeHeader ("Content-Length");
+					    dataSize = -1;
+					}
+			    } else {
+			    	setKeepAlive (false);
+			    }
+			    if (!(dataSize > -1 || ischunked))
+				setKeepAlive (false);
+			} else {
 				if (httpVersion.equals ("HTTP/1.1")) {
 				    String chunked = header.getHeader ("Transfer-Encoding");
-				    if (chunked != null && chunked.equalsIgnoreCase ("chunked")) {
+				    if (chunked != null && chunked.toLowerCase().endsWith ("chunked")) {
 						ischunked = true;
 						header.removeHeader ("Content-Length");
 						dataSize = -1;
@@ -63,19 +62,36 @@ public class ConnectionSetupResolver {
 				    if (ka == null || !ka.equalsIgnoreCase ("Keep-Alive"))
 					setKeepAlive (false);			
 				}
-		    }
+			}
 		}
 	}
 	
 	public static boolean isChunked(HttpHeader header) {
-		if ("HTTP/1.1".equals(header.getResponseHTTPVersion())) {
-			String chunked = header.getHeader ("Transfer-Encoding");
-			if (chunked != null && chunked.equalsIgnoreCase ("chunked")) {
+		if ("HTTP/1.1".equals(header.getHTTPVersion())) {
+			String teVal = header.getHeader ("Transfer-Encoding");
+			if (teVal != null && teVal.toLowerCase().endsWith("chunked"))
 				return true;
-			}
 	    }
 		return false;
 	}
+	
+	public static boolean chunkingPossible(HttpHeader header) {
+		return "HTTP/1.1".equals(header.getHTTPVersion());
+	}
+	
+	/*public static boolean isDynamicLength(HttpHeader header) {
+		if (isChunked(header))
+			return true;
+		if ("HTTP/1.1".equals(header.getResponseHTTPVersion())) {
+			String teVal = header.getHeader ("Transfer-Encoding");
+			teVal = header.getHeader ("Connection");
+			if (teVal != null && teVal.equals("close"))
+				return true;
+			// otherwise the resource MAY terminate connection, but we can NOT count on this
+			// because it probably won't
+	    }
+		return false;
+	}*/
 	
 	/** Set the keep alive value to currentkeepalive & keepalive
      * @param keepalive the new keepalive value.

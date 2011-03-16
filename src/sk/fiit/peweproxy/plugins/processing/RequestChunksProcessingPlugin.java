@@ -1,7 +1,8 @@
 package sk.fiit.peweproxy.plugins.processing;
 
 import sk.fiit.peweproxy.messages.HttpRequest;
-import sk.fiit.peweproxy.plugins.ProxyPlugin;
+import sk.fiit.peweproxy.messages.ModifiableHttpRequest;
+import sk.fiit.peweproxy.plugins.RequestChunksPlugin;
 import sk.fiit.peweproxy.services.ChunkServicesHandle;
 
 /**
@@ -13,7 +14,18 @@ import sk.fiit.peweproxy.services.ChunkServicesHandle;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestChunksProcessingPlugin extends ProxyPlugin {
+public interface RequestChunksProcessingPlugin extends RequestChunksPlugin {
+	
+	/**
+	 * Processes passed <code>request</code> by this request chunks processing plugin. In this
+	 * method a request chunks processing plugin can modify request header before it is sent
+	 * to the web resource. Plugins are discouraged to use services accessing the data of the
+	 * request's body in this method in rare situations when such services are available at
+	 * this time.
+	 * @param request full-access request message to process
+	 * @return signal for further processing of a request
+	 */
+	void startRequestProcessing(ModifiableHttpRequest request);
 	
 	/**
 	 * Process a request chunk accessible through passed <code>chunkServicesHandle</code>.
@@ -39,5 +51,5 @@ public interface RequestChunksProcessingPlugin extends ProxyPlugin {
 	 * @param request read-only request message containing already sent data
 	 * @param chunkServiceshandle chunk services handle for full access to the remaining content
 	 */
-	void finalizeProcessing(HttpRequest request, ChunkServicesHandle chunkServicesHandle);
+	void finalizeRequestProcessing(HttpRequest request, ChunkServicesHandle chunkServicesHandle);
 }

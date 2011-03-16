@@ -23,15 +23,28 @@ public class ResponseChunkServiceHandleImpl extends ChunkServicesHandleImpl<Resp
 	}
 	
 	@Override
+	void discoverDesiredServices(final ResponseChunksServiceModule plugin,
+			final Set<Class<? extends ProxyService>> desiredServices) throws Throwable {
+		manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
+			@Override
+			public void run() {
+				plugin.desiredResponseChunkServices(desiredServices,httpMessage.getHeader());
+			}
+		}, plugin, ProcessType.RESPONSE_DESIRED_SERVICES, httpMessage);
+	}
+	
+	@Override
 	String getText4Logging(LogText type) {
 		String superStr = super.getText4Logging(type);
 		if (superStr != null)
 			return superStr;
-		if (type == LogText.CAPITAL)
-			return "Request";
-		if (type == LogText.SHORT)
-			return "RQ";
-		return "request";
+		if (type == LogText.MSG_CAPITAL)
+			return "Response";
+		if (type == LogText.MSG_SHORT)
+			return "RP";
+		if (type == LogText.SVC_CAPITAL)
+			return "ResponseChunk";
+		return "response";
 	}
 	
 	@Override

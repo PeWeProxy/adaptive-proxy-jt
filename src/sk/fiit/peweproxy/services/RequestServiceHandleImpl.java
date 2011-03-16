@@ -23,12 +23,11 @@ public class RequestServiceHandleImpl extends MessageServicesHandle<RequestServi
 	
 	@Override
 	void discoverDesiredServices(final RequestServiceModule plugin,
-			final Set<Class<? extends ProxyService>> desiredServices,
-			final boolean msgChunked) throws Throwable {
+			final Set<Class<? extends ProxyService>> desiredServices) throws Throwable {
 		manager.getAdaptiveEngine().getStatistics().executeProcess(new Runnable() {
 			@Override
 			public void run() {
-				plugin.desiredRequestServices(desiredServices,httpMessage.getHeader(),msgChunked);
+				plugin.desiredRequestServices(desiredServices,httpMessage.getHeader());
 			}
 		}, plugin, ProcessType.REQUEST_DESIRED_SERVICES, httpMessage);
 	}
@@ -38,9 +37,9 @@ public class RequestServiceHandleImpl extends MessageServicesHandle<RequestServi
 		String superStr = super.getText4Logging(type);
 		if (superStr != null)
 			return superStr;
-		if (type == LogText.CAPITAL)
+		if (type == LogText.MSG_CAPITAL || type == LogText.SVC_CAPITAL)
 			return "Request";
-		if (type == LogText.SHORT)
+		if (type == LogText.MSG_SHORT)
 			return "RQ";
 		return "request";
 	}
