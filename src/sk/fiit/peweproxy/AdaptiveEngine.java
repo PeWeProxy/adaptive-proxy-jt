@@ -769,32 +769,6 @@ public class AdaptiveEngine  {
 				return conHandle.response.getServicesHandleInternal().isModificationNeeded(pluginsDesiredSvcs);
 			}
 		}, false, "");
-		boolean mayProcess = !transfer;
-		if (transfer) {
-			mayProcess = ConnectionSetupResolver.isChunked(response);
-			if (!mayProcess) {
-				if (ConnectionSetupResolver.chunkingPossible(conHandle.request.originalMessage().getHeader().getBackedHeader())) {
-					mayProcess = isModifyingNeed(conHandle, ResponseChunksProcessingPlugin.class, responseChunksPlugins, new DesiredServicesGetter<ResponseChunksProcessingPlugin>() {
-						@Override
-						public void getDesiredServices(ResponseChunksProcessingPlugin plugin,
-								Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
-							plugin.desiredResponseChunkServices(pluginsDesiredSvcs,conHandle.response.getHeader());
-						}
-
-						@Override
-						public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
-							// temporary ResponseChunkServiceHandleImpl just to resolve modification need
-							return new ResponseChunkServiceHandleImpl(null,modulesManager,null).isModificationNeeded(pluginsDesiredSvcs);
-						}
-					}, false, " chunk");
-					// handler is set to chunk according to con.getChunking() which is always TRUE when using AdaptiveHandler
-				}
-			}
-		}
-		AdaptiveHandler aHandler = ((AdaptiveHandler) conHandle.handler);
-		doResponseChunkingStartProcessing(conHandle);
-		ResponseContentListener rpModifier = new ResponseContentListener(conHandle, aHandler, mayProcess);
-		aHandler.setChunksListener(rpModifier);
 		if (transfer)
 			conHandle.rpLateProcessing = true;
 		return transfer;
@@ -1321,11 +1295,40 @@ public class AdaptiveEngine  {
 	}
 
 	public void responseHandlerUsed(Connection connection, Handler handler) {
-		ConnectionHandle conHandle = requestHandles.get(connection);
+		final ConnectionHandle conHandle = requestHandles.get(connection);
 		conHandle.handler = handler;
 		if (log.isTraceEnabled())
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
 					+" on " +conHandle.request.getHeader().getBackedHeader().getRequestLine());
+		if (handler instanceof AdaptiveHandler) {
+			// conHandle.rpLateProcessing was set to transfer in transferResponse()
+			boolean mayProcess = !conHandle.rpLateProcessing;
+			if (conHandle.rpLateProcessing) {
+				mayProcess = ConnectionSetupResolver.isChunked(conHandle.response.getHeader().getBackedHeader());
+				if (!mayProcess) {
+					if (ConnectionSetupResolver.chunkingPossible(conHandle.request.originalMessage().getHeader().getBackedHeader())) {
+						mayProcess = isModifyingNeed(conHandle, ResponseChunksProcessingPlugin.class, responseChunksPlugins, new DesiredServicesGetter<ResponseChunksProcessingPlugin>() {
+							@Override
+							public void getDesiredServices(ResponseChunksProcessingPlugin plugin,
+									Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+								plugin.desiredResponseChunkServices(pluginsDesiredSvcs,conHandle.response.getHeader());
+							}
+
+							@Override
+							public boolean resolveServices(Set<Class<? extends ProxyService>> pluginsDesiredSvcs) {
+								// temporary ResponseChunkServiceHandleImpl just to resolve modification need
+								return new ResponseChunkServiceHandleImpl(null,modulesManager,null).isModificationNeeded(pluginsDesiredSvcs);
+							}
+						}, false, " chunk");
+						// handler is set to chunk according to con.getChunking() which is always TRUE when using AdaptiveHandler
+					}
+				}
+			}
+			AdaptiveHandler aHandler = (AdaptiveHandler) handler;
+			doResponseChunkingStartProcessing(conHandle);
+			ResponseContentListener rpModifier = new ResponseContentListener(conHandle, aHandler, mayProcess);
+			aHandler.setChunksListener(rpModifier);
+		}
 	}
 
 	public ModulesManager getModulesManager() {

@@ -39,11 +39,11 @@ public class AdaptiveHandler extends FilterHandler {
 	public AdaptiveHandler() {}
 	
 	public AdaptiveHandler(Connection con, TrafficLoggerHandler tlh,
-			HttpHeader header, HttpHeader webHeader,
+			HttpHeader request, HttpHeader response,
 			ResourceSource content, boolean mayCache, boolean mayFilter,
 			long size, boolean compress, boolean repack,
 			  List<HtmlFilterFactory> filterClasses) {
-		super(con, tlh, header, webHeader, content, mayCache,
+		super(con, tlh, request, response, content, mayCache,
 				mayFilter, size, compress, repack, filterClasses);
 	}
 	
