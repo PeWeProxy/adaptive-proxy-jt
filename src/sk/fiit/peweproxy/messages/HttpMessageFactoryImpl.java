@@ -6,9 +6,9 @@ import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ConnectionSetupResolver;
 import rabbit.proxy.Connection;
+import rabbit.util.HeaderUtils;
 import sk.fiit.peweproxy.AdaptiveEngine;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
-import sk.fiit.peweproxy.utils.HeaderUtils;
 
 public final class HttpMessageFactoryImpl implements HttpMessageFactory {
 	private static final Logger log = Logger.getLogger(HttpMessageFactoryImpl.class.getName());

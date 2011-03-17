@@ -14,7 +14,7 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
-import sk.fiit.peweproxy.utils.HeaderUtils;
+import rabbit.util.HeaderUtils;
 import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class AdaptiveHandler extends FilterHandler {

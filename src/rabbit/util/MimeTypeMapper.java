@@ -14,9 +14,11 @@ public class MimeTypeMapper {
 	else if (filename.endsWith ("jpeg") || filename.endsWith ("jpg"))
 	    return "image/jpeg";
 	else if (filename.endsWith ("txt"))
-	    return "text/plain";
+	    return "text/plain; charset=UTF-8";
 	else if (filename.endsWith ("html"))
-	    return "text/html";
+	    return "text/html; charset=UTF-8";
+	else if (filename.endsWith ("js"))
+	    return "text/javascript; charset=UTF-8";
 	return null;
     }
 }    

@@ -1,10 +1,6 @@
 package rabbit.handler;
 
 import java.nio.ByteBuffer;
-import java.text.NumberFormat;
-import java.text.ParseException;
-import java.util.Iterator;
-import java.util.Locale;
 
 import rabbit.http.HttpHeader;
 import rabbit.httpio.ResourceSource;
@@ -12,6 +8,7 @@ import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
 import rabbit.proxy.Connection;
 import rabbit.proxy.TrafficLoggerHandler;
+import rabbit.util.HeaderUtils;
 import rabbit.util.SProperties;
 import rabbit.zip.GZipPackListener;
 import rabbit.zip.GZipPacker;
@@ -27,8 +24,6 @@ public class GZipHandler extends BaseHandler {
     private boolean compressedDataFinished = false;
     private GZipPacker packer = null;
     
-    private static final NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
-
     /** For creating the factory.
      */
     public GZipHandler () {
@@ -58,7 +53,7 @@ public class GZipHandler extends BaseHandler {
     protected void setupHandler () {
 	if (compress) {
 		boolean seeUnpacked = seeUnpackedData ();
-	    isCompressing = doesClientAcceptGzip() && seeUnpacked;
+	    isCompressing = HeaderUtils.doesClientAcceptGzip(con.getClientRHeader()) && seeUnpacked;
 	    if (isCompressing) {
 		response.removeHeader ("Content-Length");
 		response.setHeader ("Content-Encoding", "gzip");
@@ -71,66 +66,6 @@ public class GZipHandler extends BaseHandler {
 		    	mayFilter = false;
 	    }
 	}
-    }
-    
-    private boolean doesClientAcceptGzip() {
-    	/*
-    	 * Accept-Encoding: compress, gzip
-    	 * Accept-Encoding:
-    	 * Accept-Encoding: *
-    	 * Accept-Encoding: compress;q=0.5, gzip;q=1.0
-    	 * Accept-Encoding: gzip;q=1.0, identity; q=0.5, *;q=0
-    	 */
-    	boolean undirectAccept = false;
-    	Iterator<String> iter = con.getClientRHeader().getHeaders("Accept-Encoding").iterator();
-    	if (!iter.hasNext()) {
-    		/* RFC 2616:
-    		 * "If no Accept-Encoding field is present in a request, the server MAY
-    		 * assume that the client will accept any content coding."
-    		 */
-			//return true;
-    		
-    		/* FireFox corrupts responses when it's Accept-Encoding config value is cleared
-    		 * and it does not include any Accept-Encoding field in request
-    		 */
-    		return false;
-		}
-    	while(iter.hasNext()) {
-    		String prefs = iter.next();
-    		Boolean gzipAccept = isEncAccepted(prefs, "gzip");
-    		if (gzipAccept != null)
-    			return gzipAccept.booleanValue();
-    		Boolean otherAccept = isEncAccepted(prefs, "*");
-    		if (otherAccept != null) {
-    			undirectAccept = !otherAccept;
-    		}
-    	}
-    	return undirectAccept;
-    }
-    
-    private Boolean isEncAccepted(String prefs, String enc) {
-    	int index = -1;
-    	if ((index = prefs.indexOf(enc)) >= 0) {
-			index += enc.length();
-			String following = prefs.substring(index).trim();
-			if (following.length() == 0)
-				return true;
-			char nextChar = following.charAt(0);
-	    	if (nextChar == ',')
-	    		return true;
-	    	if (nextChar == ';') {
-	    		// cut ;q=
-	    		following = following.substring(3);
-	    		int end = following.indexOf(',');
-	    		if (end < 0)
-	    			end = following.length();
-	    		following = following.substring(0, end);
-	    		try {
-	    			return nf.parse(following).doubleValue() > 0;
-				} catch (ParseException ignored) {}
-			}
-    	}
-    	return null;
     }
     
     protected boolean seeUnpackedData () {
