@@ -32,7 +32,7 @@ import rabbit.zip.GZipPacker;
  */
 public class FileSender implements MetaHandler, HttpHeaderSentListener {
 	private static final String PREFIX_GZIP = "gzip_";
-	private static final String POSTFIX_GZIP = ".gzip";
+	private static final String POSTFIX_GZIP = ".zip";
     private Connection con;
     private TrafficLogger tlClient;
     private TrafficLogger tlProxy;
@@ -152,12 +152,9 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
 				@Override
 				public void packed(byte[] buf, int off, int len) {
 					try {
-						if (len > 0) {
+						if (len > 0)
 							outStream.write(buf, off, len);
-							getNextData(buffer, inStream);
-					    } else {
-					    	getNextData(buffer, inStream);
-					    }
+						getNextData(buffer, inStream);
 					} catch (IOException e) {
 						failed(e);
 					}
