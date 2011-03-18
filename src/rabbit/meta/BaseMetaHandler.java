@@ -48,7 +48,7 @@ public abstract class BaseMetaHandler
 	this.tlProxy = tlProxy;
 	this.tlClient = tlClient;
 	HttpHeader response = con.getHttpGenerator ().getHeader ();
-	response.setHeader ("Transfer-Encoding", "Chunked");
+	response.setHeader ("Transfer-Encoding", "chunked");
 	byte[] b2 = response.toString ().getBytes ("ASCII");
 	ByteBuffer buffer = ByteBuffer.wrap (b2);
 	BufferHandle bh = new SimpleBufferHandle (buffer);
