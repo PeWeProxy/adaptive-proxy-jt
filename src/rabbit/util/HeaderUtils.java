@@ -9,6 +9,7 @@ import rabbit.http.HttpHeader;
 
 public final class HeaderUtils {
 	private static final NumberFormat nf = NumberFormat.getNumberInstance(Locale.US);
+	private static final String TE_CHUNKED = "chunked";
 	
 	private HeaderUtils() {}
 	
@@ -89,5 +90,18 @@ public final class HeaderUtils {
 			}
     	}
     	return null;
+    }
+    
+    public static void removeChunkedEncoding(HttpHeader header) {
+    	String teHeader = header.getHeader("Transfer-Encoding");
+    	if (teHeader.toLowerCase().endsWith(TE_CHUNKED)) {
+    		teHeader = teHeader.substring(0, teHeader.length()-TE_CHUNKED.length()).trim();
+    		if (teHeader.charAt(teHeader.length()) == ',')
+    			teHeader = teHeader.substring(0, teHeader.length()-1);
+    	}
+    	if (teHeader.trim().isEmpty())
+    		header.removeHeader("Transfer-Encoding");
+    	else
+    		header.setHeader("Transfer-Encoding",teHeader);
     }
 }

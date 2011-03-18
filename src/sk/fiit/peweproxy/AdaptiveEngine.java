@@ -804,6 +804,8 @@ public class AdaptiveEngine  {
 		Connection con = conHandle.con;
 		HttpHeader header = conHandle.response.getHeader().getBackedHeader();
 		con.setChunking(ConnectionSetupResolver.isChunked(header));
+		if (!con.getChunking())
+			HeaderUtils.removeChunkedEncoding(header);
 		con.fixResponseHeader(header, conHandle.handler.changesContentSize());
 	}
 	
@@ -1304,7 +1306,8 @@ public class AdaptiveEngine  {
 			// conHandle.rpLateProcessing was set to transfer in transferResponse()
 			boolean mayProcess = !conHandle.rpLateProcessing;
 			if (conHandle.rpLateProcessing) {
-				mayProcess = ConnectionSetupResolver.isChunked(conHandle.response.getHeader().getBackedHeader());
+				// proxy's response header was modified by HttpOutFilters !
+				mayProcess = ConnectionSetupResolver.isChunked(conHandle.response.originalMessage().getHeader().getBackedHeader());
 				if (!mayProcess) {
 					if (ConnectionSetupResolver.chunkingPossible(conHandle.request.originalMessage().getHeader().getBackedHeader())) {
 						mayProcess = isModifyingNeed(conHandle, ResponseChunksProcessingPlugin.class, responseChunksPlugins, new DesiredServicesGetter<ResponseChunksProcessingPlugin>() {

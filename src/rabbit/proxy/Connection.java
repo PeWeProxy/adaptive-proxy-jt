@@ -39,6 +39,7 @@ import rabbit.io.CacheBufferHandle;
 import rabbit.io.ProxyChain;
 import rabbit.io.Resolver;
 import rabbit.util.Counter;
+import rabbit.util.HeaderUtils;
 import sk.fiit.peweproxy.headers.HeaderWrapper;
 
 /** The base connection class for rabbit.
@@ -619,6 +620,7 @@ public class Connection {
 	    		header.setHeader ("Transfer-Encoding", "chunked");
     	    } else {
     	    	setChunking (false);
+    	    	HeaderUtils.removeChunkedEncoding(header);
     	    }
     	} else {
     	    if (getKeepalive ()) {

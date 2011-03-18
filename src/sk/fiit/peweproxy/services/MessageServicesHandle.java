@@ -23,10 +23,15 @@ public abstract class MessageServicesHandle<ModuleType extends ProxyPlugin> exte
 	boolean dataAccessible() {
 		return httpMessage.bodyAccessible();
 	}
+	
+	@Override
+	boolean isReadOnly() {
+		return httpMessage.isReadOnly();
+	}
 
 	@Override
-	public boolean isReadOnly() {
-		return tempReadOnly || httpMessage.isReadOnly();
+	public boolean inReadOnlyState() {
+		return tempReadOnly || super.inReadOnlyState();
 	}
 	
 	void setReadOnly() {

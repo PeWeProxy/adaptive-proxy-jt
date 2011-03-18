@@ -698,17 +698,17 @@ public abstract class ServicesHandleBase<ModuleType extends ProxyPlugin> impleme
 		if ((svcInfo.serviceClass == ModifiableStringService.class
 				|| svcInfo.serviceClass == ModifiableBytesService.class)) {
 			if (isReadOnly()) {
-				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
+				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Content modifying services are" +
 						" unavilable for read-only "+getLogTextType(), null);
 				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
 						+" service for "+getLogTextNormal()+" because the "+getLogTextType()+" is read-only");
 				throw e;
 			}
 			if (inReadOnlyState()) {
-				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Conent modifying services are" +
-						"unavilable when discovering services", null);
+				ServiceUnavailableException e = new ServiceUnavailableException(svcInfo.serviceClass, "Content modifying services are" +
+						"unavilable when in temporary rean-only state", null);
 				log.info(getLogTextHead()+"ServiceUnavailableException raised when asked for "+svcInfo.serviceClass.getSimpleName()
-						+" service for "+getLogTextNormal()+" because we are discovering services now");
+						+" service for "+getLogTextNormal()+" because handle is in temporary read-only state");
 				throw e;
 			}
 		}
