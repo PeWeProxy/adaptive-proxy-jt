@@ -11,6 +11,8 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.khelekore.rnio.impl.Closer;
+import org.khelekore.rnio.impl.DefaultTaskIdentifier;
+
 import rabbit.http.HttpDateParser;
 import rabbit.http.HttpHeader;
 import rabbit.httpio.HttpHeaderSender;
@@ -33,6 +35,8 @@ import rabbit.zip.GZipPacker;
 public class FileSender implements MetaHandler, HttpHeaderSentListener {
 	private static final String PREFIX_GZIP = "gzip_";
 	private static final String POSTFIX_GZIP = ".zip";
+	private static final short MAX_ITERATIONS = 100;
+	
     private Connection con;
     private TrafficLogger tlClient;
     private TrafficLogger tlProxy;
@@ -41,6 +45,8 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     private long length;
     private final Logger logger = Logger.getLogger (getClass ().getName ());
     private GZipPacker packer = null;
+    private short iteration = 0;
+    private String descr;
 
     public void handle (HttpHeader request,
 			SProperties htab,
@@ -131,16 +137,18 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     
     private void prepareGzipFile(final String urlPath, final File sourceFile, final Date ifModifiedSince) throws IOException {
     	// example: "htdocs/some_paths/gzip_some_script.js"
+    	descr = sourceFile.getAbsolutePath();
     	String fileName = sourceFile.getName();
     	final File gzipSource= new File(sourceFile.getParentFile(),fileName.concat(POSTFIX_GZIP));
     	if (!gzipSource.exists() || sourceFile.lastModified() != gzipSource.lastModified()) {
-    		final byte[] buffer = new byte[4096];
+    		final byte[] inBuffer = new byte[4096];
+    		final byte[] outBuffer = new byte[4096];
     		final FileInputStream inStream = new FileInputStream(sourceFile);
     		final FileOutputStream outStream = new FileOutputStream(gzipSource);
     		packer = new GZipPacker(new GZipPackListener() {
     			@Override
     			public byte[] getBuffer () {
-    			    return buffer;
+    			    return outBuffer;
     			}
 				
 				@Override
@@ -154,7 +162,7 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
 					try {
 						if (len > 0)
 							outStream.write(buf, off, len);
-						getNextData(buffer, inStream);
+						getNextDataSafe(inBuffer, inStream);
 					} catch (IOException e) {
 						failed(e);
 					}
@@ -182,9 +190,28 @@ public class FileSender implements MetaHandler, HttpHeaderSentListener {
     		if (!packer.needsInput())
     			packer.handleCurrentData();
     		else
-    			getNextData(buffer, inStream);
+    			getNextData(inBuffer, inStream);
     	} else
     		sendHeader(urlPath, gzipSource, ifModifiedSince, true);
+    }
+    
+    private void getNextDataSafe(final byte[] buf, final InputStream inStream) throws IOException {
+    	if (iteration == MAX_ITERATIONS) {
+    		iteration = 0;
+    		con.getNioHandler().runThreadTask(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						getNextData(buf, inStream);
+					} catch (IOException e) {
+						failed(e);
+					}
+				}
+			}, new DefaultTaskIdentifier(getClass().getSimpleName()+" gzipping", descr));
+    	} else {
+    		iteration++;
+    		getNextData(buf, inStream);
+    	}
     }
     
     private void getNextData(byte[] buf, InputStream inStream) throws IOException {
