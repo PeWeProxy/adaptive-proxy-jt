@@ -93,8 +93,10 @@ public class PluginsIntegrationManager {
 	
 	
 	public void setPluginEnabled(HttpMessageImpl<?> message, String pluginName, Class<? extends ProxyPlugin> pluginType, boolean enabled) {
+		if (!togglingEnabled)
+			return;
 		String userId = message.userIdentification();
-		if (!togglingEnabled || userId == null)
+		if (userId == null)
 			return;
 		if (pluginType == null)
 			throw new IllegalArgumentException("Plugin type can not be null");

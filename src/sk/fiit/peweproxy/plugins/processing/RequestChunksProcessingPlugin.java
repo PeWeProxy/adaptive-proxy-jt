@@ -23,7 +23,6 @@ public interface RequestChunksProcessingPlugin extends RequestChunksPlugin {
 	 * request's body in this method in rare situations when such services are available at
 	 * this time.
 	 * @param request full-access request message to process
-	 * @return signal for further processing of a request
 	 */
 	void startRequestProcessing(ModifiableHttpRequest request);
 	
@@ -37,7 +36,7 @@ public interface RequestChunksProcessingPlugin extends RequestChunksPlugin {
 	 * processing, send no data to the web destination and proceed in reading next request
 	 * chunk.
 	 * @param request read-only request message containing already sent data
-	 * @param chunkServiceshandle chunk services handle for full access to the chunk data
+	 * @param chunkServicesHandle chunk services handle for full access to the chunk data
 	 */
 	void processRequestChunk(HttpRequest request, ChunkServicesHandle chunkServicesHandle);
 	
@@ -49,7 +48,7 @@ public interface RequestChunksProcessingPlugin extends RequestChunksPlugin {
 	 * of finalizing of chunk processing by all plugins, thus this method is always called
 	 * on every request chunks processing plugin.
 	 * @param request read-only request message containing already sent data
-	 * @param chunkServiceshandle chunk services handle for full access to the remaining content
+	 * @param chunkServicesHandle chunk services handle for full access to the remaining content
 	 */
 	void finalizeRequestProcessing(HttpRequest request, ChunkServicesHandle chunkServicesHandle);
 }

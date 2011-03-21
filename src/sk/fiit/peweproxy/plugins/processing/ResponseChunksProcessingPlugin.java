@@ -35,7 +35,7 @@ public interface ResponseChunksProcessingPlugin extends ResponseChunksPlugin {
 	 * other chunk plugins. Setting it to <code>null</code> signals that it should end chunk
 	 * processing, send no data to the client and proceed in reading next response chunk. 
 	 * @param response read-only response message containing already sent data
-	 * @param chunkServiceshandle chunk services handle for full access to the chunk data
+	 * @param chunkServicesHandle chunk services handle for full access to the chunk data
 	 */
 	void processResponseChunk(HttpResponse response, ChunkServicesHandle chunkServicesHandle);
 	
@@ -47,7 +47,7 @@ public interface ResponseChunksProcessingPlugin extends ResponseChunksPlugin {
 	 * of finalizing of chunk processing by all plugins, thus this method is always called
 	 * on every response chunks processing plugin.
 	 * @param response read-only response message containing already sent data
-	 * @param chunkServiceshandle chunk services handle for full access to the remaining content
+	 * @param chunkServicesHandle chunk services handle for full access to the remaining content
 	 */
 	void finalizeResponseProcessing(HttpResponse response, ChunkServicesHandle chunkServicesHandle);
 }

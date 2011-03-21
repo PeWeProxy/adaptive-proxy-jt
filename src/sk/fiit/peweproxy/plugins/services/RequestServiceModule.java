@@ -2,8 +2,9 @@ package sk.fiit.peweproxy.plugins.services;
 
 import java.util.Set;
 
+import sk.fiit.peweproxy.headers.RequestHeader;
 import sk.fiit.peweproxy.messages.HttpRequest;
-import sk.fiit.peweproxy.plugins.FullRequestPlugin;
+import sk.fiit.peweproxy.plugins.ProxyPlugin;
 import sk.fiit.peweproxy.services.ProxyService;
 import sk.fiit.peweproxy.services.ServiceUnavailableException;
 
@@ -17,7 +18,19 @@ import sk.fiit.peweproxy.services.ServiceUnavailableException;
  * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
  *
  */
-public interface RequestServiceModule extends FullRequestPlugin {
+public interface RequestServiceModule extends ProxyPlugin {
+	/**
+	 * Called by platform to get services (their classes) over request message that this request
+	 * service module wishes to be able to get and use later during message processing. This set is
+	 * used to decide whether there is a need for the basic data services and the proxy server
+	 * should precache all request body data before processing phase. For convenience, an empty set
+	 * is passed so that a plugin only needs to fill it with desired services (their interfaces).
+	 * @param desiredServices set to be filled with classes of desired services
+	 * @param clientRQHeader read-only request header
+	 */
+	void desiredRequestServices(Set<Class<? extends ProxyService>> desiredServices,
+			RequestHeader clientRQHeader);
+	
 	/**
 	 * Called by platform to get services (their classes) which this request service module is
 	 * able to provide implementation for, depending on particular request messages context. For
