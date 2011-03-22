@@ -101,12 +101,8 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 		// this method in that case is illegal
 	}
 	
-	public <T, Service extends ProxyService> void ceaseContent(Service byService, T chunkPart) {
-		ceaseContentInternal(byService, chunkPart);
-	};
-	
 	@SuppressWarnings("unchecked")
-	public <T, Service extends ProxyService> void ceaseContentInternal(Service byService, T chunkPart) {
+	public <T, Service extends ProxyService> void ceaseContent(Service byService, T chunkPart) {
 		/*if (moduleExecutingProvide == null) {
 			log.debug("Attempt to cease data outside of provideService() method, ignoring");
 			throw new IllegalStateException("Calling ceaseContent() is allowed from provideService() method only");
@@ -123,7 +119,7 @@ public abstract class ChunkServicesHandleImpl<ModuleType extends ProxyPlugin> ex
 			// TODO statistics maybe
 			svcProvider.ceaseContent(chunkPart, this);
 		}
-	};
+	}
 	
 	abstract <Service extends ProxyService> void callDoChanges(ChunkServiceProvider<?, Service> svcProvider);
 	
