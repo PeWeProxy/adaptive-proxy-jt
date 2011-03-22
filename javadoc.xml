@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <project default="javadoc">
-	<property name="dest_dir" value="htdocs/pewepropxy_javadoc"/>
+	<property name="dest_dir" value="htdocs/peweproxy_javadoc"/>
 	<property name="tmp_dir" value="api_tmp"/>
 	
 	<target name="-extract_api">
@@ -9,19 +9,23 @@
         		excludes="**/HeaderWrapper.java,**/EventsHandler.java,
         			**/BaseServiceProvider.java,**/PluginHandler.java,
         			**/ModulesManager.java,**/ServicesHandleBase.java,
-        		    **/AdaptiveEngine.java,**/RequestContentCahcedListener.java">
+        		    **/MessageServicesHandle.java,**/AdaptiveEngine.java,
+        		    **/PluginsIntegrationManager.java,**/PluginsThreadPool.java,
+        		    **/MessageAccessAspect.aj,**/PluginConfigurationException.java">
         		<exclude name="**/*Impl.java"/>
         		<exclude name="/utils/**"/>
+        		<exclude name="src/sk/fiit/peweproxy/plugins/services/impl/**"/>
         	</fileset>
 		</copy>
-	</target>
 		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/doc-files" overwrite="true">
 	    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/>
 	    		<filelist dir="./src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
 		</copy>
 		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/processing/doc-files" overwrite="true">
 		    		<filelist dir="./plugins" files="plugins_ordering"/>
-			</copy>
+		</copy>
+	</target>
+	
     <target name="javadoc" depends="-extract_api" description="Generates JavaDoc for AdaptiveProxy API classes">
     	<delete dir="${dest_dir}"/>
         <javadoc access="package" author="true"
