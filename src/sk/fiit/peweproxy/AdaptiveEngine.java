@@ -353,8 +353,7 @@ public class AdaptiveEngine  {
 			if (result.action != null) // other than PROCEED returned
 				conHandle.rqResult = result;
 			boolean rqSendingChunked = isChunked || prefetch;
-			if (!rqSendingChunked) {
-				// if prefetch = true, chunk processing will take place
+			if (!rqSendingChunked && result.action == null) {
 				rqSendingChunked = isModifyingNeed(conHandle, RequestChunksProcessingPlugin.class, requestChunksPlugins
 						, new DesiredServicesGetter<RequestChunksProcessingPlugin, RequestProcessingActions>() {
 					@Override
@@ -1365,7 +1364,6 @@ public class AdaptiveEngine  {
 			log.trace("RP: "+conHandle+" | Handler "+handler.toString()+" used for response "+conHandle.response
 					+" on " +conHandle.request.getHeader().getBackedHeader().getRequestLine());
 		if (handler instanceof AdaptiveHandler) {
-			// conHandle.rpLateProcessing was set to transfer in transferResponse()
 			boolean mayProcess = !conHandle.rpLateProcessing && conHandle.rpResult.action == null;
 			if (conHandle.rpLateProcessing && conHandle.rpResult.action == null) {
 				// proxy's response header was modified by HttpOutFilters !
