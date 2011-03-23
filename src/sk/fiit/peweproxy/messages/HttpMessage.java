@@ -20,7 +20,7 @@ public interface HttpMessage {
 	/**
 	 * Returns whether body data of this HTTP message is accessible. Returning <code>false
 	 * </code> does not mean that this message does not carry any body data, just that the
-	 * proxy server has not body data prefetched.
+	 * proxy server has not prefetched body data.
 	 * @return whether body data of this message is accessible
 	 */
 	boolean bodyAccessible();

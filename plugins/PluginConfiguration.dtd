@@ -1,6 +1,6 @@
 <!--
 	Plugin's configuration. XML files in plugins home directory (see proxy conf file)
-	conforming this schema represents single pluggable Adaptive Proxy plugin that will
+	conforming this schema represents single pluggable AdaptiveProxy plugin that will
 	be loaded (instantiated and configured) and treated as single plugin entity. Such
 	file reference single class exposed by plugin in form of relative path to the plugins
 	bundle (binaries) and name of the exposed class that is present within the bundle.

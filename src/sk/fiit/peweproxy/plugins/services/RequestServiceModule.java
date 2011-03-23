@@ -42,7 +42,7 @@ public interface RequestServiceModule extends ProxyPlugin {
 	void getProvidedRequestServices(Set<Class<? extends ProxyService>> providedServices);
 	
 	/**
-	 * Returns request service provider that provide implementation of requested service
+	 * Returns request service provider that provides implementation of requested service
 	 * identified by passed <code>serviceClass</code> over passed request message.
 	 * If this request service module is unable to provide the service over this
 	 * request message, returns <code>null</code>.

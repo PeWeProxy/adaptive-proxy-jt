@@ -14,15 +14,14 @@
         		    **/MessageAccessAspect.aj,**/PluginConfigurationException.java">
         		<exclude name="**/*Impl.java"/>
         		<exclude name="/utils/**"/>
-        		<exclude name="src/sk/fiit/peweproxy/plugins/services/impl/**"/>
         	</fileset>
 		</copy>
 		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/doc-files" overwrite="true">
-	    		<filelist dir="./plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/>
-	    		<filelist dir="./src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
+	    		<filelist dir="plugins" files="PluginConfiguration.dtd,VariablesConfiguration.dtd"/>
+	    		<filelist dir="src/sk/fiit/peweproxy/plugins" files="best_practices.html"/>
 		</copy>
 		<copy todir="${tmp_dir}/sk/fiit/peweproxy/plugins/processing/doc-files" overwrite="true">
-		    		<filelist dir="./plugins" files="plugins_ordering"/>
+		    		<filelist dir="plugins" files="plugins_ordering"/>
 		</copy>
 	</target>
 	
@@ -32,9 +31,9 @@
         	classpath="libs/log4j-zeroconf.jar;libs/antlr-3.2.jar;libs/rnio-1.jar;
         		libs/jargs.jar;libs/log4j-1.2.15.jar;libs/cpdetector_1.0.7.jar;
         		libs/commons-lang-2.5.jar;libs/aspectjrt.jar;
-        		libs/chardet.jar;libs/dnsjava-2.0.7.jar"
+        		libs/chardet.jar;libs/dnsjava-2.1.0.jar"
         	destdir="${dest_dir}"
-        	doctitle="Adaptive Proxy" nodeprecated="false" nodeprecatedlist="false"
+        	doctitle="AdaptiveProxy" nodeprecated="false" nodeprecatedlist="false"
         	noindex="false" nonavbar="false" notree="false"
         	overview="${tmp_dir}/sk/fiit/peweproxy/overview.html" source="1.6"
         	splitindex="true" use="true" version="true"
@@ -46,7 +45,9 @@
         	    sk.fiit.peweproxy.plugins.processing,
         	    sk.fiit.peweproxy.plugins.services,
         	    sk.fiit.peweproxy.services,
-        	    sk.fiit.peweproxy.services.content"/>
+        	    sk.fiit.peweproxy.services.content,
+        	    sk.fiit.peweproxy.services.platform,
+        	    sk.fiit.peweproxy.services.user"/>
     	<delete dir="${tmp_dir}"/>
     </target>
 </project>

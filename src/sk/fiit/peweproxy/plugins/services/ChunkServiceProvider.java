@@ -3,6 +3,12 @@ package sk.fiit.peweproxy.plugins.services;
 import sk.fiit.peweproxy.services.DataHolder;
 import sk.fiit.peweproxy.services.ProxyService;
 
+/**
+ * Base interface for all chunk service providers. Chunks service provider is an entity that
+ * provides particular service implementation over chunk of body data of particular HTTP message.
+ * @author <a href="mailto:redeemer.sk@gmail.com">Jozef Tomek</a>
+ *
+ */
 public interface ChunkServiceProvider<Type, Service extends ProxyService> extends ServiceProvider<Service> {
 	/**
 	 * Store data representing passed <i>chunkPart</i> for later joining with data of the next chunk. This

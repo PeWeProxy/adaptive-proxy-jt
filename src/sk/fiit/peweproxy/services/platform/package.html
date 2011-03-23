@@ -1,0 +1,48 @@
+<html>
+<head>
+<title>AdaptiveProxy</title>
+<body>
+Contains specifications for services involved into the plugins toggling mechanism in
+AdaptiveProxy platform. Plugins toggling enables plugins to enable or disable integration
+of other loaded plugins into the process of handling of HTTP messages of specific users
+at places where they are used as being of specific proxy plugin type. Integration for all types
+of plugins other than service modules can be toggled, at places where service modules are
+queried to provide functionality, always every loaded service module is used.
+<p>
+{@link sk.fiit.peweproxy.services.platform.PlatformContextService} is provided by the
+AdaptiveProxy platform and enables plugins to examine and change integration statuses of other
+plugins.
+{@link sk.fiit.peweproxy.services.platform.PluginsTogglingService} is to be provided by
+plugged-in 3rd party service modules to provide AdaptiveProxy platform with blacklists
+of plugins (plugins that are disabled for specific type for same user) retrieved from their
+custom external persistent storages.
+<p>
+For performance purposes, AdaptiveProxy platform internally stores integration flags for every
+loaded plugin, for every plugin type it can act as, for every recognized user. 
+<p>
+When the new request message arrives, AdaptiveProxy platform asks plugged-in service modules
+providing {@link sk.fiit.peweproxy.services.user.UserIdentificationService} to return unique
+identifier of the user that initiated the message. When one is obtained (at least one of such
+service modules returns non-<code>null</code> user id), platform will try to find existing
+integration flags for this user whenever plugins are about to be queried to act as specific
+proxy plugin type in the process of handling the message.
+<p>
+When no such data are stored in the platform's internal storage, the platform queries <u>all</u>
+plugged-in service modules providing
+{@link sk.fiit.peweproxy.services.platform.PluginsTogglingService} to return blacklists - the set
+of names of the plugins that are disabled for being used as target plugin type. Resulting sets
+are combined and stored in the internal storage.
+<p>
+Next time the message initiated by the same user is received, integration data is already present
+in the internal storage and no blacklist gathering is performed. When no loaded implementation of
+<code>UserIdentificationService</code> is able to identify the user, all loaded plugins are
+always enabled for every one of the plugin types supported by the particular plugin.
+<p> 
+Platform's internal integration flags storage is always cleared right after the platform loads
+the plugins, that is when the proxy starts or when the plugins reloading is requested through administration
+meta-page).
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

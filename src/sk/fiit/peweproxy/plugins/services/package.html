@@ -1,27 +1,44 @@
 <html>
 <head>
-<title>Adaptive Proxy</title>
+<title>AdaptiveProxy</title>
 <body>
 Contains interfaces for pluggable services modules.
 A service module is an external (3rd party) component that provides a service, therefore
-knows how to work with HTTP message. It's purpose is to provide implementation(s) of 
-particular service(s) that know how to gather particular information from a message or
-how to modify a message to carry the information other plugin (processing plugin or
-another module) wants to. These implementations can directly read and modify HTTP header
-of the message being processed, but can access it's body (if any) only indirectly by
-requesting other services present for that message (see
-{@link sk.fiit.peweproxy.services.ServicesHandle}) and calling their methods.
+knows how to work with HTTP message or part of it's body. It's purpose is to provide
+implementation(s) of particular service(s) that know how to gather particular information
+from a message / message body chunk or how to modify a message / message body chunk to carry
+the information other plugin (processing plugin or another module) wants to. There are two
+types of service modules, <b>full message service modules</b> that provide services over
+entire HTTP messages and <b>message chunks service modules</b> that provide services over
+parts or chunks of bodies of HTTP messages.
+<p>
+Implementations of full message services can directly read and modify HTTP header of the
+message being processed, but can access it's body (if any) only indirectly by requesting
+other services present for that message (see {@link sk.fiit.peweproxy.services.ServicesHandle})
+and calling their methods.
+<p>
+Implementations of message chunks services can directly read data already sent - HTTP header
+and already sent chunks of body of the message being transfered and can access the content
+of the chunk being processed indirectly by requesting other services present for that chunk
+(see {@link sk.fiit.peweproxy.services.ChunkServicesHandle}) and calling their methods.
 <p>
 Modules made to provide services over HTTP requests expose classes implementing
-{@link sk.fiit.peweproxy.plugins.services.RequestServiceModule}
-interface. Modules made to provide services over HTTP responses expose classes
-implementing {@link sk.fiit.peweproxy.plugins.services.ResponseServiceModule} interface.
+{@link sk.fiit.peweproxy.plugins.services.RequestServiceModule} or
+{@link sk.fiit.peweproxy.plugins.services.RequestChunksServiceModule} interface. Modules made
+to provide services over HTTP responses expose classes implementing
+{@link sk.fiit.peweproxy.plugins.services.ResponseServiceModule} or
+{@link sk.fiit.peweproxy.plugins.services.ResponseChunksServiceModule} interface.
 <p>
 When a request / response HTTP message is processed (real-time or late message processing)
-by the Adaptive Proxy platform, a representation of the HTTP message is passed sequentially
-to all successfully loaded request / response processing plugins. To read or modify processed
-message, these plugins need to use services available over that message obtained from
-message's {@link sk.fiit.peweproxy.services.ServicesHandle}, thus use active modules
+by the AdaptiveProxy platform, a representation of the HTTP message is passed sequentially
+to all successfully loaded full request / response processing plugins. To read or modify
+processed message, these plugins need to use services available over that message obtained
+from message's {@link sk.fiit.peweproxy.services.ServicesHandle}, thus use active modules
+indirectly. Also when a request / response body chunks are processed, all successfully
+loaded request / response chunks processing plugins are sequentially provided with chunk
+context (data already sent and actual chunk content). To read or modify chunk content, these
+plugins need to use services available over that message body chunk obtained from provided
+{@link sk.fiit.peweproxy.services.ChunkServicesHandle}, thus use active chunk modules
 indirectly.
 <p>
 <b>Service implementation providing</b><br>
@@ -31,14 +48,14 @@ provides service implementation that is an instance that implements service defi
 interface and that will be returned to other plugins when they ask for that service. Having
 service provider as a wrapper for a service implementation, and not only the implementation
 directly, is needed to isolate service usage from introducing changes made by the service
-implementation into the actual message data.
+implementation into the actual message / chunk data.
 <p>
-Since it's ineffective to write changes, caused by using service, to the message data
+Since it's ineffective to write changes, caused by using service, to the message / chunk
 every single time any method of a service is called, service implementations are expected
-to operate on their own inner model of a message, that is written to the message data
-later when needed. Adaptive Proxy platform itself keeps watching when it's time to do
+to operate on their own inner model of a message, that is written to the message / chunk
+later when needed. AdaptiveProxy platform itself keeps watching when it's time to do
 that. When its the right time, it is the service provider who introduce changes made in
-the inner model of its service implementation to the actual message data. For more
+the inner model of its service implementation to the actual message / chunk. For more
 information on requesting service providers and signaling service providers to introduce
 changes to the actual message data, see
 {@link sk.fiit.peweproxy.plugins.services.ServiceProvider} and it's subclasses.
@@ -56,16 +73,16 @@ provider, based on actual message data. For example based on whether a message i
 page of Google, Bing, Yahoo, or other search portal supported by module. 
 <p>
 <b>Discovering available services</b><br>
-Adaptive Proxy platform keeps list of zero or many references to created and provided
+AdaptiveProxy platform keeps list of zero or many references to created and provided
 service implementations inner models of which are considered up to date. If this list is
 not empty, it either holds one or more service implementations inner models of which
 are exact transformations of actual message data, or it holds single service
 implementation inner model of which was modified so it is not exact transformation of
 current message data it was built from.
 <p>
-Every time a plugin tries to access the message in a way that would make returned
-information inaccurate, the modified inner model of some service implementation, if there
-is such in the list, is written back to the actual message data, and the list is cleared
+Every time a plugin tries to access the message / chunk in a way that would make returned
+information inaccurate, the modified inner model of such service implementation, if there
+is one in the list, is written back to the actual message / chunk, and the list is cleared
 first. This is when plugin tries to read or write HTTP header or use some service
 implementation other than only one with up to date inner mode (if there is one).
 <p>
@@ -73,18 +90,42 @@ Only when an implementation of requested service or service being used is not in
 list (was not created and considered with up to date inner model), modules that are able
 to provide that service are requested one by one to return service provider providing
 implementation of that service. This is the situation when read only representation of a
-HTTP message is passed to modules and they are not expected / allowed to modify it in any
-way. That's why base services modifying a message (
+HTTP message / message body chunk is passed to modules and they are not expected / allowed
+to modify it in any way. That's why base services modifying a message (
 {@link sk.fiit.peweproxy.services.content.ModifiableBytesService} and
 {@link sk.fiit.peweproxy.services.content.ModifiableStringService}) won't be available
-during this querying, which means that no message modifying services will be available.
-First time any module return non <code>null</code> service provider, its service
+during this querying, which means that no message / chunk content modifying services will be
+available. First time any module return non <code>null</code> service provider, its service
 implementation is added to the list of implementations with up to date inner model.
 Providing a service implementation itself can be a process that ends with service
 implementation inner model of which is not exact transformation of the actual message data
 it was built from. In such cases, service provider is expected to signal this (see
 {@link sk.fiit.peweproxy.plugins.services.ServiceProvider#initChangedModel()}).
 <p>
+<b>Handling data split into multiple chunks</b><br>
+Since message body chunks being processed are of different random lengths depending on
+multiple factors (size of chunks sent by the message source, speed of the connection vs.
+speed of the chunks handling in the proxy, size of the internal buffers used by the proxy),
+chunks service modules need to expect that entities in the context of the service may be /
+will be split into multiple subsequent chunks. During service providing, when the service
+module detects that this is the case, it is expected to save the trailing content of the
+chunk that does not form the last complete entity recognized in the chunk - thus being the
+heading of the next entity that is broken into multiple chunks, using <i>data holder</i>.
+It does so by calling
+{@link sk.fiit.peweproxy.services.DataHolder#ceaseContent(ProxyService, Object)}, passing
+a service used to get the lower-level content of the entire chunk and part of this content
+that should be ceased until it can be joined with the next chunk.
+<p>
+To make abstract content ceasing functionality available, a service implementation - chunk
+service provider need to be able to handle ceasing parts of its own content (parts of the
+abstract representation of the chunk). It does so in its 
+{@link sk.fiit.peweproxy.plugins.services.ChunkServiceProvider#ceaseContent(Object, DataHolder)}
+method also by calling <code>ceaseContent</code> method of provided data holder and passing
+content of the underlying service that represents / forms passed content to cease, and the
+underlying service that was used to get such underlying content when this service provider was
+created.
+<p>
+<b>Readonly services</b><br>
 Platform also differentiates two types of methods of the services based on what type of
 access to the inner model of the service implementation (thus message itself) do they
 provide - read only methods and modifying methods. To distinguish whether a method is
@@ -94,6 +135,13 @@ definition (service interface) or a service implementation (provided by service 
 is annotated with this <code>readonly</code> flag, platform will not clear list of
 up to date service implementations, since it consider method to only read inner model of
 the service implementation without modifying it in any way.
+<p>
+For services that, once constructed, do not depend on or change the data of a particular HTTP
+message / message body chunk in any way, <code>readonly</code> annotation should be used on
+service definition interface. This way AdaptiveProxy platform would know it can omit message
+/ chunk guarding mechanism entirely and calling methods of that service won't fire commit of
+the changes made by other services to make the data of the HTTP message / message body chunk
+actual.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

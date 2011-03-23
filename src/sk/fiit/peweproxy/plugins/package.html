@@ -1,8 +1,8 @@
 <html>
 <head>
-<title>Adaptive Proxy</title>
+<title>AdaptiveProxy</title>
 <body>
-Contains interfaces for pluggable Adaptive Proxy plugins.
+Contains interfaces for pluggable AdaptiveProxy plugins.
 A plugin is an external (3rd party) component that adds some new functionality to the Adaptive
 Proxy platform. To be pluggable into the platform, a plugin bundle must expose a class that
 implements at least one <b>processing plugin</b> interface
@@ -19,7 +19,6 @@ chunks processing plugins</i> that are processing only chunks of messages bodies
 received from the source of the message. Processing plugins are provided with services by HTTP
 message's services handle (see {@link sk.fiit.peweproxy.services.ServicesHandle} and
 {@link sk.fiit.peweproxy.services.ChunkServicesHandle})
- 
 <p>
 <b>Modules</b> or service modules are plugins that provide implementation of particular
 services to other plugins. Their purpose is to know how to get or modify information from / of
@@ -28,7 +27,7 @@ of service modules, <i>full message service modules</i> that provide services ov
 and <i>message chunks service modules</i> that provide services over chunks of messages bodies'
 data.
 <p>
-Adaptive Proxy also distinguishes two types of processing plugins and modules, those plugged into
+AdaptiveProxy also distinguishes two types of processing plugins and modules, those plugged into
 the process of handling of HTTP requests and those for HTTP responses handling.
 <p>
 <b>Event plugins</b> are plugins that are notified by the platform when particular event (e.g.
@@ -38,10 +37,16 @@ This package contains common interafce for all plugins (see
 {@link sk.fiit.peweproxy.plugins.ProxyPlugin}) that define the way a plugin is loaded,
 configured and started. For more details on plugin's life cycle, see methods of this class,
 namely {@link sk.fiit.peweproxy.plugins.ProxyPlugin#start(PluginProperties)}
-method.
+method. Besides the base plugin interface, this package also contains common interfaces for all
+request (see {@link sk.fiit.peweproxy.plugins.RequestChunksPlugin}) and response (see
+{@link sk.fiit.peweproxy.plugins.ResponseChunksPlugin}) chunks plugins, that define the way a
+request / response chunks plugins (processing chunks plugins and chunks modules) are asked for
+services they want to be available over the HTTP message chunks later in the chunks processing.
+For description of chunks processing see see {@link sk.fiit.peweproxy.plugins.processing}
+documentation.
 <p>
 <b>Plugin's configuration</b><br>
-For the Adaptive Proxy platform, a plugin is a combination of <b>plugin's configuration
+For the AdaptiveProxy platform, a plugin is a combination of <b>plugin's configuration
 file</b> (XML file) in plugins home directory and a plugin bundle (plugin's binaries).
 Plugin configuration file contains path to the bundle and the name of exactly one class 
 in the bundle that will be loaded and instantiated to become an active plugin entity.
@@ -62,122 +67,6 @@ file, all plugins can access global configuration parameters called <b>variables
 defined in single variables file "<i>variables.xml</i>" in the plugins home directory. For
 more information on creating valid variables file, see
 <a href="doc-files/VariablesConfiguration.dtd">Variables configuration schema</a>.
-
-<h3><i>Full message processing</i></h3>
-<b>Real-time vs. late full message processing</b><br>
-Data of the HTTP messages are transfered in chunks of bytes as the source of the message sends
-more bytes through the connection with the proxy. The most straightforward implementation of
-<i>transparent proxy</i> server (see
-<a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec1.html#sec1.3"> RFC 2616: 1.3
-Terminology</a>) reads whole HTTP header first, processes it, and then just transfers (sents
-bytes as they are being received) the message body to destination. This is also the fastest
-way to successfully proxy a HTTP message. To allow plugins to read and modify <u>whole</u>
-message content (header and body data) <u>at once</u>, Adaptive Proxy platform (obviously a
-<i>non-transparent proxy</i>) have to cache all incoming data of the message first and just
-then run message processing. This means that message destination won't receive any message
-data (neither header nor body data) until all plugins successfully processed the message what
-slows down overall message exchange. This way the message handling time is increased from
-the time it takes the slower node (source or target of the message) to handle (read / write) all
-data to time it takes both nodes to handle data together plus time it takes plugins to process
-the message.
-<p>
-This is unavoidable if at least one full message processing plugin wants to modify a message. But
-when there's no such plugin, and all full message processing plugins just want to read the
-message without modifying it, the platform may use faster data transfer mechanism with caching
-data passing through, and then run message processing on cached data. This is where Adaptive
-Proxy platform differentiates <i>real-time message processing</i> and <i>late messageprocessing
-</i>. 
-<p>
-<u>Real-time message processing</u> is run every time a message is handled before any data of
-the message is sent to destination.
-<p>
-When no full message processing plugin wants to modify the message body, it's run just after the
-message header is received. During this real-time processing, plugins (processing plugins and
-modules) are allowed to read and / or change the header, but no services that depend on body of
-the message being processed will be available. After processing, the message header is sent and
-the platform starts to transfer message body, if any. In cases when some plugin constructs
-response during this processing, no data is sent to the destination web resource, but proxy reads
-and caches all incoming data of the request body, if any, runs request late processing and then
-starts the process of handling of constructed response as if it was received by the web resource.
-<p>
-When some plugin wants to modify message body, after the message header is received the
-platform starts to cache incoming message body data. After all message data has been received
-and cached, it runs this real-time processing, during which plugins can read and / or modify
-both header and body content (through services). After processing, the message si late processed
-and then it's header is sent followed by message body data.
-<p>
-<u>Late message processing</u> is run every time after all data of the message that was sent or
-will be sent is available.
-<p>
-To simplify the realization of plugins, that are interested in processing original messages
-(as received from the client or web resource) or messages that were actually sent, late processing
-is also run every time. It's run in time when all data of both original message and actual
-message that was sent is available. During late processing only read only representation of a
-HTTP message is passed to plugins as they are not expected / allowed to modify it in any way.
-<p>
-<b>Desired services discovery</b><br>
-The decision whether there will be whole message body accessible during real-time processing
-(thus if there will be slowdown in message handling), is made by asking all plugins, if any one
-wishes to modify the message, based on received HTTP header of the message. This is recognized
-as need of 2 base content modifying services, <code>ModifiableBytesService</code> and
-<code>ModifiableStringService</code> (see {@link sk.fiit.peweproxy.services.content}).
-<p>
-When a HTTP header for incoming request / response message is received (before any
-message body data is read), Adaptive Proxy platform requests every full request / response
-processing plugin to return a list of services (their definitions, i.e. interfaces of
-those services) it would like to be able to use later in the processing phase. If it
-finds one of these 2 services in the lists, there is a plugins that wants to modify the
-message body, so that whole body has to be available during real-time processing.
-<p>
-If these base services are not find in the lists, platform then checks whether these services
-aren't "desired indirectly". This is when a plugin (processing plugin or a module), in order
-to do what it is made for, wants to be able to use some other service, which could be in turn
-provided by plugged-in module if it could use one of these 2 base services, even "indirectly".
-If one of these 2 services is "desired indirectly", there is a plugins that wants to modify
-the message, so that whole body has to be available during real-time processing.
-
-<h3><i>Message chunks processing</i></h3>
-<b>Chunks processing</b><br>
-In case of plugin that doesn't need to alter message according to whole message body content, but
-only need to modify certain part of the message body (e.g. append some text, or replace some
-text in specific part of the page), there's no need to cache the whole message body first, what
-slows down message handling significantly. In those cases, plugin only need to be allowed to
-modify parts or chunks of the message body as they are read from the connection with the source
-of the message. This way, the handling time of the message is only increased by the time it
-takes the plugins to process all chunks of transfered message body.
-<p>
-As stated above, data of the bodies of HTTP messages being proxied is also transfered through the
-proxy server in chunks. The most basic way in which message body (carried within the message) is
-delimited from following bytes of subsequent messages sent through the connection, is by
-specifying message body length explicitly in the message header. In communication of HTTP/1.1
-compliant hosts on the Internet however, bodies of the HTTP messages could also be and often are
-self-delimited by using using specific transfer method (e.g. "chunked" transfer encoding, using 
-boundary for multipart data types or by termination of connection, for more details see
-<a href="http://tools.ietf.org/html/rfc2616#section-4.4"> RFC 2616: 4.4 Message Length</a>,
-). When such method is used, there's no need to explicitly specify message body length in the
-message header, and the possibility to alter data of the message body by the AdaptiveProxy
-platform after it has already sent message header becomes available.
-<p>
-When the AdaptiveProxy platform can modify the message body without corrupting it (i.e.
-introducing inconsistency of length specified in header and actual length), it will call loaded
-message chunks processing plugins to process the chunks of the body of message being transfered,
-so that they can change the chunk. Like in case of full message processing, message chunks
-processing plugins can modify the content of the chunks through services provided by chunk
-service modules.
-<p>
-<b>Desired services discovery</b><br>
-Querying all message chunks processing plugins for desired services is done by Adaptive Proxy
-platform in cases, when the body of the message is not self-delimiting (so that modification of
-the message's body without altering it's header first would corrupt the message) and the target
-of the message would able to handle self-delimited message. It's done to find out whether some
-chunks plugin wants to be able to modify chunks being transfered so that the platform can change
-the header sent before chunk processing accordingly. 
-<p>
-Besides the base plugin interface, this package also contains common interfaces for all request
-(see {@link sk.fiit.peweproxy.plugins.RequestChunksPlugin}) and response (see
-{@link sk.fiit.peweproxy.plugins.ResponseChunksPlugin}) chunks plugins, that define the way a
-request / response chunks plugins (processing chunks plugins or chunks modules) are asked for
-services they want to be available over the HTTP message chunks later in the chunks processing.
 </body>
 <address>
 <a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>

@@ -1,0 +1,16 @@
+<html>
+<head>
+<title>AdaptiveProxy</title>
+<body>
+Contains single services definition of
+{@link sk.fiit.peweproxy.services.user.UserIdentificationService} that is to be provided by
+plugged-in 3rd party service modules to provide AdaptiveProxy platform and other plugins with
+the unique identifiers of the users that initiated the messages. When such user id is needed by
+the platform, the platform queries all loaded service modules that provides this service to
+return user identification until some returns non-<code>null</code> value. Resulting value is
+stored for further queries.
+</body>
+<address>
+<a href="mailto:redeemer.sko@gmail.com">Jozef Tomek</a>
+</address>
+</html>

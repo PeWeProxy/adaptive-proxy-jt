@@ -1,15 +1,15 @@
 <html>
 <head>
-<title>Adaptive Proxy</title>
+<title>AdaptiveProxy</title>
 <body>
-Contains specifications for base services over HTTP messages.
+Contains specifications for base services over HTTP messages or messages bodies parts.
 There are 4 base services, specifications and implementations of which are part of
-the Adaptive Proxy platform itself. These services are present (when possible) to provide
+the AdaptiveProxy platform itself. These services are present (when possible) to provide
 lowest level access to the HTTP message data for processing plugins and other services
 (modules).
 <p>
-All four services provide access to the message entity data that are properly
-"transfer-decoded" and "content-decoded" beforehand (see
+All four services provide access to the all or some of the message entity data that are
+properly "transfer-decoded" and "content-decoded" beforehand (see
 <a href="http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.2">RFC 2616: 7.2
 Entity Body</a>).
 <p>
@@ -27,23 +27,24 @@ to the same entity data as <code>StringContentService</code>.
 <code>StringContentService</code> will be provided during:
 <ul>
 <li>discovering services (see {@link sk.fiit.peweproxy.plugins.services})</li>
-<li>real-time processing of a message by plugins</li>
-<li>committing changes to the message</li>
+<li>real-time processing of a message or chunk processing of message part by plugins</li>
+<li>committing changes to the message or message body chunk</li>
 <li>late processing of a message by plugins</li>
 </ul>
-for every request message that has a body (carries and entity) and response message that has a
-body (carries and entity) and is / was handled by AdaptiveHandler.
+for every request message body chunk / message that has a body (carries and entity), and response
+message body chunk / message that has a body (carries and entity) and is / was handled by
+AdaptiveHandler.
 <p>
 <i>Conent modifying services</i>, <code>ModifiableBytesService</code> and
 <code>ModifiableStringService</code>
 will be provided while:
 <ul>
-<li>real-time processing of a message by plugins</li>
-<li>committing changes to the message</li>
+<li>real-time processing of a message or chunk processing of message part by plugins</li>
+<li>committing changes to the message or message body chunk</li>
 </ul>
-for every <u>non read-only</u> (see {@link sk.fiit.peweproxy.messages}) request message that
-has a body (carries and entity) and response message that has a body (carries and entity) and
-is / was handled by AdaptiveHandler.
+for every <u>non read-only</u> (see {@link sk.fiit.peweproxy.messages}) request message body chunk
+/ message that has a body (carries and entity), and response message body chunk / message that
+has a body (carries and entity)  and is / was handled by AdaptiveHandler.
 <p>
 A response is handled by AdaptiveHandler depending on it's "Content-Type" HTTP header and
 proxy configuration (see proxy conf file, <code>Handlers</code> section).
