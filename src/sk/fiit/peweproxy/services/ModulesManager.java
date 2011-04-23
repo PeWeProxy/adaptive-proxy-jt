@@ -61,6 +61,8 @@ public class ModulesManager {
 	}
 	
 	public void initPlugins(PluginHandler pluginHandler) {
+		providedRqServices.clear();
+		providedRpServices.clear();
 		log.info("Loading request service modules");
 		initPlugins(RequestServiceModule.class, rqModules, providedRqServices, new ProvidedServicesGetter<RequestServiceModule>() {
 			@Override
@@ -107,7 +109,6 @@ public class ModulesManager {
 			, Map<ProxyPlugin, Set<Class<? extends ProxyService>>> providedServicesMap
 			, ProvidedServicesGetter<ModuleType> providedSvcsGetter) {
 		modulesList.clear();
-		providedServicesMap.clear();
 		modulesList.addAll(adaptiveEngine.getPluginHandler().getPlugins(modulesClass));
 		for (ModuleType module : modulesList) {
 			Set<Class<? extends ProxyService>> providedServices = null;
