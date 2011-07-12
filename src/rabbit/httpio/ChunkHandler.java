@@ -2,6 +2,8 @@ package rabbit.httpio;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.StringTokenizer;
 import rabbit.io.BufferHandle;
 import rabbit.io.SimpleBufferHandle;
@@ -54,39 +56,8 @@ public class ChunkHandler {
      */
     public void handleData (BufferHandle bufHandle) {
 	try {
-	    ByteBuffer buffer = bufHandle.getBuffer ();
 	    if (needChunkSize ()) {
-		buffer.mark ();
-		if (!readTrailingCRLF && totalRead > 0) {
-		    if (buffer.remaining () < 2) {
-			feeder.readMore ();
-			return;
-		    }
-		    readOffCRLF (buffer);
-		    buffer.mark ();
-		}
-		LineReader lr = new LineReader (strictHttp);
-		lr.readLine (buffer, new ChunkSizeHandler ());
-		if (currentChunkSize == 0) {
-		    readFooter (bufHandle);
-		} else if (currentChunkSize > 0) {
-		    readFromChunk = 0;
-		    handleChunkData (bufHandle);
-		} else {
-		    buffer.reset ();
-		    if (buffer.position () > 0) {
-			feeder.readMore ();
-		    } else {
-			if (checkChunkSizeAndExtension (buffer)) {
-			    // rest of buffer is a huge extension that we
-			    // do not recognize, so we ignore it...
-			    feeder.readMore ();
-			} else {
-			    String err = "failed to read chunk size";
-			    listener.failed (new IOException (err));
-			}
-		    }
-		}
+		tryToReadChunkSize (bufHandle);
 	    } else if (readExtension) {
 		tryToReadExtension (bufHandle);
 	    } else {
@@ -97,6 +68,42 @@ public class ChunkHandler {
 	    }
 	} catch (BadChunkException e) {
 	    listener.failed (e);
+	}
+    }
+
+    private void tryToReadChunkSize (BufferHandle bufHandle) {
+	ByteBuffer buffer = bufHandle.getBuffer ();
+	buffer.mark ();
+	if (!readTrailingCRLF && totalRead > 0) {
+	    if (buffer.remaining () < 2) {
+		bufHandle.possiblyFlush ();
+		feeder.readMore ();
+		return;
+	    }
+	    readOffCRLF (buffer);
+	    buffer.mark ();
+	}
+	LineReader lr = new LineReader (strictHttp);
+	lr.readLine (buffer, new ChunkSizeHandler ());
+	if (currentChunkSize == 0) {
+	    readFooter (bufHandle);
+	} else if (currentChunkSize > 0) {
+	    readFromChunk = 0;
+	    handleChunkData (bufHandle);
+	} else {
+	    buffer.reset ();
+	    if (buffer.position () > 0) {
+		feeder.readMore ();
+	    } else {
+		if (checkChunkSizeAndExtension (buffer)) {
+		    // rest of buffer is a huge extension that we
+		    // do not recognize, so we ignore it...
+		    feeder.readMore ();
+		} else {
+		    String err = "Failed to read chunk size";
+		    listener.failed (new IOException (err));
+		}
+	    }
 	}
     }
 
@@ -147,23 +154,29 @@ public class ChunkHandler {
 	int leftInChunk = currentChunkSize - readFromChunk;
 	int thisChunk = Math.min (remaining, leftInChunk);
 	if (thisChunk == 0) {
+	    bufHandle.possiblyFlush ();
 	    feeder.readMore ();
 	    return;
 	}
-	readFromChunk += thisChunk;
-	totalRead += thisChunk;
 	if (thisChunk < remaining) {
-	    ByteBuffer copy = buffer.duplicate ();
-	    int nextPos = buffer.position () + thisChunk;
-	    copy.limit (nextPos);
-	    buffer.position (nextPos);
-	    if (readFromChunk == currentChunkSize) {
-		currentChunkSize = -1;
-		readTrailingCRLF = false;
+	    // Grab all chunks and merge them into one chunk
+	    List<ByteBuffer> chunks = getAllChunks (bufHandle, thisChunk);
+	    if (chunks.size () > 1) {
+		int size = 0;
+		for (ByteBuffer buf : chunks)
+		    size += buf.remaining ();
+		ByteBuffer chunksData = ByteBuffer.allocate (size);
+		for (ByteBuffer buf : chunks)
+		    chunksData.put (buf);
+		chunksData.flip ();
+		listener.bufferRead (new SimpleBufferHandle (chunksData));
+	    } else {
+		listener.bufferRead (new SimpleBufferHandle (chunks.get (0)));
 	    }
-	    listener.bufferRead (new SimpleBufferHandle (copy));
 	} else {
 	    // all the rest of the current buffer
+	    readFromChunk += thisChunk;
+	    totalRead += thisChunk;
 	    if (readFromChunk == currentChunkSize) {
 		currentChunkSize = -1;
 		readTrailingCRLF = false;
@@ -172,12 +185,64 @@ public class ChunkHandler {
 	}
     }
 
+    /** Get all the chunks that we can from the current buffer.
+     *  We do this since we risk getting stack overflow when the
+     *  buffer contains many tiny chunks.
+     * @param bufHandle the BufferHandle to the buffer we are currently reading
+     * @param thisChunk the size of the current chunk
+     * @return the ByteBuffers with the chunk data
+     */
+    private List<ByteBuffer> getAllChunks (BufferHandle bufHandle,
+					   int thisChunk) {
+	List<ByteBuffer> ret = new ArrayList<ByteBuffer> ();
+	ByteBuffer buffer = bufHandle.getBuffer ();
+	do {
+	    ByteBuffer copy = buffer.duplicate ();
+	    int nextPos = buffer.position () + thisChunk;
+	    copy.limit (nextPos);
+	    buffer.position (nextPos);
+	    ret.add (copy);
+	    readFromChunk += copy.remaining ();
+	    totalRead += readFromChunk;
+
+	    readTrailingCRLF = false;
+	    if (readFromChunk == currentChunkSize) {
+		currentChunkSize = -1;
+		readFromChunk = 0;
+	    }
+
+	    if (buffer.remaining () < 2)
+		break;
+	    readOffCRLF (buffer);
+	    readTrailingCRLF = true;
+	    thisChunk = getSizeOfNextChunk (bufHandle);
+	    thisChunk = Math.min (thisChunk,
+				  buffer.remaining ());
+	} while (thisChunk > 0);
+	return ret;
+    }
+
+    private int getSizeOfNextChunk (BufferHandle bufHandle) {
+	ByteBuffer buffer = bufHandle.getBuffer ();
+	if (buffer.remaining () < 2)
+	    return -1;
+	buffer.mark ();
+	LineReader lr = new LineReader (strictHttp);
+	lr.readLine (buffer, new ChunkSizeHandler ());
+	if (currentChunkSize == -1) {
+	    buffer.reset ();
+	}
+	return currentChunkSize;
+    }
+
     private void readOffCRLF (ByteBuffer buffer) throws BadChunkException {
+	int pos = buffer.position ();
 	byte b1 = buffer.get ();
 	byte b2 = buffer.get ();
 	if (!(b1 == '\r' && b2 == '\n'))
-	    throw new BadChunkException ("F to read CRLF: " +
-					 (int)b1 + ", " + (int)b2);
+	    throw new BadChunkException ("Failed to read CRLF: " +
+					 (int)b1 + ", " + (int)b2 +
+					 ", pos: " + pos);
 	readTrailingCRLF = true;
     }
 
@@ -190,10 +255,12 @@ public class ChunkHandler {
 	    elh = new EmptyLineHandler ();
 	    lr.readLine (buffer, elh);
 	    if (!elh.lineRead ()) {
+		bufHandle.possiblyFlush ();
 		feeder.readMore ();
 		return;
 	    }
 	} while (!elh.ok ());
+	bufHandle.possiblyFlush ();
 	listener.finishedRead ();
     }
 
@@ -236,7 +303,8 @@ public class ChunkHandler {
 		    throw new BadChunkException (err, e);
 		}
 	    } else {
-		throw new BadChunkException ("Chunk size is not available.");
+		throw new BadChunkException ("Chunk size is not available: " +
+					     "line: " + line);
 	    }
 	}
     }

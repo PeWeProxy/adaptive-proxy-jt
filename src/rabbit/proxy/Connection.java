@@ -141,7 +141,6 @@ public class Connection {
 	clearStatuses ();
 	proxy.getAdaptiveEngine().newRequestAttempt(this);
 	try {
-	    channel.socket ().setTcpNoDelay (true);
 	    HttpHeaderListener clientListener = new RequestListener ();
 	    HttpHeaderReader hr =
 		new HttpHeaderReader (channel, requestHandle, getNioHandler (),
@@ -217,7 +216,7 @@ public class Connection {
     }
 
     private void requestRead (HttpHeader request, BufferHandle bh,
-			      boolean isChunked, long dataSize) {
+			      final boolean isChunked, final long dataSize) {
 	if (request == null) {
 	    logger.warning ("Got a null request");
 	    closeDown ();
@@ -264,8 +263,16 @@ public class Connection {
 		    if (ct != null)
 		    	separator = readMultiPart (ct);
 	    }
-
-	    filterAndHandleRequest(separator,dataSize,isChunked);
+	    final ContentSeparator sep = separator;
+	    TaskIdentifier ti =
+		new DefaultTaskIdentifier (getClass ().getSimpleName () +
+					   ".filterAndHandleRequest: ",
+					   request.getRequestURI ());
+	    getNioHandler ().runThreadTask (new Runnable () {
+		    public void run () {
+				filterAndHandleRequest(sep,dataSize,isChunked);
+		    }
+		}, ti);
 	} catch (Throwable t) {
 	    handleInternalError (t);
 	}
@@ -297,8 +304,6 @@ public class Connection {
     /** Filter the request and handle it.
      * @param header the request
      */
-    // TODO: filtering here may block! be prepared to run filters in a
-    // TODO: separate thread.
     private void filterAndHandleRequest (ContentSeparator separator, long dataSize, boolean isChunked) {
 	// Filter the request based on the header.
 	// A response means that the request is blocked.
@@ -361,16 +366,7 @@ public class Connection {
 	status = "Handling request";
 	final RequestHandler rh = new RequestHandler (this);
 	if (proxy.getCache ().getMaxSize () > 0) {
-	    // memory consistency is guarded by the underlying SynchronousQueue
-	    TaskIdentifier ti =
-		new DefaultTaskIdentifier (getClass ().getSimpleName () +
-					   ".fillInCacheEntries: ",
-					   proxyRequest.getRequestURI ());
-	    getNioHandler ().runThreadTask (new Runnable () {
-		    public void run () {
-			fillInCacheEntries (rh);
-		    }
-		}, ti);
+	    fillInCacheEntries (rh);
 	} else {
 	    handleRequestBottom (rh);
 	}

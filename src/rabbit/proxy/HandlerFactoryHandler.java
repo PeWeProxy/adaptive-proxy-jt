@@ -24,10 +24,11 @@ class HandlerFactoryHandler {
     
     public HandlerFactoryHandler (SProperties handlersProps, 
 				  SProperties cacheHandlersProps, 
-				  Config config) {
+				  Config config,
+				  HttpProxy proxy) {
 	handlersForNames = new HashMap<String, HandlerFactory>();
-	handlers = loadHandlers (handlersProps, config);
-	cacheHandlers = loadHandlers (cacheHandlersProps, config);
+	handlers = loadHandlers (handlersProps, config, proxy);
+	cacheHandlers = loadHandlers (cacheHandlersProps, config, proxy);
     }
 
     private static class HandlerInfo {
@@ -58,21 +59,23 @@ class HandlerFactoryHandler {
      * @return a Map with mimetypes as keys and Handlers as values.
      */
     protected List<HandlerInfo> loadHandlers (SProperties handlersProps,
-					      Config config) {
+					      Config config,
+					      HttpProxy proxy) {
 	List<HandlerInfo> hhandlers = new ArrayList<HandlerInfo> ();
 	if (handlersProps == null)
 	    return hhandlers;
 	for (String handler : handlersProps.keySet ()) {
 	    HandlerFactory hf;
 	    String id = handlersProps.getProperty (handler).trim ();
-	    hf = setupHandler (id, config, handler);
+	    hf = setupHandler (id, config, handler, proxy);
 	    hhandlers.add (new HandlerInfo (handler, hf));
 	}
 	return hhandlers;
     }
 
     private HandlerFactory setupHandler (String id, Config config, 
-					 String handler) {
+					 String handler,
+					 HttpProxy proxy) {
 	String className = id;
 	HandlerFactory hf = handlersForNames.get(id);
     if (hf != null) {
@@ -83,9 +86,9 @@ class HandlerFactoryHandler {
 	    if (i >= 0)
 		className = id.substring (0, i);
 	    Class<? extends HandlerFactory> cls = 
-		Class.forName (className).asSubclass (HandlerFactory.class);
+		proxy.load3rdPartyClass (className, HandlerFactory.class);
 	    hf = cls.newInstance ();
-	    hf.setup (config.getProperties (id));
+	    hf.setup (config.getProperties (id), proxy);
 	} catch (ClassNotFoundException ex) {
 	    logger.log (Level.WARNING, 
 		       "Could not load class: '" + className

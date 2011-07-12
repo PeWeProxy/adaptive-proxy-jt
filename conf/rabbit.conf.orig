@@ -20,6 +20,12 @@ port=9666
 # If not specified will use the same as the number of processors
 #num_selector_threads=4
 
+# This specifies the directory that rabbit will look in for
+# 3:rd party libraries. Specify the directories and rabbit will
+# add all jar files found in them. Default is the libs-dir.
+# Separate entries with the path separator ":" (linux/unix) or ";" (windows)
+#libs=libs
+
 # This is the proxy that RabbIT should use when getting its files.
 # Leave it blank to don't have a proxy.
 # Both of these need to be set, or they will be ignored.
@@ -89,10 +95,18 @@ access_log_level=INFO
 error_log_level=INFO
 
 
+[data_sources]
+# Specify the DataSource configuration here, one resource for each
+# different database. If you have only one database with say both
+# users and host blocking then you only need one resource
+#resources=user_database,host_blocker
+resources=
+
 [dns]
 # Select the dns handler to use. 
 # DNSJavaHandler is fully threaded but may fail on some machines.
 # DNSSunHandler should work for more people, but is not threaded.
+# If you are on windows then the Sun-version will always be used.
 dnsHandler=rabbit.dns.DNSJavaHandler
 #dnsHandler=rabbit.dns.DNSSunHandler
 
@@ -245,6 +259,8 @@ accessfilters=rabbit.filter.AccessFilter
 #                  since rabbit can repack gzip:ed and deflated files.
 # RevalidateFilter A filter that makes sure that resources are always re-validated
 # SetHeaderFilter  A filter that can add request or response headers.
+# SQLBlockFilter   A filter similar to BlockFilter, but that uses a sql database to block
+#                  access to a set of hosts
 #
 # by default we use a few filters, 
 httpinfilters=rabbit.filter.HttpBaseFilter,rabbit.filter.DontFilterFilter,rabbit.filter.BlockFilter,rabbit.filter.RevalidateFilter
@@ -364,6 +380,17 @@ blockURLmatching=(\.sex\.|[-.]ad([sx]?)\.|/ad\.|adserving\.|ad101com-|pagead/img
 # only allow access to these urls
 #allowURLmatching=(www\.)?somesite.com/
 
+
+[rabbit.filter.SQLBlockFilter]
+# return a 403 forbidden for the requests that have a host found in 
+# a database
+# The resource must match a loaded resource
+resource=jdbc/host_blocker
+user=
+password=
+select=select 1 from bad_hosts where hostname = ?
+
+
 [rabbit.filter.HttpSnoop]
 # mode can be one of NORMAL, REQUEST_LINE, FULL
 # mode defaults to NORMAL if not specified
@@ -393,16 +420,9 @@ authenticator=plain
 # For plain text file authentication:
 userfile=conf/allowed
 
-# The driver to use: 
-# org.gjt.mm.mysql.Driver for mysql
-# org.hsqldb.jdbcDriver for hssql
-# org.apache.derby.jdbc.ClientDriver for derby
-driver=
-# The url to use for the database, something like:
-# jdbc:oracle:thin:@//myhost:1521/orcl for an oracle db
-# jdbc:hsqldb:hsql://localhost for a hssql
-# jdbc:derby://localhost:1527/dbname
-url=
+# The database resource to use, must match a loaded resource
+#resource=jdbc/host_blocker_database
+resource=
 # The database user, may be blank
 user=
 # The database password, may be blank
@@ -555,3 +575,33 @@ adreplacer=http://$proxy/FileSender/public/NoAd.gif
 [rabbit.filter.LowresImageFilter]
 # A filter that removes the lowres attributes from the img-tags.
 # This filter (currently) has no configuration options.
+
+
+[user_database]
+# Configure the resource for the user database
+# Please drop the needed jar-files in one of the directories given by
+# the libs-entry in the rabbit.proxy.HttpProxy-section.
+#
+#class=com.mysql.jdbc.jdbc2.optional.MysqlConnectionPoolDataSource
+#DataSource=oracle.jdbc.OracleDataSource
+class=org.apache.derby.jdbc.ClientConnectionPoolDataSource40
+# The name to bind to
+bind_name=java:comp/env/jdbc/user_database
+# The set-methods to call, if any, check the documentation for your DataSource
+# Here you can also call setup methods on the DataSource
+# check the manual for your DataSource and then add a <method>=<value> to
+# call that method. Currently the values can only be strings, but that
+# may be changed in the future.
+setServerName=userDatabase
+setDatabaseName=database
+#setUser=
+#setPassword=
+#For oracle you probably want to set the url
+#url=jdbc:oracle:thin:@127.0.0.1:1521:mysid
+
+
+[host_blocker]
+class=org.apache.derby.jdbc.ClientConnectionPoolDataSource40
+bind_name=java:comp/env/jdbc/host_blocker_database
+setServerName=hostBlockerDatabase
+setDatabaseName=database

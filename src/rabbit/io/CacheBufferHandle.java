@@ -19,17 +19,19 @@ public class CacheBufferHandle implements BufferHandle {
 	this.bh = bh;
     }
 
-    public boolean isEmpty () {
+    public synchronized boolean isEmpty () {
 	return buffer == null || !buffer.hasRemaining ();
     }
     
-    public ByteBuffer getBuffer () {
+    public synchronized ByteBuffer getBuffer () {
 	if (buffer == null)
 	    buffer = bh.getBuffer ();
 	return buffer;
     }
     
-    public ByteBuffer getLargeBuffer () {
+    public synchronized ByteBuffer getLargeBuffer () {
+	if (buffer != null && isLarge (buffer))
+	    return buffer;
 	buffer = bh.growBuffer (buffer);
 	return buffer;
     }
@@ -38,7 +40,7 @@ public class CacheBufferHandle implements BufferHandle {
 	return bh.isLarge (buffer);
     }
 
-    public void possiblyFlush () {
+    public synchronized void possiblyFlush () {
 	if (!mayBeFlushed)
 	    throw new IllegalStateException ("buffer may not be flushed!: " +
 					     System.identityHashCode (buffer));
@@ -50,7 +52,7 @@ public class CacheBufferHandle implements BufferHandle {
 	}
     }
 
-    public void setMayBeFlushed (boolean mayBeFlushed) {
+    public synchronized void setMayBeFlushed (boolean mayBeFlushed) {
 	this.mayBeFlushed = mayBeFlushed;
     }
 

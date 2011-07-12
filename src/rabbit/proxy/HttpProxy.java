@@ -17,12 +17,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.naming.NamingException;
 import org.khelekore.rnio.NioHandler;
 import org.khelekore.rnio.StatisticsHolder;
 import org.khelekore.rnio.impl.Acceptor;
 import org.khelekore.rnio.impl.AcceptorListener;
 import org.khelekore.rnio.impl.BasicStatisticsHolder;
 import org.khelekore.rnio.impl.MultiSelectorNioHandler;
+import org.khelekore.rnio.impl.SimpleThreadFactory;
 import rabbit.cache.Cache;
 import rabbit.cache.NCache;
 import rabbit.dns.DNSHandler;
@@ -52,7 +54,7 @@ import sk.fiit.peweproxy.AdaptiveEngine;
 public class HttpProxy {
 
     /** Current version */
-    public static final String VERSION = "RabbIT proxy version 4.8";
+    public static final String VERSION = "RabbIT proxy version 4.10";
 
     /** The current config of this proxy. */
     private Config config;
@@ -136,7 +138,11 @@ public class HttpProxy {
     
     private File cfgFile;
 
+    /** The factory for http header generator */
     private HttpGeneratorFactory hgf;
+
+    /** The ClassLoader to use when loading handlers*/
+    private ClassLoader libLoader;
 
     /** Create a new HttpProxy.
      * @throws UnknownHostException if the local host address can not
@@ -175,6 +181,13 @@ public class HttpProxy {
 	HttpDateParser.setOffset (getOffset ());
     }
 
+    private void setup3rdPartyClassLoader () {
+	ProxyClassLoaderHelper clh = new ProxyClassLoaderHelper ();
+	String libDirs = 
+	    config.getProperty (getClass ().getName (), "libs", "libs");
+	libLoader = clh.get3rdPartyClassLoader (libDirs);
+    }
+
     private void setupDNSHandler () {
 	/* DNSJava have problems with international versions of windows.
 	 * so we default to the default dns handler.
@@ -190,7 +203,7 @@ public class HttpProxy {
 				    DNSJavaHandler.class.getName ());
 	    try {
 		Class<? extends DNSHandler> clz =
-		    Class.forName (dnsHandlerClass).asSubclass (DNSHandler.class);
+		    load3rdPartyClass (dnsHandlerClass, DNSHandler.class);
 		dnsHandler = clz.newInstance ();
 		dnsHandler.setup (config.getProperties ("dns"));
 	    } catch (Exception e) {
@@ -223,7 +236,7 @@ public class HttpProxy {
     private ProxyChain setupProxyChainFromFactory (String pcf) {
 	try {
 	    Class<? extends ProxyChainFactory> clz =
-		Class.forName (pcf).asSubclass (ProxyChainFactory.class);
+		load3rdPartyClass (pcf, ProxyChainFactory.class);
 	    ProxyChainFactory factory = clz.newInstance ();
 	    SProperties props = config.getProperties (pcf);
 	    return 
@@ -273,6 +286,24 @@ public class HttpProxy {
 	}
 	if (proxyChain == null)
 	    proxyChain = new SimpleProxyChain (nioHandler, dnsHandler);
+    }
+
+    private void setupResources () {
+	SProperties props = config.getProperties ("data_sources");
+	if (props == null || props.isEmpty ())
+	    return;
+	String resources = props.getProperty ("resources", "");
+	if (resources.isEmpty ())
+	    return;
+	try {
+	    ResourceLoader rl = new ResourceLoader ();
+	    for (String r : resources.split (","))
+		rl.setupResource (r, config.getProperties (r), this);
+	} catch (NamingException e) {
+	    logger.log (Level.WARNING,
+			"Failed to setup initial context",
+			e);
+	}
     }
 
     private void setupCache () {
@@ -360,7 +391,7 @@ public class HttpProxy {
 					      "http_generator_factory", def);
 	try {
 	    Class<? extends HttpGeneratorFactory> clz =
-		Class.forName (hgfClass).asSubclass (HttpGeneratorFactory.class);
+		load3rdPartyClass (hgfClass, HttpGeneratorFactory.class);
 	    hgf = clz.newInstance ();
 	} catch (Exception e) {
 	    logger.log (Level.WARNING,
@@ -377,6 +408,7 @@ public class HttpProxy {
 	this.config = config;
 	setupLogging ();
 	setupDateParsing ();
+	setup3rdPartyClassLoader ();
 	setupDNSHandler ();
 	setupNioHandler ();
 	setupProxyConnection ();
@@ -387,6 +419,7 @@ public class HttpProxy {
 	String strictHttp = config.getProperty (cn, "StrictHTTP", "true");
 	setStrictHttp (strictHttp.equals ("true"));
 	setupMaxConnections ();
+	setupResources ();
 	setupCache ();
 	setupSSLSupport ();
 	loadClasses ();
@@ -473,17 +506,16 @@ public class HttpProxy {
     private void loadClasses () {
 	SProperties hProps = config.getProperties ("Handlers");
 	SProperties chProps = config.getProperties ("CacheHandlers");
-	handlerFactoryHandler =
-	    new HandlerFactoryHandler (hProps, chProps, config);
+	handlerFactoryHandler = new HandlerFactoryHandler (hProps, chProps, config, this);
 
 	String filters = config.getProperty ("Filters", "accessfilters","");
 	socketAccessController =
-	    new SocketAccessController (filters, config);
+	    new SocketAccessController (filters, config, this);
 
 	String in = config.getProperty ("Filters", "httpinfilters","");
 	String out = config.getProperty ("Filters", "httpoutfilters","");
 	String connect = config.getProperty ("Filters", "conectfilters","");
-	httpHeaderFilterer = new HttpHeaderFilterer (in, out, connect, config);
+	httpHeaderFilterer = new HttpHeaderFilterer (in, out, connect, config, this);
     }
 
 
@@ -491,7 +523,7 @@ public class HttpProxy {
     public void start () {
     	if (ssc != null) {
         	started = System.currentTimeMillis ();	
-        	nioHandler.start ();
+        	nioHandler.start (new SimpleThreadFactory());
         } else {
         	System.err.println("Proxy start failed: SocketChannel is not opened");
         }
@@ -737,6 +769,19 @@ public class HttpProxy {
      */
     public HttpGeneratorFactory getHttpGeneratorFactory () {
 	return hgf;
+    }
+
+    /** Load a 3:rd party class.
+     * @param name the fully qualified name of the class to load
+     * @param type the super type of the class
+     * @param <T> the type of the clas
+     * @return the loaded class
+     * @throws ClassNotFoundException if the class can not be found
+     */
+    public <T> Class<? extends T> load3rdPartyClass (String name,
+						     Class<T> type)
+	throws ClassNotFoundException {
+	return Class.forName (name, true, libLoader).asSubclass (type);
     }
     
     public AdaptiveEngine getAdaptiveEngine() {
