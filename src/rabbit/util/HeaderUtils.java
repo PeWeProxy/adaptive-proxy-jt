@@ -94,6 +94,8 @@ public final class HeaderUtils {
     
     public static void removeChunkedEncoding(HttpHeader header) {
     	String teHeader = header.getHeader("Transfer-Encoding");
+    	if (teHeader == null)
+    		return;
     	if (teHeader.toLowerCase().endsWith(TE_CHUNKED)) {
     		teHeader = teHeader.substring(0, teHeader.length()-TE_CHUNKED.length()).trim();
     		if (teHeader.charAt(teHeader.length()) == ',')
