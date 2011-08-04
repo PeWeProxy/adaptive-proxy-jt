@@ -17,9 +17,9 @@ public interface HttpResponse extends HttpMessage {
 	HttpRequest getRequest();
 
 	/**
-	 * Returns modifiable representation of HTTP response header of this response
+	 * Returns read-only representation of HTTP response header of this request
 	 * message.
-	 * @return modifiable HTTP response header
+	 * @return read-only HTTP response header
 	 */
 	ResponseHeader getResponseHeader();
 	
