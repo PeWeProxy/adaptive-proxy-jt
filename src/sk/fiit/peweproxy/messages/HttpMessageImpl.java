@@ -87,6 +87,13 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 		return data;
 	}
 	
+	public int getDataLenght() {
+		int retVal = 0;
+		if (getData() != null)
+			retVal = getData().length;
+		return retVal;
+	}
+	
 	public HandleType getServicesHandleInternal() {
 		return serviceHandle;
 	}

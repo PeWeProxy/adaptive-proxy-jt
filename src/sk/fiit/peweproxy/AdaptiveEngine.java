@@ -510,9 +510,9 @@ public class AdaptiveEngine  {
 	private void requestContentCached(final ConnectionHandle conHandle) {
 		if (log.isTraceEnabled()) {
 			if (conHandle.rqLateProcessing)
-				log.trace("RQ: "+conHandle+" | "+conHandle.request.originalMessage().getData().length+" bytes of request cached for late processing");
+				log.trace("RQ: "+conHandle+" | "+conHandle.request.originalMessage().getDataLenght()+" bytes of request cached for late processing");
 			else
-				log.trace("RQ: "+conHandle+" | "+conHandle.request.getData().length+" bytes of request cached for real-time processing");
+				log.trace("RQ: "+conHandle+" | "+conHandle.request.getDataLenght()+" bytes of request cached for real-time processing");
 		}
 		if (conHandle.rqLateProcessing) {
 			// full message late processing
@@ -871,11 +871,11 @@ public class AdaptiveEngine  {
 	public void responseContentCached(final ConnectionHandle conHandle, final AdaptiveHandler handler) {
 		if (conHandle.rpLateProcessing) {
 			if (log.isTraceEnabled())
-				log.trace("RP: "+conHandle+" | "+conHandle.response.originalMessage().getData().length+" bytes of response cached for late processing");
+				log.trace("RP: "+conHandle+" | "+conHandle.response.originalMessage().getDataLenght()+" bytes of response cached for late processing");
 			doResponseLateProcessing(conHandle);
 		} else {
 			if (log.isTraceEnabled())
-				log.trace("RP: "+conHandle+" | "+conHandle.response.getData().length+" bytes of response cached for real-time processing");
+				log.trace("RP: "+conHandle+" | "+conHandle.response.getDataLenght()+" bytes of response cached for real-time processing");
 			proxy.getNioHandler().runThreadTask(new Runnable() {
 				@Override
 				public void run() {
