@@ -462,6 +462,7 @@ public class AdaptiveEngine  {
 			, List<ProcessingPluginInstance<PluginType>> pluginList, final DesiredServicesGetter<PluginType, ActionType> getter
 			, boolean request, String logText) {
 		String msgType = (request) ? "RQ: " : "RP: ";
+		String msgTypeLong  = (request) ? "request" : "response";
 		ProcessType procType = (request) ? ProcessType.REQUEST_DESIRED_SERVICES : ProcessType.RESPONSE_DESIRED_SERVICES;
 		ModifyNeedResult<PluginType, ActionType> retVal = new ModifyNeedResult<PluginType, ActionType>();
 		Set<String> blacklistedPlugins = integrationManager.getBlackList(conHandle.request,pluginClass);
@@ -469,7 +470,7 @@ public class AdaptiveEngine  {
 		for (ProcessingPluginInstance<PluginType> rqPlgInstance : pluginList) {
 			if (blacklistedPlugins.contains(rqPlgInstance.plgInstance.getName())) {
 				if (log.isTraceEnabled())
-					log.trace(msgType+conHandle+" | Plugin "+rqPlgInstance+" skipped during"+logText+" services need discovery");
+					log.trace(msgType+conHandle+" | Plugin "+rqPlgInstance+" skipped during"+logText+" services need discovery for "+msgTypeLong);
 				continue;
 			}
 			try {
@@ -489,7 +490,7 @@ public class AdaptiveEngine  {
 				}
 				if (ServicesHandleBase.contentNeeded(pluginsDesiredSvcs)) {
 					if (log.isDebugEnabled())
-						log.debug(msgType+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for request"+logText);
+						log.debug(msgType+conHandle+" | Plugin "+rqPlgInstance+" wants content modifying service for "+msgTypeLong+logText);
 					retVal.modifyNeed = true;
 					break;
 				} else
@@ -502,7 +503,7 @@ public class AdaptiveEngine  {
 			retVal.modifyNeed = getter.resolveServices(desiredServices);
 		}
 		if (!retVal.modifyNeed && log.isDebugEnabled()) {
-			log.debug(msgType+conHandle+" | No plugin wants content modifying"+logText+" service for request"+logText);
+			log.debug(msgType+conHandle+" | No plugin wants content modifying"+logText+" service for "+msgTypeLong+logText);
 		}
 		return retVal;
 	}
