@@ -136,8 +136,11 @@ public abstract class HttpMessageImpl<HandleType extends ServicesHandle> impleme
 	}
 	
 	public String userIdentification() {
-		if (userId == VOID_USERID)
+		if (userId == VOID_USERID) {
+			if (log.isTraceEnabled())
+				log.trace(this+" trying to extract user identification");
 			userId = ((ServicesHandleBase<?>)serviceHandle).getUserId();
+		}
 		return userId;
 	}
 	
