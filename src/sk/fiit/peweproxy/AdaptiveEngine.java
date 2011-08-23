@@ -439,8 +439,10 @@ public class AdaptiveEngine  {
 					con.setProxyRHeader(headerToBeSent);
 					byte[] requestContent = conHandle.request.getData();
 					if (requestContent != null) {
-						// substitutive request with body was constructed
 						boolean isChunked = ConnectionSetupResolver.isChunked(headerToBeSent); // plugins can decide whether to chunk request body
+						if (!isChunked) {
+							headerToBeSent.setHeader("Content-Length", Integer.toString(requestContent.length, 10));
+						}
 						PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
 						// transfer constructed request body instead
 						handlerToUse = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
@@ -573,6 +575,7 @@ public class AdaptiveEngine  {
 								headerToBeSent.setHeader("Content-Length", Integer.toString(requestContent.length, 10));
 							}
 							PrefetchedContentSource contentSource = new PrefetchedContentSource(requestContent);
+							// transfer constructed request body instead
 							resourceHandler = new ClientResourceHandler(conHandle.con,contentSource,isChunked);
 						} else
 							HeaderUtils.removeContentHeaders(headerToBeSent);
