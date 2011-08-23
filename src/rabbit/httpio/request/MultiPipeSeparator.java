@@ -11,6 +11,11 @@ public class MultiPipeSeparator implements ContentSeparator {
 	}
 	
 	@Override
+	public boolean isAlreadyDone() {
+		return false;
+	}
+	
+	@Override
 	public byte separateData(BufferHandle bufHandle) {
 		mpp.parseBuffer(bufHandle.getBuffer());
 		return (mpp.isFinished()) ? VAL_SEPARATED_FINISHED : VAL_SEPARATED_UNFINISHED;

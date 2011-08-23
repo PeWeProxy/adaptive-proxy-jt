@@ -15,7 +15,12 @@ public abstract class ContentSource {
 	protected BlockListener listener;
 	
 	
-	public void readFirstBytes(BlockListener listener) {
+	/**
+	 * Starts the process of reading data from this content source by registering content
+	 * <code>listener</code> and calling {@link #readNextBytes()}.
+	 * @param listener content listener waiting for content data
+	 */
+	public final void readFirstBytes(BlockListener listener) {
 		this.listener = listener;
 		readNextBytes();
 	}

@@ -9,4 +9,6 @@ public interface ContentSeparator {
 	public static final byte VAL_SEPARATED_NEEDMOREDATA = 3;
 	
 	byte separateData(BufferHandle bufHandle) throws Exception;
+	
+	boolean isAlreadyDone();
 }

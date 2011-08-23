@@ -11,6 +11,11 @@ public class FixedLengthSeparator implements ContentSeparator {
 	public FixedLengthSeparator(long dataSize) {
 		this.dataSize = dataSize;
 	}
+	
+	@Override
+	public boolean isAlreadyDone() {
+		return dataSize == 0;
+	}
 
 	@Override
 	public byte separateData(BufferHandle bufHandle) {

@@ -26,6 +26,8 @@ public class DirectContentSource extends ContentSource {
 		this.tlh = tlh;
 		this.separator = separator;
 		this.chunksModifier = chunksModifier;
+		if (separator.isAlreadyDone())
+			allDataPassed = true;
 	}
 
 	@Override
