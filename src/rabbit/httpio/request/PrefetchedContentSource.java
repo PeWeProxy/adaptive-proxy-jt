@@ -5,16 +5,16 @@ import rabbit.io.SimpleBufferHandle;
 import sk.fiit.peweproxy.utils.InMemBytesStore;
 
 public class PrefetchedContentSource extends ContentSource {
-	private final ByteBuffer contentByffer; 
+	private final ByteBuffer contentBuffer; 
 	
 	public PrefetchedContentSource(byte[] contentData) {
-		contentByffer = ByteBuffer.wrap(contentData);
+		contentBuffer = ByteBuffer.wrap(contentData);
 	}
 	
 	@Override
 	void readNextBytes() {
-		if (contentByffer.hasRemaining()) {
-			listener.bufferRead(new SimpleBufferHandle(InMemBytesStore.chunkBufferForSend(contentByffer)));
+		if (contentBuffer.hasRemaining()) {
+			listener.bufferRead(new SimpleBufferHandle(InMemBytesStore.chunkBufferForSend(contentBuffer)));
 		} else
 			listener.finishedRead();
 	}
