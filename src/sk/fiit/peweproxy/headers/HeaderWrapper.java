@@ -120,6 +120,8 @@ public final class HeaderWrapper implements WritableRequestHeader, WritableRespo
 	
 	private String getDestionationInternal() {
 		String reqURI = backedHeader.getRequestURI();
+		if (reqURI.isEmpty())
+			return "N/A";
 		String host = backedHeader.getHeader("Host");
 		if (reqURI.charAt(0) == '/') {
 			// Podla RFC by proxy srv VZDY mal dostat plnu URI v Request-Line
