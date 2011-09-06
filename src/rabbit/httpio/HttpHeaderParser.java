@@ -83,7 +83,7 @@ public class HttpHeaderParser implements LineListener {
 			    getBufferStartString (buffer, 5));
 	    // Create a http/0.9 response...
 	    header = new HttpHeader ();
-	    return true;
+	    return false;
 	}
 
 	return true;
