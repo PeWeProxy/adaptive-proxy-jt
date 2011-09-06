@@ -135,11 +135,12 @@ public class HttpHeaderReader extends BaseSocketHandler
 		// a partial long line (cookie or whatever).
 		if (buffer.limit () < buffer.capacity ()) {
 		    // try to read some more
+			buffer.position (pos); // Redeemer: |MP~~~~~~L____C|, pos should be equal to limit
 		} else  if (isUsingSmallBuffer (buffer)) {
 		    // try to expand buffer
 		    buffer = getLargeBuffer ();
-		    buffer.position (pos);
-		    startParseAt = 0;
+		    buffer.position (pos); // Redeemer: |MP~~~~~~~~~~LC|, pos should be equal to limit
+		    //startParseAt = 0; // Redeemer: buffer.position() is 0 what means startParseAt has to be 0 too
 		} else {
 		    releaseBuffer ();
 		    // ok, we did no progress, abort, client is sending
