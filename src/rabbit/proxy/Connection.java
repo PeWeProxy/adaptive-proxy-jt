@@ -108,6 +108,8 @@ public class Connection {
     private final TrafficLoggerHandler tlh = new TrafficLoggerHandler ();
 
     private final Logger logger = Logger.getLogger (getClass ().getName ());
+    
+    private long bytesBeforeHeaderRead = -1;
 
     /** Create a new Connection
      * @param id the ConnectionId of this connection.
@@ -138,6 +140,8 @@ public class Connection {
     /** Read a request.
      */
     public void readRequest () {
+    if (clientRequest != null)	// this Connection handled some request before
+    	bytesBeforeHeaderRead = 0;
 	clearStatuses ();
 	proxy.getAdaptiveEngine().newRequestAttempt(this);
 	try {
@@ -187,7 +191,10 @@ public class Connection {
 	}
 
 	public void timeout () {
-	    readTimeout();
+		if (bytesBeforeHeaderRead != -1 && tlh.getClient().read() == bytesBeforeHeaderRead)
+			closeDown();
+		else
+			readTimeout();
 	}
 
 	public void failed (Exception e) {
